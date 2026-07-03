@@ -26,15 +26,15 @@ Depends on: Phase 0 (does not depend on Phase 1).
 Contains: color/spacing/radius/typography tokens (`DESIGN_SYSTEM.md`), category color-variant mapping function, core components (Card, Button, ProgressBar, CompletionControl, CategoryBadge, Sheet, EmptyState), base animation/haptics hooks (no feature wiring yet).
 Exit criterion: a component-preview screen (dev-only, excluded from production navigation) renders every primitive in its states; component tests cover CompletionControl's tap/long-press distinction (normal vs exceeded) since that interaction is safety-critical to get right early.
 
-### Phase 3 — Categories
-**Goal:** categories are fully functional end-to-end, as the smallest complete vertical slice (data + domain + UI) validating the whole stack before routines.
+### Phase 3 — Categories and Settings Shell
+**Goal:** categories are fully functional end-to-end, as the smallest complete vertical slice (data + domain + UI) validating the whole stack before routines; the Settings screen becomes real (it needs to exist as a target before Categories can link into it, and display-name editing is a standalone MVP requirement with no other natural home).
 Depends on: Phase 1, Phase 2.
-Contains: category repository, category service (including safe-delete reassignment flow), category management screen, create/edit category form using Phase 2 primitives.
-Exit criterion: user can create, edit, and safely delete a category (with reassignment prompt) on-device; deleting an assigned category never deletes the routines/tasks referencing it (no routines/tasks exist yet, so this is verified by a unit test on the service, plus a manual check once Phase 4 exists).
+Contains: category repository, category service (including safe-delete reassignment flow), category management screen, create/edit category form using Phase 2 primitives, Settings screen shell with display-name editing (an earlier draft of this plan omitted a task for this entirely, even though `docs/MVP_SCOPE.md` and `docs/SCREEN_SPECIFICATIONS.md` both list display name as a required Settings field).
+Exit criterion: user can create, edit, and safely delete a category (with reassignment prompt) on-device; deleting an assigned category never deletes the routines/tasks referencing it (no routines/tasks exist yet, so this is verified by a unit test on the service, plus a manual check once Phase 4/7 exist); user can edit and persist their display name from Settings.
 
 ### Phase 4 — Routine Domain Logic
 **Goal:** all routine scheduling and completion-state business rules exist and are proven correct in isolation, before any routine UI is built.
-Depends on: Phase 1 (schema), Phase 3 (category FK exists, though logic is UI-independent).
+Depends on: Phase 1 (schema) only — this logic is pure and never touches `category_id`, so it does not need Phase 3 (Categories) to exist and can be built in parallel with it. (An earlier draft of this plan listed Phase 3 as a dependency; that was a stated-but-unused dependency contradicted by the actual task list, corrected here.)
 Contains: schedule representation + occurrence-due calculation (`daily`/`weekdays`/`weekly_target`), completion state machine (`completed`/`exceeded`/`skipped`/`missed`/`moved`), retroactive completion + event superseding, pause/reactivate semantics — **excluding** streaks/jokers/levels, which are Phase 6.
 Exit criterion: full unit test coverage of scheduling and completion-state rules from `ROUTINE_RULES.md` and `TEST_STRATEGY.md`'s "Core Logic Tests" list (excluding gamification items), with zero UI.
 
@@ -47,12 +47,12 @@ Exit criterion: user can create a routine of each schedule type, complete/exceed
 ### Phase 6 — Gamification
 **Goal:** streaks, jokers, levels, and the overall app streak are implemented, on top of the already-tested Phase 4 event model.
 Depends on: Phase 5.
-Contains: `routine_state_cache`/`app_streak_cache` replay algorithm, joker earning/consumption/restoration, 66-completion protection window, level rank + progress bar, overall app streak, completion animations (exceeded emphasis, first-completion-of-day burst), haptics.
-Exit criterion: full unit coverage of `TEST_STRATEGY.md`'s gamification test list; manual verification that a joker is consumed then restored correctly after a retroactive completion, on-device.
+Contains: streak/level/joker replay algorithm, **missed-occurrence reconciliation** (the mechanism that materializes `missed`/`joker_protected`/`joker_consumed` events from the passage of time — see `docs/ARCHITECTURE.md`'s Missed-Occurrence Reconciliation; this was missing from an earlier draft of this plan, which implied joker consumption and 66-day protection were "wired" without ever specifying what writes the underlying events), `routine_state_cache`/`app_streak_cache` persistence, level rank + progress bar, overall app streak, completion animations (exceeded emphasis, first-completion-of-day burst, level-up milestone), haptics.
+Exit criterion: full unit coverage of `TEST_STRATEGY.md`'s gamification test list; manual verification that a joker is consumed (via reconciliation, after a missed day) then restored correctly after a retroactive completion, on-device.
 
 ### Phase 7 — Tasks
 **Goal:** tasks are fully functional, deliberately built after routines per the project's stated product focus.
-Depends on: Phase 3 (categories), Phase 2 (design system). Does not depend on Phase 4–6 (tasks are architecturally independent of routine gamification, per `PROJECT_PRINCIPLES.md`).
+Depends on: Phase 1 (schema), Phase 2 (design system). Does not depend on Phase 4–6 (tasks are architecturally independent of routine gamification, per `PROJECT_PRINCIPLES.md`). Phase 3 (Categories) is not a hard dependency either — a task can be created with `category_id` left unset — but building Phase 7 after Phase 3 is still recommended so there are real categories to pick from when manually testing the create-task form.
 Contains: task repository/service, create/edit task flow, Tasks screen sections (Überfällig/Heute/Demnächst/Ohne Datum/Erledigt), completion/undo/move/reschedule, overdue derivation.
 Exit criterion: all task interactions in `SCREEN_SPECIFICATIONS.md` work on-device; overdue tasks recompute correctly across a day boundary (tested by advancing device date or injecting a fixed clock in tests).
 
@@ -64,7 +64,7 @@ Exit criterion: Today screen matches `SCREEN_SPECIFICATIONS.md` section ordering
 
 ### Phase 9 — Backup and Restore
 **Goal:** export, validated import, and automatic pre-import safety backup, before the app is considered release-candidate.
-Depends on: Phase 1 (schema stable enough to serialize), can run in parallel with Phase 7/8 once Phase 6 is done, but is sequenced last among features because it must serialize *every* entity, including gamification caches.
+Depends on: Phase 6 **and** Phase 7 — export must serialize every table, including the task table (Phase 7) and the gamification caches (Phase 6), so it cannot start until both exist. (An earlier draft of this plan described Phase 9 as running "in parallel with Phase 7," which contradicted the actual export task's dependency on the task repository; corrected here.) Can run in parallel with Phase 8, which adds no new tables.
 Contains: export service, manifest + schema-version validation, staged/transactional import, automatic pre-import backup, Settings screen export/import UI, failed-import rollback.
 Exit criterion: export → wipe app data → import round-trips all entities including routine event history and streak state, verified by an automated test and a manual on-device export/reinstall/import cycle.
 
@@ -77,15 +77,25 @@ Exit criterion: signed/release Android build installs and runs cleanly on a phys
 ## Dependency Graph (summary)
 
 ```
-Phase 0 ──▶ Phase 1 ──────────────────────────┐
-       └──▶ Phase 2 ──▶ Phase 3 ──▶ Phase 4 ──▶ Phase 5 ──▶ Phase 6 ──┐
-                              └──────────────────────────▶ Phase 7 ──┼─▶ Phase 8 ──▶ Phase 9 ──▶ Phase 10
+Phase 0 ─┬─▶ Phase 1 ─┬─────────────────────────────▶ Phase 4 ─┐
+         │            │                                        ▼
+         └─▶ Phase 2 ─┴─▶ Phase 3 ─┐                     Phase 5 ─▶ Phase 6 ─┐
+                                   ├─▶ Phase 7 ────────────────────────────────┼─▶ Phase 8 ─┐
+                                   │  (Phase 3 helps but isn't required)       │            ▼
+                                   └────────────────────────────────────────────────────▶ Phase 9 ─▶ Phase 10
 ```
-(Phase 7 depends on Phase 3 + Phase 2 only; Phase 9 depends on Phase 1 and effectively lands after Phase 6 since it must serialize gamification state.)
+Phase 3 and Phase 4 both depend only on Phase 1 (+ Phase 2 for Phase 3's UI) and can be built in either order or in parallel. Phase 7 hard-depends only on Phase 1 + Phase 2. Phase 9 depends on both Phase 6 and Phase 7 having landed, since it must serialize every table including the gamification caches and the task table.
+
+## Open Product Questions
+
+These are gaps or ambiguities found in the existing product documentation during planning, not decisions made unilaterally here. Each has a provisional assumption so Phase 6 is not blocked, but both should be confirmed with the product owner before or during Phase 6.
+
+1. **Does the overall app streak reset on a day with scheduled routines but zero completions?** `docs/ROUTINE_RULES.md`'s Overall App Streak section states the streak "increases when at least one routine is actually completed" and that "a day with no scheduled routines does not break" it — but it never states what happens on a day that *did* have scheduled routines and none were completed (all missed). Provisional assumption: the streak resets to 0, symmetric with routine-level streak behavior. This assumption is encoded in `docs/ARCHITECTURE.md`'s reconciliation design and should be confirmed before Phase 6 ships.
+2. **What, if anything, belongs in "settings" beyond display name?** `docs/DATA_PERSISTENCE.md` lists "settings" as its own persistent-data category, but `docs/SCREEN_SPECIFICATIONS.md`'s Settings screen defines no setting beyond display name. No settings storage beyond `profile.display_name` is planned; if this is intentional, no action is needed — this is flagged only because the two source documents don't obviously agree on whether more exists.
 
 ## Major Technical Risks
 
-1. **Streak/joker/level replay correctness.** The entire gamification model depends on correct event-replay logic (`ROUTINE_RULES.md` has intricate interacting rules: joker earn/consume/restore, the pre-66 vs post-66 regimes, retroactive recalculation). A subtle bug here is highly visible to the user and hard to retrofit once event data exists. Mitigation: Phase 4/6 build this in complete isolation with exhaustive unit tests before any UI touches it.
+1. **Streak/joker/level replay and reconciliation correctness.** The entire gamification model depends on correct event-replay logic (`ROUTINE_RULES.md` has intricate interacting rules: joker earn/consume/restore, the pre-66 vs post-66 regimes, retroactive recalculation) *and* on the reconciliation mechanism that turns elapsed time into `missed`/`joker_protected`/`joker_consumed` events correctly and in strict chronological order (see `docs/ARCHITECTURE.md`). A subtle bug in either is highly visible to the user and hard to retrofit once event data exists. Mitigation: Phase 4/6 build both in complete isolation with exhaustive unit tests before any UI touches them.
 2. **Migration safety over time.** Every future schema change is a chance to corrupt or lose the user's only copy of their data (no cloud backup in MVP). Mitigation: migration tests are mandatory from Task 1 of Phase 1 onward (not deferred), and destructive changes are explicitly banned in favor of additive-then-backfill-then-drop sequences.
 3. **Import/rollback correctness.** A failed or partial import is the single highest-blast-radius failure mode in the app (can destroy the user's only data copy). Mitigation: staged/transactional import + automatic pre-import backup, both required, both tested with deliberately-corrupted fixture backups.
 4. **Drizzle + expo-sqlite maturity/tooling gaps.** This combination is less battle-tested than raw SQL; migration-generation edge cases or Node-test-environment incompatibilities could surface mid-project. Mitigation: Phase 1's first task explicitly validates the toolchain (migration generation + a runnable migration test) before any other work depends on it; a raw-SQL fallback is documented as a deliberate escape hatch in `ARCHITECTURE.md`.
@@ -105,9 +115,9 @@ Phase 0 ──▶ Phase 1 ──────────────────
 These are checkpoint-level (phase-exit) manual tests; each individual task in `TASKS.md` also carries its own smaller manual checklist.
 
 - **After Phase 1:** force-close the app mid-use and reopen; confirm no data loss. Reinstall the app (simulating first launch) and confirm a fresh profile/DB is created cleanly.
-- **After Phase 3:** create/edit/delete a category on-device; attempt to delete a category with no references (should hard-delete) — full reassignment-flow manual check happens after Phase 5/7 once routines/tasks exist.
+- **After Phase 3:** create/edit/delete a category on-device; attempt to delete a category with no references (should hard-delete) — full reassignment-flow manual check happens after Phase 5/7 once routines/tasks exist. Also: edit the display name in Settings, force-close and reopen, confirm it persisted.
 - **After Phase 5:** on a physical Android device, create one routine of each schedule type, complete/skip/move/pause each, force-close and reopen, confirm state persisted correctly.
-- **After Phase 6:** manually drive a routine through 5 completions (joker earned), consume the joker via a missed day, then retroactively complete the missed day and confirm the joker is restored — on-device, not just in tests.
+- **After Phase 6:** manually drive a routine through 5 completions (joker earned), advance the device clock (or wait) past a scheduled day without completing it so reconciliation materializes a `joker_consumed` event on next app open, then retroactively complete the missed day and confirm the joker is restored — on-device, not just in tests.
 - **After Phase 7:** create tasks in each section (overdue, today, upcoming, undated), complete/undo/move one of each, confirm the Erledigt section stays collapsed by default and tasks persist after restart.
 - **After Phase 8:** verify Today screen ordering (routines, tasks, for later) and that the first routine completion of the day (and only the first) triggers the streak animation, across an actual day boundary (or a manually adjusted device clock).
 - **After Phase 9:** export a backup, uninstall the app, reinstall, import the backup, confirm every routine's history/streak/level and every task is restored exactly.

@@ -20,9 +20,10 @@ The single local profile (see `USER_MODEL.md`).
 | `id` | TEXT PK | stable, generated once at first launch |
 | `display_name` | TEXT | user-editable |
 | `created_at` | TEXT | |
-| `settings_json` | TEXT | small serialized settings blob (see Settings below) |
 
 Exactly one row in the MVP. Schema does not prevent a future `profiles` table with a `profile_id` FK added to owned entities — that FK column can be added additively later; omitted now because the MVP is explicitly single-profile.
+
+Note: `docs/DATA_PERSISTENCE.md` lists "settings" as its own persistent-data category separate from "local profile," but `docs/SCREEN_SPECIFICATIONS.md`'s Settings screen defines no setting beyond display name (category management and export/import are separate entities/actions, not stored settings values). No speculative settings blob is added here — this is an open documentation gap, not a modeling decision; see `docs/IMPLEMENTATION_PLAN.md`'s Open Product Questions. If a real setting is identified later, it is added as its own column, additively.
 
 ### `category`
 
@@ -33,9 +34,8 @@ Exactly one row in the MVP. Schema does not prevent a future `profiles` table wi
 | `base_color` | TEXT | hex or design-token key, see Category Color Variants |
 | `created_at` | TEXT | |
 | `updated_at` | TEXT | |
-| `archived_at` | TEXT NULL | set instead of deleting, see below |
 
-**Deletion:** per `SCREEN_SPECIFICATIONS.md`, deleting an assigned category must not delete tasks/routines. The delete flow (a service, not a raw repository delete) requires the user to choose reassignment or "remove category" for affected items first, then the category row is either hard-deleted (if never assigned, or after reassignment clears all references) or soft-deleted via `archived_at` if history references it (e.g. a task completed under that category historically). Routines/tasks store `category_id` as nullable, so "remove category" just sets it to `NULL`.
+**Deletion:** per `SCREEN_SPECIFICATIONS.md`, deleting an assigned category must not delete tasks/routines. The delete flow (a service, not a raw repository delete) requires the user to choose reassignment or "remove category" for affected items first; once that resolves (routines/tasks store `category_id` as nullable, so "remove category" just sets it to `NULL`), the category row is always hard-deleted. No soft-delete/`archived_at` is needed: nothing else in the schema stores a category name/color snapshot, so once a routine or task no longer references a category, the category row has no remaining history to preserve — keeping it around would be complexity with no purpose.
 
 ### `routine`
 
@@ -52,6 +52,7 @@ Exactly one row in the MVP. Schema does not prevent a future `profiles` table wi
 | `allow_conscious_skip` | INTEGER (bool) | default true or false per creation flow |
 | `is_paused` | INTEGER (bool) | see Pause below |
 | `sort_order` | REAL | for manual drag-and-drop reorder on the Routines screen; independent of `id`, safe to rewrite freely |
+| `color_variant_seed` | INTEGER | assigned once at creation, never recalculated — see Category Color Variants |
 | `created_at` | TEXT | routine "starts immediately when created" — no separate start_date needed, `created_at` date is the start |
 | `updated_at` | TEXT | |
 | `deleted_at` | TEXT NULL | soft delete, preserves history for any prior events referencing this routine |
@@ -68,13 +69,14 @@ The single append-only event log for everything that happens to a routine occurr
 | `routine_id` | TEXT FK → routine.id | |
 | `occurrence_date` | TEXT | the calendar date (`YYYY-MM-DD`) this event applies to — for retroactive completion this is the *original* planned date, not the date the event was recorded |
 | `event_type` | TEXT | `'completed' \| 'exceeded' \| 'skipped' \| 'missed' \| 'joker_protected' \| 'paused' \| 'reactivated' \| 'moved' \| 'joker_earned' \| 'joker_consumed' \| 'joker_restored'` |
-| `recorded_at` | TEXT | wall-clock timestamp the event was actually written (differs from `occurrence_date` for retroactive entries) |
+| `recorded_at` | TEXT | wall-clock timestamp the event was actually written (differs from `occurrence_date` for retroactive entries; `is_retroactive` is not stored separately since it is always `recorded_at`'s date ≠ `occurrence_date`, trivially computed from the two columns already on the row) |
 | `moved_to_date` | TEXT NULL | only for `'moved'` events |
 | `skip_reason` | TEXT NULL | only for `'skipped'` events, optional |
-| `is_retroactive` | INTEGER (bool) | true if `recorded_at`'s date ≠ `occurrence_date` |
 | `superseded_by_event_id` | TEXT NULL FK → routine_event.id | when a retroactive edit changes the outcome of a prior occurrence, the old event is marked superseded rather than deleted — full history is never destroyed |
 
-Streaks, jokers, levels are **recalculated by domain logic reading this table**, not stored as the source of truth (cached copies exist — see Derived vs Persisted). This is what makes joker restoration and full streak recalculation on retroactive edits correct by construction: replay the event log for a routine, in `occurrence_date` order, and the current state falls out.
+Two distinct write paths populate this table (see `docs/ARCHITECTURE.md`'s Missed-Occurrence Reconciliation): `completed`, `exceeded`, `skipped`, `moved`, `paused`, `reactivated`, and `joker_earned` are written synchronously by direct user actions; `missed`, `joker_protected`, and `joker_consumed` are written by the reconciliation pass that runs when the app needs up-to-date state for a routine (since "missing a day" has no user action to trigger it); `joker_restored` is written by the retroactive-completion path when it supersedes a previously-`joker_consumed` occurrence.
+
+Streaks, jokers, levels are **recalculated by domain logic reading this table**, not stored as the source of truth (cached copies exist — see Derived vs Persisted). This is what makes joker restoration and full streak recalculation on retroactive edits correct by construction: replay the event log for a routine, in `occurrence_date` order, and the current state falls out — provided reconciliation has already materialized any missed/joker events up to the query date.
 
 ### `routine_state_cache` (derived, persisted for performance)
 
@@ -90,9 +92,10 @@ One row per routine, rebuilt from `routine_event` whenever it changes.
 | `joker_inventory` | INTEGER | 0–2 |
 | `joker_progress` | INTEGER | completions since last joker earned, 0–4 |
 | `consecutive_missed_after_66` | INTEGER | tracks the "up to 3 tolerated" window |
+| `reconciled_through_date` | TEXT | last calendar date for which missed/joker events have been materialized for this routine; reconciliation resumes from the day after this date |
 | `recalculated_at` | TEXT | |
 
-This table exists purely as a cache: it must always be re-derivable from `routine_event` by replay. Any test suite change to the streak/joker/level algorithm is validated by asserting cache-from-replay matches expected values (`TEST_STRATEGY.md`).
+This table exists purely as a cache: it must always be re-derivable from `routine_event` by replay, provided reconciliation is caught up to the query date. Any test suite change to the streak/joker/level algorithm is validated by asserting cache-from-replay matches expected values (`TEST_STRATEGY.md`).
 
 ### `app_streak_cache` (derived, persisted)
 
@@ -103,6 +106,7 @@ Single row.
 | `id` | TEXT PK | constant singleton id |
 | `current_streak` | INTEGER | increases on any day with ≥1 actual routine completion (not skip/joker-protected) |
 | `last_incremented_date` | TEXT | |
+| `reconciled_through_date` | TEXT | last calendar date for which the app streak has been reconciled across all routines; see the open question on fully-missed days in `docs/IMPLEMENTATION_PLAN.md` |
 | `recalculated_at` | TEXT | |
 
 Derived from the union of all `routine_event` rows with `event_type IN ('completed','exceeded')`, grouped by date, across all routines.
@@ -120,6 +124,7 @@ Derived from the union of all `routine_event` rows with `event_type IN ('complet
 | `is_completed` | INTEGER (bool) | |
 | `completed_at` | TEXT NULL | |
 | `sort_order` | REAL | manual ordering within undated/date sections |
+| `color_variant_seed` | INTEGER | assigned once at creation, never recalculated — see Category Color Variants |
 | `created_at` | TEXT | |
 | `updated_at` | TEXT | |
 | `deleted_at` | TEXT NULL | soft delete; completed tasks are explicitly required to be stored permanently (`MVP_SCOPE.md`), so deletion is a distinct, user-initiated action from completion and still soft-deletes rather than hard-deletes, to keep history/undo safe |
@@ -153,15 +158,13 @@ A task is a mutable single-row entity, not an event-sourced one (see rationale a
 
 `category.base_color` stores the single base color. Per-item visual variants (lightness/saturation/warmth/gradient-position adjustments, per `DESIGN_SYSTEM.md`) are **derived and persisted per-item**, not recomputed on every render, to satisfy "each item's selected variant must remain stable across sorting, app restarts, migrations, and updates":
 
-- `routine.color_variant_seed` and `task.color_variant_seed` (INTEGER, added to both tables): assigned once at creation time (e.g. a small deterministic index or random seed), never recalculated. The design-system layer maps `(base_color, color_variant_seed)` → concrete style values. Because the seed is persisted on the item, migrations and re-sorts can never change an item's visual identity, and a future re-theme only has to change the mapping function, not stored color values.
-
-(This column is listed here for completeness; it is added to the `routine` and `task` tables above conceptually — implementation may add it as part of the Phase 2/3 category or routine/task migration rather than Phase 1, per `TASKS.md` sequencing.)
+- `routine.color_variant_seed` and `task.color_variant_seed` (INTEGER, part of both tables from the initial migration — see Schema Versioning): assigned once at creation time (e.g. a small deterministic index or random seed), never recalculated. The design-system layer maps `(base_color, color_variant_seed)` → concrete style values. Because the seed is persisted on the item, migrations and re-sorts can never change an item's visual identity, and a future re-theme only has to change the mapping function, not stored color values.
 
 ## Streak and Joker Source Data
 
-Source of truth: `routine_event` rows with types `completed`, `exceeded`, `skipped`, `missed`, `joker_protected`, `joker_earned`, `joker_consumed`, `joker_restored`, `paused`, `reactivated`, `moved`.
+Source of truth: `routine_event` rows with types `completed`, `exceeded`, `skipped`, `missed`, `joker_protected`, `joker_earned`, `joker_consumed`, `joker_restored`, `paused`, `reactivated`, `moved`. Not all of these are written the same way — see `routine_event`'s note above on the two write paths (direct user action vs. reconciliation vs. retroactive-completion side effect).
 
-Domain algorithm (implemented in `src/domain/streaks`, tested per `TEST_STRATEGY.md`) replays these events in date order per routine to derive: current streak, best streak, total completions, level rank, joker inventory/progress, and the post-66 missed-occurrence tolerance window. `routine_state_cache` stores the *result* of the last replay for fast reads; it is never hand-written outside of a full or incremental replay.
+Domain algorithm (implemented in `src/domain/streaks`, tested per `TEST_STRATEGY.md`) replays these events in date order per routine to derive: current streak, best streak, total completions, level rank, joker inventory/progress, and the post-66 missed-occurrence tolerance window. `routine_state_cache` stores the *result* of the last replay for fast reads; it is never hand-written outside of a full or incremental replay. Replay assumes the event log is complete up to the query date — reconciliation (see `docs/ARCHITECTURE.md`) is what keeps that assumption true.
 
 ## Derived versus Persisted Values
 
@@ -174,6 +177,7 @@ Domain algorithm (implemented in `src/domain/streaks`, tested per `TEST_STRATEGY
 | `routine.scheduled_weekdays` for weekly-target | initially derived (suggested), then persisted as authoritative once created/edited |
 | Category color variant per item | derived once, persisted permanently (seed), never recomputed |
 | `task.is_completed` | persisted directly (not event-sourced) |
+| `routine_state_cache.reconciled_through_date` / `app_streak_cache.reconciled_through_date` | persisted watermark (not itself derived — it records reconciliation progress) |
 
 Rule of thumb applied throughout: if a value is *reconstructible* from an append-only log, it is cached, not authoritative, and every cache must have a documented replay path. If a value is inherently a current-state field with no meaningful history requirement (task completion, category color seed), it is persisted directly.
 
@@ -182,4 +186,4 @@ Rule of thumb applied throughout: if a value is *reconstructible* from an append
 - A `schema_migrations` table (`version INTEGER PK, applied_at TEXT`) records every migration applied, in order. `version` matches the numeric prefix of the migration file under `migrations/` (Drizzle Kit's generated naming).
 - The backup manifest's `schemaVersion` field (see `ARCHITECTURE.md` Backup and Restore) is this same integer — the highest applied migration version at export time.
 - Migrations are additive-by-default (see `ARCHITECTURE.md` Migration Strategy); any destructive change is split into an additive migration + backfill + a later, separately reviewed drop migration, each independently tested.
-- No entity table listed above is expected to exist before Phase 1's initial migration (`0001_init`), which creates `profile`, `category`, `routine`, `routine_event`, `routine_state_cache`, `app_streak_cache`, `task`, and `schema_migrations` together, since they have interdependent foreign keys and no prior data exists to migrate from.
+- No entity table listed above is expected to exist before Phase 1's initial migration (`0001_init`), which creates `profile`, `category`, `routine`, `routine_event`, `routine_state_cache`, `app_streak_cache`, `task`, and `schema_migrations` together, with every column listed in this document (including `color_variant_seed` and `reconciled_through_date`) included from the start, since they have interdependent foreign keys and no prior data exists to migrate from. Deferring any of these columns to a later migration would be pure churn with no data to preserve across the split.
