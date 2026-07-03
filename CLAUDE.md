@@ -20,6 +20,10 @@ Before changing code, read:
 - `docs/DESIGN_SYSTEM.md`
 - `docs/TEST_STRATEGY.md`
 - `docs/ROADMAP.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DATA_MODEL.md`
+- `docs/IMPLEMENTATION_PLAN.md`
+- `TASKS.md`
 
 ## Working Rules
 
