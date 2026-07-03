@@ -3,9 +3,11 @@
     "name": "HabitHelper",
     "slug": "habithelper",
     "version": "1.0.0",
+    "scheme": "habithelper",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "plugins": ["expo-router"],
     "ios": {
       "supportsTablet": true
     },
