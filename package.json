@@ -36,6 +36,9 @@
     "test-renderer": "^1.2.0",
     "typescript": "~6.0.3"
   },
+  "overrides": {
+    "react-dom": "19.2.3"
+  },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
