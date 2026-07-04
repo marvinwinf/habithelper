@@ -1,12 +1,77 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 
-// TODO(T023/T024/T055): Phase 0 placeholder - becomes the Settings screen
-// (display name editing, category management link, backup export/import).
+import { db } from '../../src/data/db/client';
+import { ensureProfile, updateDisplayName } from '../../src/data/repositories/profileRepository';
+import { Button } from '../../src/ui/components/Button';
+import { Card } from '../../src/ui/components/Card';
+import { colors, radius, spacing, typography } from '../../src/ui/theme';
+
 export default function SettingsScreen() {
+  const [profileId, setProfileId] = useState<string | undefined>(undefined);
+  const [displayName, setDisplayName] = useState('');
+  const [savedDisplayName, setSavedDisplayName] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    ensureProfile(db).then((profile) => {
+      if (!cancelled) {
+        setProfileId(profile.id);
+        setDisplayName(profile.displayName);
+        setSavedDisplayName(profile.displayName);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const trimmedName = displayName.trim();
+  const canSave = trimmedName.length > 0 && trimmedName !== savedDisplayName;
+
+  async function handleSave() {
+    if (!profileId) {
+      return;
+    }
+    await updateDisplayName(db, profileId, trimmedName);
+    setSavedDisplayName(trimmedName);
+    setDisplayName(trimmedName);
+  }
+
   return (
-    <View style={styles.container}>
-      <Text>Einstellungen</Text>
+    <View style={styles.screen}>
+      <Text style={styles.title}>Einstellungen</Text>
+
+      <Card style={styles.section}>
+        <Text style={styles.label}>Anzeigename</Text>
+        <TextInput
+          value={displayName}
+          onChangeText={setDisplayName}
+          placeholder="Anzeigename"
+          style={styles.input}
+          testID="settings-display-name-input"
+        />
+        <Button
+          label="Speichern"
+          onPress={handleSave}
+          disabled={!canSave}
+          testID="settings-save-display-name"
+        />
+      </Card>
+
+      <Card style={styles.section}>
+        <Text style={styles.label}>Kategorien</Text>
+        {/* TODO(T024): link to the category management list once it exists. */}
+        <Text style={styles.placeholder}>Kategorienverwaltung folgt in Kürze.</Text>
+      </Card>
+
+      <Card style={styles.section}>
+        <Text style={styles.label}>Datensicherung</Text>
+        {/* TODO(T055): export/import backup actions. */}
+        <Text style={styles.placeholder}>Backup-Export und -Import folgen in Kürze.</Text>
+      </Card>
+
       {__DEV__ && (
         <Link href="/_dev/component-preview" testID="dev-component-preview-link">
           Component Preview (Dev)
@@ -17,9 +82,40 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: colors.background,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  title: {
+    fontSize: typography.title.fontSize,
+    lineHeight: typography.title.lineHeight,
+    fontWeight: typography.title.fontWeight,
+    color: colors.textPrimary,
+  },
+  section: {
+    gap: spacing.sm,
+  },
+  label: {
+    fontSize: typography.bodySmall.fontSize,
+    lineHeight: typography.bodySmall.lineHeight,
+    fontWeight: typography.bodySmall.fontWeight,
+    color: colors.textSecondary,
+  },
+  placeholder: {
+    fontSize: typography.body.fontSize,
+    lineHeight: typography.body.lineHeight,
+    color: colors.textSecondary,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: typography.body.fontSize,
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
   },
 });
