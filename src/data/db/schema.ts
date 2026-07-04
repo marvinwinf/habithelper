@@ -11,6 +11,27 @@ import {
 // own zero-indexed naming, see migrate.test.ts) — see that document's Schema
 // Versioning section for why every column ships together in one migration.
 
+// Discriminator unions from docs/DATA_MODEL.md, applied to the columns below
+// as compile-time brands ($type) — SQLite stores plain TEXT either way, so
+// these change no SQL, but inserts/selects through Drizzle are type-checked.
+// TODO(T025): the domain layer's schedule union (DailySchedule |
+// WeekdaySchedule | WeeklyTargetSchedule) maps from these columns and should
+// reuse ScheduleType rather than redeclare the literals.
+export type ScheduleType = 'daily' | 'weekdays' | 'weekly_target';
+
+export type RoutineEventType =
+  | 'completed'
+  | 'exceeded'
+  | 'skipped'
+  | 'missed'
+  | 'joker_protected'
+  | 'paused'
+  | 'reactivated'
+  | 'moved'
+  | 'joker_earned'
+  | 'joker_consumed'
+  | 'joker_restored';
+
 export const profile = sqliteTable('profile', {
   id: text('id').primaryKey(),
   displayName: text('display_name').notNull(),
@@ -29,8 +50,10 @@ export const routine = sqliteTable('routine', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   categoryId: text('category_id').references(() => category.id),
-  scheduleType: text('schedule_type').notNull(),
-  scheduledWeekdays: text('scheduled_weekdays'),
+  scheduleType: text('schedule_type').$type<ScheduleType>().notNull(),
+  // JSON array of ISO weekday ints (1-7); mode json makes Drizzle
+  // stringify/parse it automatically at the query layer.
+  scheduledWeekdays: text('scheduled_weekdays', { mode: 'json' }).$type<number[]>(),
   weeklyTargetCount: integer('weekly_target_count'),
   timeOfDay: text('time_of_day'),
   reason: text('reason'),
@@ -49,7 +72,7 @@ export const routineEvent = sqliteTable('routine_event', {
     .notNull()
     .references(() => routine.id),
   occurrenceDate: text('occurrence_date').notNull(),
-  eventType: text('event_type').notNull(),
+  eventType: text('event_type').$type<RoutineEventType>().notNull(),
   recordedAt: text('recorded_at').notNull(),
   movedToDate: text('moved_to_date'),
   skipReason: text('skip_reason'),

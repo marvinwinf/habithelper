@@ -49,6 +49,10 @@ function createDriver(sqlite: Database.Database): MigrationDriver {
 /** A fresh in-memory SQLite database with no migrations applied yet. */
 export function createInMemoryFixture(): MigrationFixture {
   const sqlite = new Database(':memory:');
+  // Mirror the production connection (client.ts): FK violations must fail in
+  // tests exactly as they would on-device, or FK-breaking repository code
+  // would pass CI and crash in the real app.
+  sqlite.pragma('foreign_keys = ON');
   return { sqlite, driver: createDriver(sqlite) };
 }
 

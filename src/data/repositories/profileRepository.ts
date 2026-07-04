@@ -13,6 +13,9 @@ export type Profile = typeof profile.$inferSelect;
 
 const DEFAULT_DISPLAY_NAME = 'Nutzer';
 
+// TODO(T023): add an updateDisplayName(db, id, name) path here when the
+// Settings screen makes profile.display_name editable.
+
 /**
  * Creates the single local profile row (docs/USER_MODEL.md) if none exists
  * yet; otherwise returns the existing one. Safe to call on every app
