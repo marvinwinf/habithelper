@@ -3,12 +3,11 @@ import { Stack } from 'expo-router';
 import { runMigrations } from '../src/data/db/migrate';
 
 export default function RootLayout() {
-  // Throwaway T006 toolchain validation: proves a drizzle-kit-generated
-  // migration runs against a real on-device expo-sqlite database at startup.
-  // Replaced by the real migration runner and schema_migrations wiring in T009.
+  // T009 will replace this with schema_migrations-tracked reconciliation and
+  // a dedicated startup-failure recovery screen (docs/ARCHITECTURE.md).
   useEffect(() => {
     runMigrations().catch((error) => {
-      console.error('T006 toolchain migration check failed', error);
+      console.error('Database migration failed', error);
     });
   }, []);
 

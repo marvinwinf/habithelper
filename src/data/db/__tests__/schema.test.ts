@@ -9,6 +9,7 @@ import {
   task,
   schemaMigrations,
 } from '../schema';
+import { EXPECTED_TABLE_NAMES } from '../expectedTables';
 
 const schema = {
   profile,
@@ -48,8 +49,10 @@ describe('database schema shape (docs/DATA_MODEL.md)', () => {
     const drizzleKitApi = require('drizzle-kit/api') as typeof import('drizzle-kit/api');
     const { generateSQLiteDrizzleJson, generateSQLiteMigration } = drizzleKitApi;
 
-    const prev = await generateSQLiteDrizzleJson({});
-    const cur = await generateSQLiteDrizzleJson(schema);
+    const [prev, cur] = await Promise.all([
+      generateSQLiteDrizzleJson({}),
+      generateSQLiteDrizzleJson(schema),
+    ]);
     const statements = await generateSQLiteMigration(prev, cur);
 
     sqlite = new Database(':memory:');
@@ -68,18 +71,7 @@ describe('database schema shape (docs/DATA_MODEL.md)', () => {
       .all()
       .map((row) => (row as { name: string }).name);
 
-    expect(tables).toEqual(
-      [
-        'app_streak_cache',
-        'category',
-        'profile',
-        'routine',
-        'routine_event',
-        'routine_state_cache',
-        'schema_migrations',
-        'task',
-      ].sort(),
-    );
+    expect(tables).toEqual(EXPECTED_TABLE_NAMES);
   });
 
   it('defines the profile table columns', () => {

@@ -2,6 +2,7 @@ import path from 'path';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { EXPECTED_TABLE_NAMES } from '../expectedTables';
 
 /**
  * T008: proves the committed 0001_init migration (see migrations/0000_init.sql
@@ -26,18 +27,7 @@ describe('initial schema migration', () => {
       // Drizzle's own migration-tracking table, not part of the app schema.
       .filter((name) => name !== '__drizzle_migrations');
 
-    expect(tables).toEqual(
-      [
-        'app_streak_cache',
-        'category',
-        'profile',
-        'routine',
-        'routine_event',
-        'routine_state_cache',
-        'schema_migrations',
-        'task',
-      ].sort(),
-    );
+    expect(tables).toEqual(EXPECTED_TABLE_NAMES);
 
     sqlite.close();
   });

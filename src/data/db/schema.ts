@@ -7,8 +7,9 @@ import {
 } from 'drizzle-orm/sqlite-core';
 
 // Schema per docs/DATA_MODEL.md. This is the single source of truth for the
-// initial migration (0001_init) — see that document's Schema Versioning
-// section for why every column ships together in one migration.
+// initial migration (generated as migrations/0000_init.sql — Drizzle Kit's
+// own zero-indexed naming, see migrate.test.ts) — see that document's Schema
+// Versioning section for why every column ships together in one migration.
 
 export const profile = sqliteTable('profile', {
   id: text('id').primaryKey(),

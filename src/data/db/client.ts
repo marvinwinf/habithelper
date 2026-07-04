@@ -1,11 +1,11 @@
 import { openDatabaseSync } from 'expo-sqlite';
 import { drizzle } from 'drizzle-orm/expo-sqlite';
+import * as schema from './schema';
 
-/**
- * Throwaway T006 toolchain-validation client. Uses its own database file
- * (distinct from the app's real database name) so it cannot collide with
- * the real schema/migrations introduced in T007-T009. Replaced entirely then.
- */
-export const expoDb = openDatabaseSync('toolchain-check.db');
+export const expoDb = openDatabaseSync('habithelper.db');
 
-export const db = drizzle(expoDb);
+// SQLite defaults foreign key enforcement to off per connection; the schema's
+// FKs (docs/DATA_MODEL.md) rely on this being on to catch bad references.
+expoDb.execSync('PRAGMA foreign_keys = ON;');
+
+export const db = drizzle(expoDb, { schema });
