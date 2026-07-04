@@ -23,6 +23,12 @@ describe('SettingsScreen', () => {
     expect(await screen.findByDisplayValue('Nutzer')).toBeTruthy();
   });
 
+  it('links to the category management screen', async () => {
+    await render(<SettingsScreen />);
+
+    expect(screen.getByTestId('settings-category-management-link')).toBeTruthy();
+  });
+
   it('saves the new display name and disables save again once persisted', async () => {
     await render(<SettingsScreen />);
     await screen.findByDisplayValue('Nutzer');

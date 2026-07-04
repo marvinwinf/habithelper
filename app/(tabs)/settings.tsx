@@ -62,8 +62,9 @@ export default function SettingsScreen() {
 
       <Card style={styles.section}>
         <Text style={styles.label}>Kategorien</Text>
-        {/* TODO(T024): link to the category management list once it exists. */}
-        <Text style={styles.placeholder}>Kategorienverwaltung folgt in Kürze.</Text>
+        <Link href="/category" style={styles.link} testID="settings-category-management-link">
+          Kategorien verwalten
+        </Link>
       </Card>
 
       <Card style={styles.section}>
@@ -107,6 +108,10 @@ const styles = StyleSheet.create({
     fontSize: typography.body.fontSize,
     lineHeight: typography.body.lineHeight,
     color: colors.textSecondary,
+  },
+  link: {
+    fontSize: typography.body.fontSize,
+    color: colors.accent,
   },
   input: {
     borderWidth: 1,
