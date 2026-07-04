@@ -22,12 +22,22 @@ export interface MigrationsData {
   migrations: Record<string, string>;
 }
 
+export interface RunMigrationsOptions {
+  /** Only apply migrations whose version is <= this value. Omit to apply
+   * every pending migration. Lets tests seed a database at an older schema
+   * version before migrating it the rest of the way (see testUtils.ts). */
+  upToVersion?: number;
+}
+
 export async function runPendingMigrations(
   driver: MigrationDriver,
   migrationsData: MigrationsData,
+  options: RunMigrationsOptions = {},
 ): Promise<void> {
   const applied = await getAppliedVersions(driver);
-  const entries = [...migrationsData.journal.entries].sort((a, b) => a.idx - b.idx);
+  const entries = [...migrationsData.journal.entries]
+    .sort((a, b) => a.idx - b.idx)
+    .filter((entry) => options.upToVersion === undefined || entry.idx <= options.upToVersion);
 
   for (const entry of entries) {
     const version = entry.idx;

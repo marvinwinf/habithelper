@@ -1,34 +1,18 @@
-import path from 'path';
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { createMigratedFixture, getTableNames } from '../testUtils';
 import { EXPECTED_TABLE_NAMES } from '../expectedTables';
 
 /**
- * T008: proves the committed 0001_init migration (see migrations/0000_init.sql
- * — Drizzle Kit's own zero-indexed naming, per TASKS.md's T008 allowance)
- * applies cleanly to a fresh, empty database. Uses better-sqlite3 as a
- * same-SQL-dialect stand-in for expo-sqlite, since expo-sqlite's native
- * module cannot run under Jest (see docs/TEST_STRATEGY.md).
+ * T010: exercises the shared migration test harness (testUtils.ts) itself —
+ * seeds a completely empty database (pre-0000_init, Drizzle Kit's own
+ * zero-indexed naming for the initial migration) and runs migrations up to
+ * current, asserting every entity table exists afterward.
  */
-describe('initial schema migration', () => {
-  it('applies cleanly to an empty database and creates every entity table', () => {
-    const sqlite = new Database(':memory:');
-    const db = drizzle(sqlite);
+describe('migration test harness', () => {
+  it('seeds an empty database and migrates it to current, creating every entity table', async () => {
+    const fixture = await createMigratedFixture();
 
-    migrate(db, {
-      migrationsFolder: path.join(__dirname, '../../../../migrations'),
-    });
+    expect(getTableNames(fixture)).toEqual(EXPECTED_TABLE_NAMES);
 
-    const tables = sqlite
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
-      .all()
-      .map((row) => (row as { name: string }).name)
-      // Drizzle's own migration-tracking table, not part of the app schema.
-      .filter((name) => name !== '__drizzle_migrations');
-
-    expect(tables).toEqual(EXPECTED_TABLE_NAMES);
-
-    sqlite.close();
+    fixture.sqlite.close();
   });
 });

@@ -1,35 +1,10 @@
-import Database from 'better-sqlite3';
 import migrations from '../../../../migrations/migrations';
-import { runPendingMigrations, type MigrationDriver, type MigrationsData } from '../migrationRunner';
-
-function createDriver(sqlite: Database.Database): MigrationDriver {
-  return {
-    execAsync: async (sql) => {
-      sqlite.exec(sql);
-    },
-    runAsync: async (sql, params) => {
-      sqlite.prepare(sql).run(...params);
-    },
-    getAllAsync: async <T>(sql: string) => sqlite.prepare(sql).all() as T[],
-    withTransactionAsync: async (task) => {
-      sqlite.exec('BEGIN');
-      try {
-        await task();
-        sqlite.exec('COMMIT');
-      } catch (error) {
-        sqlite.exec('ROLLBACK');
-        throw error;
-      }
-    },
-  };
-}
+import { runPendingMigrations, type MigrationsData } from '../migrationRunner';
+import { createInMemoryFixture, createMigratedFixture, getTableNames } from '../testUtils';
 
 describe('runPendingMigrations', () => {
   it('applies the real migration on first launch and records it in schema_migrations', async () => {
-    const sqlite = new Database(':memory:');
-    const driver = createDriver(sqlite);
-
-    await runPendingMigrations(driver, migrations);
+    const { sqlite } = await createMigratedFixture();
 
     const rows = sqlite.prepare('SELECT version, applied_at FROM schema_migrations').all() as {
       version: number;
@@ -42,23 +17,20 @@ describe('runPendingMigrations', () => {
   });
 
   it('is a no-op on a second run against an already-migrated database', async () => {
-    const sqlite = new Database(':memory:');
-    const driver = createDriver(sqlite);
+    const fixture = await createMigratedFixture();
 
-    await runPendingMigrations(driver, migrations);
     // A re-run would try to CREATE TABLE profile (etc.) again and throw if
     // the skip logic didn't work, so simply not throwing is part of the proof.
-    await expect(runPendingMigrations(driver, migrations)).resolves.toBeUndefined();
+    await expect(runPendingMigrations(fixture.driver, migrations)).resolves.toBeUndefined();
 
-    const rows = sqlite.prepare('SELECT version FROM schema_migrations').all();
+    const rows = fixture.sqlite.prepare('SELECT version FROM schema_migrations').all();
     expect(rows).toHaveLength(1);
 
-    sqlite.close();
+    fixture.sqlite.close();
   });
 
   it('runs each migration in its own transaction, isolating a failure to only that migration', async () => {
-    const sqlite = new Database(':memory:');
-    const driver = createDriver(sqlite);
+    const fixture = createInMemoryFixture();
 
     const twoMigrations: MigrationsData = {
       journal: {
@@ -76,23 +48,25 @@ describe('runPendingMigrations', () => {
       },
     };
 
-    await expect(runPendingMigrations(driver, twoMigrations)).rejects.toThrow();
+    // Asserted via a plain truthy check rather than .rejects.toThrow(): a
+    // native module (better-sqlite3) loaded from a different test file's own
+    // Jest VM realm can produce a SqliteError that fails `instanceof Error`
+    // here, which .toThrow() relies on — a Jest/native-addon quirk, not a
+    // bug in the rejection itself.
+    await expect(runPendingMigrations(fixture.driver, twoMigrations)).rejects.toBeTruthy();
 
-    const tables = sqlite
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
-      .all()
-      .map((row) => (row as { name: string }).name);
+    const tables = getTableNames(fixture);
     // The first migration's own transaction committed independently...
     expect(tables).toContain('ok_table');
     // ...while the second migration's table-creation attempt rolled back
     // before its schema_migrations row was ever inserted.
     expect(tables).not.toContain('this_is_not_valid_sql');
 
-    const rows = sqlite.prepare('SELECT version FROM schema_migrations').all() as {
+    const rows = fixture.sqlite.prepare('SELECT version FROM schema_migrations').all() as {
       version: number;
     }[];
     expect(rows.map((row) => row.version)).toEqual([0]);
 
-    sqlite.close();
+    fixture.sqlite.close();
   });
 });
