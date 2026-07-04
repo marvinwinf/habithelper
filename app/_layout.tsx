@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { db } from '../src/data/db/client';
 import { runMigrations } from '../src/data/db/migrate';
 import { ensureProfile } from '../src/data/repositories/profileRepository';
@@ -21,5 +22,9 @@ export default function RootLayout() {
     });
   }, []);
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false }} />
+    </GestureHandlerRootView>
+  );
 }
