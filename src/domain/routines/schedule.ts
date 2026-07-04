@@ -22,6 +22,35 @@ export interface WeeklyTargetSchedule {
 
 export type RoutineSchedule = DailySchedule | WeekdaySchedule | WeeklyTargetSchedule;
 
+// The subset of a `routine` row (docs/DATA_MODEL.md) needed to derive its
+// typed schedule union — kept minimal so callers can pass either a full
+// repository row or a small fixture.
+export interface RoutineScheduleRow {
+  readonly scheduleType: ScheduleType;
+  readonly scheduledWeekdays: readonly number[] | null;
+  readonly weeklyTargetCount: number | null;
+}
+
+/**
+ * Maps a routine's raw, nullable-column schema representation to the typed
+ * `RoutineSchedule` union domain logic operates on (see this file's module
+ * doc comment in docs/DATA_MODEL.md's Routine Schedule Representation).
+ */
+export function scheduleFromRoutineRow(row: RoutineScheduleRow): RoutineSchedule {
+  switch (row.scheduleType) {
+    case 'daily':
+      return { type: 'daily' };
+    case 'weekdays':
+      return { type: 'weekdays', weekdays: (row.scheduledWeekdays ?? []) as IsoWeekday[] };
+    case 'weekly_target':
+      return {
+        type: 'weekly_target',
+        weekdays: (row.scheduledWeekdays ?? []) as IsoWeekday[],
+        targetCount: row.weeklyTargetCount ?? 0,
+      };
+  }
+}
+
 // A single occurrence moved from its originally scheduled date to a new one
 // (a routine_event row with event_type 'moved'), per docs/ROUTINE_RULES.md's
 // Move to Tomorrow section.
