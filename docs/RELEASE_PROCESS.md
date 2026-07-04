@@ -12,9 +12,17 @@ After the final task of an implementation phase (per `TASKS.md`) is completed, m
    git push origin apk-phase-<n>
 
    # b) or dispatch the workflow on the phase's branch/commit with the
-   #    release_tag input set to apk-phase-<n> (works from environments
-   #    where tag pushes are restricted, e.g. Claude Code sessions):
+   #    release_tag input set to apk-phase-<n> (requires the workflow to
+   #    exist on the default branch — true once the first phase branch
+   #    carrying it has been merged):
    gh workflow run android-apk.yml --ref <branch> -f release_tag=apk-phase-<n>
+
+   # c) or, from environments that can push neither tags nor to main
+   #    (e.g. Claude Code sessions before the workflow reaches main),
+   #    push an empty commit to the working branch whose message contains
+   #    the marker:
+   git commit --allow-empty -m "chore: build phase APK [build-apk apk-phase-<n>]"
+   git push origin <branch>
    ```
 
 2. The workflow (`.github/workflows/android-apk.yml`) builds the app (`expo prebuild` + Gradle `assembleRelease`) and attaches `habithelper.apk` to a GitHub Release named after the tag (creating the tag itself in the dispatch case).

@@ -1,13 +1,17 @@
 # Builds an installable Android APK and attaches it to a GitHub Release.
-# Triggered by pushing a tag named `apk-*` (one per completed phase, see
-# docs/RELEASE_PROCESS.md) or manually via workflow_dispatch (build-only,
-# no release).
+# Three triggers (see docs/RELEASE_PROCESS.md):
+#   1. pushing a tag named `apk-*` (one per completed phase),
+#   2. workflow_dispatch with the optional release_tag input,
+#   3. a branch push whose commit message contains `[build-apk <tag>]`
+#      (fallback for environments that can push neither tags nor to main).
 name: Android APK
 
 on:
   push:
     tags:
       - 'apk-*'
+    branches:
+      - '**'
   workflow_dispatch:
     inputs:
       release_tag:
@@ -23,9 +27,33 @@ permissions:
 
 jobs:
   build:
+    # Plain branch pushes only build when explicitly requested via the
+    # commit-message marker; tag pushes and manual dispatches always build.
+    if: >-
+      startsWith(github.ref, 'refs/tags/apk-') ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, '[build-apk')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Determine release tag
+        id: release_tag
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message || '' }}
+          DISPATCH_TAG: ${{ inputs.release_tag || '' }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/apk-* ]]; then
+            tag="$GITHUB_REF_NAME"
+          elif [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            tag="$DISPATCH_TAG"
+          elif [[ "$COMMIT_MESSAGE" =~ \[build-apk[[:space:]]+([A-Za-z0-9._-]+)\] ]]; then
+            tag="${BASH_REMATCH[1]}"
+          else
+            tag=""
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Resolved release tag: '$tag'"
 
       - uses: actions/setup-node@v4
         with:
@@ -62,11 +90,11 @@ jobs:
           path: habithelper.apk
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/apk-') || inputs.release_tag != ''
+        if: steps.release_tag.outputs.tag != ''
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/apk-') && github.ref_name || inputs.release_tag }}
-          name: ${{ startsWith(github.ref, 'refs/tags/apk-') && github.ref_name || inputs.release_tag }}
+          tag_name: ${{ steps.release_tag.outputs.tag }}
+          name: ${{ steps.release_tag.outputs.tag }}
           target_commitish: ${{ github.sha }}
           files: habithelper.apk
           fail_on_unmatched_files: true
