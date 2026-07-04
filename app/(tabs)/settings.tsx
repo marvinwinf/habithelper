@@ -1,3 +1,4 @@
+import { Link } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 // TODO(T023/T024/T055): Phase 0 placeholder - becomes the Settings screen
@@ -6,6 +7,11 @@ export default function SettingsScreen() {
   return (
     <View style={styles.container}>
       <Text>Einstellungen</Text>
+      {__DEV__ && (
+        <Link href="/_dev/component-preview" testID="dev-component-preview-link">
+          Component Preview (Dev)
+        </Link>
+      )}
     </View>
   );
 }
