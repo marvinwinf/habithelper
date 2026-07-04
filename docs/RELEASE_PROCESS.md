@@ -4,14 +4,20 @@
 
 After the final task of an implementation phase (per `TASKS.md`) is completed, merged/pushed, and green on `npm run verify`, an updated installable Android APK is published:
 
-1. Tag the commit that completes the phase and push the tag:
+1. Trigger the `Android APK` workflow for the commit that completes the phase, either way:
 
    ```bash
+   # a) push a tag (requires direct tag-push access):
    git tag apk-phase-<n>
    git push origin apk-phase-<n>
+
+   # b) or dispatch the workflow on the phase's branch/commit with the
+   #    release_tag input set to apk-phase-<n> (works from environments
+   #    where tag pushes are restricted, e.g. Claude Code sessions):
+   gh workflow run android-apk.yml --ref <branch> -f release_tag=apk-phase-<n>
    ```
 
-2. The `Android APK` GitHub Actions workflow (`.github/workflows/android-apk.yml`) builds the app (`expo prebuild` + Gradle `assembleRelease`) and attaches `habithelper.apk` to a GitHub Release named after the tag.
+2. The workflow (`.github/workflows/android-apk.yml`) builds the app (`expo prebuild` + Gradle `assembleRelease`) and attaches `habithelper.apk` to a GitHub Release named after the tag (creating the tag itself in the dispatch case).
 
 3. Verify the workflow run succeeded and the release contains the APK. No README change is needed per release: the README's download link uses `releases/latest/download/habithelper.apk`, which always points at the newest release's asset.
 

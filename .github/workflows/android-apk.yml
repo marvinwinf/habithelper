@@ -9,6 +9,14 @@ on:
     tags:
       - 'apk-*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: >-
+          Optional apk-* tag to create and publish a release for (e.g.
+          apk-phase-2). Leave empty for a build-only run that just uploads
+          the APK as a workflow artifact.
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -54,10 +62,12 @@ jobs:
           path: habithelper.apk
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/apk-')
+        if: startsWith(github.ref, 'refs/tags/apk-') || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ github.ref_name }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/apk-') && github.ref_name || inputs.release_tag }}
+          name: ${{ startsWith(github.ref, 'refs/tags/apk-') && github.ref_name || inputs.release_tag }}
+          target_commitish: ${{ github.sha }}
           files: habithelper.apk
           fail_on_unmatched_files: true
           body: |
