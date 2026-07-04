@@ -10,7 +10,9 @@
 // observe a migration attempt that's expected to fail partway through.
 
 import Database from 'better-sqlite3';
+import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import realMigrations from '../../../migrations/migrations';
+import * as schema from './schema';
 import {
   runPendingMigrations,
   type MigrationDriver,
@@ -122,4 +124,21 @@ export function getAppliedVersions(fixture: MigrationFixture): number[] {
     version: number;
   }[];
   return rows.map((row) => row.version);
+}
+
+export interface DrizzleTestDb {
+  sqlite: Database.Database;
+  db: BetterSQLite3Database<typeof schema>;
+}
+
+/**
+ * A fresh in-memory database migrated to current, wrapped with Drizzle's
+ * query builder (schema-bound), for testing repositories. Repositories
+ * accept any sync-dialect SQLite drizzle database, so this same-SQL-dialect
+ * stand-in exercises the real query-building code, not just raw SQL —
+ * expo-sqlite's native module cannot run under Jest (docs/TEST_STRATEGY.md).
+ */
+export async function createDrizzleTestDb(): Promise<DrizzleTestDb> {
+  const { sqlite } = await createMigratedFixture();
+  return { sqlite, db: drizzle(sqlite, { schema }) };
 }
