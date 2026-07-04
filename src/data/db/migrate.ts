@@ -1,7 +1,16 @@
-import { migrate } from 'drizzle-orm/expo-sqlite/migrator';
 import migrations from '../../../migrations/migrations';
-import { db } from './client';
+import { expoDb } from './client';
+import { runPendingMigrations, type MigrationDriver } from './migrationRunner';
+
+const driver: MigrationDriver = {
+  execAsync: (sql) => expoDb.execAsync(sql),
+  runAsync: async (sql, params) => {
+    await expoDb.runAsync(sql, params);
+  },
+  getAllAsync: (sql) => expoDb.getAllAsync(sql),
+  withTransactionAsync: (task) => expoDb.withTransactionAsync(task),
+};
 
 export async function runMigrations(): Promise<void> {
-  await migrate(db, migrations);
+  await runPendingMigrations(driver, migrations);
 }
