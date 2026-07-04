@@ -1,5 +1,5 @@
 import { createDrizzleTestDb } from '../../db/testUtils';
-import { ensureProfile } from '../profileRepository';
+import { ensureProfile, updateDisplayName } from '../profileRepository';
 
 jest.mock('expo-crypto', () => ({
   randomUUID: jest.fn(() => 'test-profile-id'),
@@ -18,6 +18,21 @@ describe('ensureProfile', () => {
 
     const rows = sqlite.prepare('SELECT * FROM profile').all();
     expect(rows).toHaveLength(1);
+
+    sqlite.close();
+  });
+});
+
+describe('updateDisplayName', () => {
+  it('persists a new display name for the given profile id', async () => {
+    const { sqlite, db } = await createDrizzleTestDb();
+    const profile = await ensureProfile(db);
+
+    await updateDisplayName(db, profile.id, 'Alex');
+
+    const rows = sqlite.prepare('SELECT * FROM profile').all();
+    expect(rows).toHaveLength(1);
+    expect((rows[0] as { display_name: string }).display_name).toBe('Alex');
 
     sqlite.close();
   });

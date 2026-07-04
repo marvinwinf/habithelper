@@ -1,4 +1,5 @@
 import { randomUUID } from 'expo-crypto';
+import { eq } from 'drizzle-orm';
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 import { profile } from '../db/schema';
 
@@ -12,9 +13,6 @@ type ProfileDb = BaseSQLiteDatabase<'sync', unknown, { profile: typeof profile }
 export type Profile = typeof profile.$inferSelect;
 
 const DEFAULT_DISPLAY_NAME = 'Nutzer';
-
-// TODO(T023): add an updateDisplayName(db, id, name) path here when the
-// Settings screen makes profile.display_name editable.
 
 /**
  * Creates the single local profile row (docs/USER_MODEL.md) if none exists
@@ -35,4 +33,13 @@ export async function ensureProfile(db: ProfileDb): Promise<Profile> {
   };
   await db.insert(profile).values(created);
   return created;
+}
+
+/** Updates the profile's display name, per the Settings screen (T023). */
+export async function updateDisplayName(
+  db: ProfileDb,
+  id: string,
+  displayName: string,
+): Promise<void> {
+  await db.update(profile).set({ displayName }).where(eq(profile.id, id));
 }

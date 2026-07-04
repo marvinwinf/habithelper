@@ -39,6 +39,10 @@ Before changing code, read:
 - Do not add cloud services, authentication, social features, notifications, or iOS-specific work unless explicitly requested.
 - Do not treat timers as required for routine completion.
 
+## Release Process
+
+After the final task of each implementation phase (per `TASKS.md`) is completed and pushed, publish an updated Android APK by pushing an `apk-phase-<n>` tag and confirming the `Android APK` workflow succeeds — see `docs/RELEASE_PROCESS.md`. The README's Releases section links to the latest release automatically and only needs editing if the process itself changes.
+
 ## Definition of Done
 
 A task is complete only when:
