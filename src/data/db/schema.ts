@@ -14,9 +14,8 @@ import {
 // Discriminator unions from docs/DATA_MODEL.md, applied to the columns below
 // as compile-time brands ($type) — SQLite stores plain TEXT either way, so
 // these change no SQL, but inserts/selects through Drizzle are type-checked.
-// TODO(T025): the domain layer's schedule union (DailySchedule |
-// WeekdaySchedule | WeeklyTargetSchedule) maps from these columns and should
-// reuse ScheduleType rather than redeclare the literals.
+// The domain layer's schedule union (see src/domain/routines/schedule.ts)
+// maps from these columns and reuses ScheduleType rather than redeclaring it.
 export type ScheduleType = 'daily' | 'weekdays' | 'weekly_target';
 
 export type RoutineEventType =
