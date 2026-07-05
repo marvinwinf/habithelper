@@ -26,7 +26,10 @@ export interface RoutineStreakState {
 }
 
 const MAX_JOKER_INVENTORY = 2;
-const LEVEL_SEGMENT_SIZE = 66;
+// Shared with src/domain/routines/reconcile.ts: the pre-66/post-66 joker
+// regime boundary (docs/ROUTINE_RULES.md) and the level segment size
+// (docs/ROUTINE_RULES.md's Levels section) are documented as the same 66.
+export const LEVEL_SEGMENT_SIZE = 66;
 const POST_66_TOLERATED_MISSES = 3;
 
 const INITIAL_STATE: RoutineStreakState = {
