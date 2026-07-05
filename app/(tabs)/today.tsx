@@ -13,6 +13,7 @@ import {
   getAppStreakCache,
   type AppStreakCache,
 } from '../../src/data/repositories/appStreakCacheRepository';
+import { ensureProfile } from '../../src/data/repositories/profileRepository';
 import {
   completeRoutineOccurrence,
   exceedRoutineOccurrence,
@@ -21,6 +22,7 @@ import {
   skipRoutineOccurrence,
 } from '../../src/services/routineService';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
+import { getGreeting } from '../../src/domain/greeting';
 import { classifyOccurrence, type OccurrenceState } from '../../src/domain/routines/completion';
 import { scheduleFromRoutineRow } from '../../src/domain/routines/schedule';
 import { isFirstCompletionOfDay } from '../../src/domain/streaks/appStreak';
@@ -31,10 +33,16 @@ import { EmptyState } from '../../src/ui/components/EmptyState';
 import { RoutineCard, type RoutineCardOccurrenceState } from '../../src/ui/components/RoutineCard';
 import { colors, spacing, typography } from '../../src/ui/theme';
 
-// TODO(T048/T049): greeting, date, and daily routine progress, plus the
-// combined routines/tasks/for-later ordering, land in Phase 8; this is the
-// routines-only slice from T033, with just the overall app streak (T040)
-// added to the header so far.
+// TODO(T049): the combined routines/tasks/for-later ordering lands with the
+// rest of Phase 8; this is still the routines-only slice from T033, with
+// the full header (greeting, date, app streak, daily progress) now in place.
+
+const DATE_FORMATTER = new Intl.DateTimeFormat('de-DE', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
 
 interface DueRoutine {
   routine: Routine;
@@ -51,12 +59,14 @@ export default function TodayScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [eventsByRoutineId, setEventsByRoutineId] = useState<Record<string, RoutineEvent[]>>({});
   const [appStreak, setAppStreak] = useState<AppStreakCache | undefined>(undefined);
+  const [displayName, setDisplayName] = useState('');
   const streakBurst = useStreakBurst();
 
   const loadData = useCallback(() => {
     listRoutines(db).then((allRoutines) => setRoutines(allRoutines.filter((r) => !r.isPaused)));
     listCategories(db).then(setCategories);
     getAppStreakCache(db).then(setAppStreak);
+    ensureProfile(db).then((profile) => setDisplayName(profile.displayName));
   }, []);
 
   useEffect(() => {
@@ -126,13 +136,32 @@ export default function TodayScreen() {
     outputRange: [1, 1.3, 1],
   });
 
+  const completedRoutineCount = dueRoutines.filter(
+    ({ state }) => state === 'completed' || state === 'exceeded',
+  ).length;
+  const greeting = getGreeting(new Date().getHours(), displayName);
+  const formattedDate = DATE_FORMATTER.format(new Date());
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Animated.View style={[styles.header, { transform: [{ scale: streakScale }] }]}>
-        <Text style={styles.appStreak} testID="today-app-streak">
-          Streak: {appStreak?.currentStreak ?? 0}
+      <View style={styles.header}>
+        <Text style={styles.greeting} testID="today-greeting">
+          {greeting}
         </Text>
-      </Animated.View>
+        <Text style={styles.date} testID="today-date">
+          {formattedDate}
+        </Text>
+        <View style={styles.headerMetaRow}>
+          <Animated.View style={{ transform: [{ scale: streakScale }] }}>
+            <Text style={styles.appStreak} testID="today-app-streak">
+              Streak: {appStreak?.currentStreak ?? 0}
+            </Text>
+          </Animated.View>
+          <Text style={styles.routineProgress} testID="today-routine-progress">
+            {completedRoutineCount}/{dueRoutines.length} Routinen erledigt
+          </Text>
+        </View>
+      </View>
 
       {dueRoutines.length === 0 ? (
         <EmptyState
@@ -198,10 +227,31 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: spacing.md,
+    gap: spacing.xxs,
+  },
+  greeting: {
+    fontSize: typography.title.fontSize,
+    lineHeight: typography.title.lineHeight,
+    fontWeight: typography.title.fontWeight,
+    color: colors.textPrimary,
+  },
+  date: {
+    fontSize: typography.body.fontSize,
+    color: colors.textSecondary,
+  },
+  headerMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
   },
   // Subtle per docs/SCREEN_SPECIFICATIONS.md's "Subtle overall app streak" —
   // small, muted text, not a visually dominant element.
   appStreak: {
+    fontSize: typography.bodySmall.fontSize,
+    color: colors.textSecondary,
+  },
+  routineProgress: {
     fontSize: typography.bodySmall.fontSize,
     color: colors.textSecondary,
   },

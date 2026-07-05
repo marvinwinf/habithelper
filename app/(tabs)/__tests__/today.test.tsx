@@ -10,12 +10,16 @@ import {
   getAppStreakCache,
   type AppStreakCache,
 } from '../../../src/data/repositories/appStreakCacheRepository';
+import { ensureProfile } from '../../../src/data/repositories/profileRepository';
 import { completeRoutineOccurrence, moveRoutineOccurrence } from '../../../src/services/routineService';
 import { triggerFirstCompletionOfDayHaptic } from '../../../src/ui/animation/haptics';
 
 jest.mock('../../../src/data/db/client', () => ({ db: {} }));
 jest.mock('../../../src/data/repositories/categoryRepository', () => ({
   listCategories: jest.fn().mockResolvedValue([]),
+}));
+jest.mock('../../../src/data/repositories/profileRepository', () => ({
+  ensureProfile: jest.fn(),
 }));
 jest.mock('../../../src/data/repositories/routineRepository', () => ({
   listRoutines: jest.fn(),
@@ -77,6 +81,11 @@ describe('TodayScreen', () => {
     (listCategories as jest.Mock).mockResolvedValue([]);
     (listRoutineEventsInRange as jest.Mock).mockResolvedValue([]);
     (getAppStreakCache as jest.Mock).mockResolvedValue(undefined);
+    (ensureProfile as jest.Mock).mockResolvedValue({
+      id: 'profile-1',
+      displayName: 'Marvin',
+      createdAt: 'x',
+    });
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   });
 
@@ -101,6 +110,37 @@ describe('TodayScreen', () => {
     await render(<TodayScreen />);
 
     expect(await screen.findByTestId('today-app-streak')).toHaveTextContent('Streak: 0');
+  });
+
+  it('shows a time-based greeting with the profile display name', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([]);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(8);
+
+    await render(<TodayScreen />);
+
+    expect(await screen.findByTestId('today-greeting')).toHaveTextContent('Guten Morgen, Marvin');
+  });
+
+  it('shows the daily routine progress as completed/total', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
+    (listRoutineEventsInRange as jest.Mock).mockResolvedValue([
+      {
+        id: 'event-1',
+        routineId: dailyRoutine.id,
+        occurrenceDate: TODAY,
+        eventType: 'completed',
+        recordedAt: TODAY,
+        movedToDate: null,
+        skipReason: null,
+        supersededByEventId: null,
+      },
+    ]);
+
+    await render(<TodayScreen />);
+
+    expect(await screen.findByTestId('today-routine-progress')).toHaveTextContent(
+      '1/1 Routinen erledigt',
+    );
   });
 
   it('shows a pending due routine and excludes a paused one', async () => {
