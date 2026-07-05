@@ -307,6 +307,7 @@ export default function RoutineDetailScreen() {
           onPrevMonth={() => shiftMonth(-1)}
           onNextMonth={() => shiftMonth(1)}
           onDayPress={handleDayPress}
+          today={todayDateString()}
           testID="routine-detail-calendar"
         />
       </Card>

@@ -69,6 +69,39 @@ describe('getCalendarDayState', () => {
     // 2026-06-16 is a Tuesday.
     expect(getCalendarDayState(mondayOnly, [], START, '2026-06-16', TODAY)).toBe('not_due');
   });
+
+  it('marks a joker-protected day as joker_protected, not missed', () => {
+    const withJoker = [
+      ...events,
+      event({ occurrenceDate: '2026-06-15', eventType: 'joker_protected' }),
+      event({ occurrenceDate: '2026-06-15', eventType: 'joker_consumed' }),
+    ];
+    expect(getCalendarDayState(daily, withJoker, START, '2026-06-15', TODAY)).toBe(
+      'joker_protected',
+    );
+  });
+
+  it('falls back to the underlying state once a joker protection is superseded', () => {
+    // A retroactive completion supersedes the protection pair and writes a
+    // completed event (T027) — the day then shows as completed.
+    const withSupersededJoker = [
+      ...events,
+      event({
+        occurrenceDate: '2026-06-15',
+        eventType: 'joker_protected',
+        supersededByEventId: 'event-retro',
+      }),
+      event({
+        occurrenceDate: '2026-06-15',
+        eventType: 'joker_consumed',
+        supersededByEventId: 'event-retro',
+      }),
+      event({ occurrenceDate: '2026-06-15', eventType: 'completed' }),
+    ];
+    expect(getCalendarDayState(daily, withSupersededJoker, START, '2026-06-15', TODAY)).toBe(
+      'completed',
+    );
+  });
 });
 
 describe('listMonthDates', () => {
