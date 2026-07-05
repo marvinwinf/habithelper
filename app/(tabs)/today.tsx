@@ -103,7 +103,7 @@ export default function TodayScreen() {
       {dueRoutines.length === 0 ? (
         <EmptyState
           title="Für heute nichts geplant"
-          message="Erstelle eine Routine über das Plus-Symbol, um loszulegen."
+          message="Erstelle eine Routine im Tab „Routinen“, um loszulegen."
         />
       ) : (
         <View style={styles.list}>
