@@ -6,6 +6,7 @@ import { todayDateString } from '../../../src/domain/dates';
 import { listCategories } from '../../../src/data/repositories/categoryRepository';
 import { listRoutines, softDeleteRoutine } from '../../../src/data/repositories/routineRepository';
 import { listRoutineEventsInRange } from '../../../src/data/repositories/routineEventRepository';
+import { getAppStreakCache } from '../../../src/data/repositories/appStreakCacheRepository';
 import { completeRoutineOccurrence, moveRoutineOccurrence } from '../../../src/services/routineService';
 
 jest.mock('../../../src/data/db/client', () => ({ db: {} }));
@@ -18,6 +19,9 @@ jest.mock('../../../src/data/repositories/routineRepository', () => ({
 }));
 jest.mock('../../../src/data/repositories/routineEventRepository', () => ({
   listRoutineEventsInRange: jest.fn().mockResolvedValue([]),
+}));
+jest.mock('../../../src/data/repositories/appStreakCacheRepository', () => ({
+  getAppStreakCache: jest.fn(),
 }));
 jest.mock('../../../src/services/routineService', () => ({
   completeRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
@@ -58,7 +62,31 @@ describe('TodayScreen', () => {
     jest.clearAllMocks();
     (listCategories as jest.Mock).mockResolvedValue([]);
     (listRoutineEventsInRange as jest.Mock).mockResolvedValue([]);
+    (getAppStreakCache as jest.Mock).mockResolvedValue(undefined);
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  });
+
+  it('shows the overall app streak from the cache', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([]);
+    (getAppStreakCache as jest.Mock).mockResolvedValue({
+      id: 'app_streak_cache',
+      currentStreak: 5,
+      lastIncrementedDate: TODAY,
+      reconciledThroughDate: TODAY,
+      recalculatedAt: TODAY,
+    });
+
+    await render(<TodayScreen />);
+
+    expect(await screen.findByTestId('today-app-streak')).toHaveTextContent('Streak: 5');
+  });
+
+  it('shows a zero streak when the cache has never been computed', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([]);
+
+    await render(<TodayScreen />);
+
+    expect(await screen.findByTestId('today-app-streak')).toHaveTextContent('Streak: 0');
   });
 
   it('shows a pending due routine and excludes a paused one', async () => {
