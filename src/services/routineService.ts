@@ -1,36 +1,134 @@
-import { eq } from 'drizzle-orm';
-import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
-import { routine, routineEvent } from '../data/db/schema';
+import { eq, type ExtractTablesWithRelations } from 'drizzle-orm';
+import type { BaseSQLiteDatabase, SQLiteTransaction } from 'drizzle-orm/sqlite-core';
+import { appStreakCache, routine, routineEvent, routineStateCache } from '../data/db/schema';
 import {
   RoutineNotFoundError,
   createRoutine as repoCreateRoutine,
-  getRoutine,
   listRoutines,
   type Routine,
   type RoutineInput,
 } from '../data/repositories/routineRepository';
 import {
-  appendRoutineEvent,
   buildRoutineEvent,
   listRoutineEvents,
   type RoutineEvent,
 } from '../data/repositories/routineEventRepository';
+import {
+  buildRoutineStateCache,
+  type RoutineStateCache,
+} from '../data/repositories/routineStateCacheRepository';
+import { APP_STREAK_CACHE_ID, buildAppStreakCache } from '../data/repositories/appStreakCacheRepository';
+import { addDaysToDateString, todayDateString } from '../domain/dates';
 import { requestConsciousSkip } from '../domain/routines/completion';
 import { planRetroactiveCompletion } from '../domain/routines/retroactive';
+import { replayRoutineStreak } from '../domain/streaks/replay';
 
 // Accepts any sync-dialect SQLite drizzle database (both the real
 // expo-sqlite-backed client and a better-sqlite3-backed test database
 // satisfy this), so tests can run against a real SQLite engine per
 // docs/TEST_STRATEGY.md without needing expo-sqlite's native module, which
 // cannot run under Jest.
-type RoutineServiceDb = BaseSQLiteDatabase<
+type RoutineServiceSchema = {
+  routine: typeof routine;
+  routineEvent: typeof routineEvent;
+  routineStateCache: typeof routineStateCache;
+  appStreakCache: typeof appStreakCache;
+};
+type RoutineServiceDb = BaseSQLiteDatabase<'sync', unknown, RoutineServiceSchema>;
+type RoutineServiceTx = SQLiteTransaction<
   'sync',
   unknown,
-  { routine: typeof routine; routineEvent: typeof routineEvent }
+  RoutineServiceSchema,
+  ExtractTablesWithRelations<RoutineServiceSchema>
 >;
 
 export { RoutineNotFoundError };
-export type { Routine, RoutineEvent };
+export type { Routine, RoutineEvent, RoutineStateCache };
+
+/**
+ * Recomputes a routine's streak/joker/level cache from its full event log
+ * and persists it, per docs/ARCHITECTURE.md's Event and Cache Write
+ * Atomicity — always called from inside the same transaction as the
+ * `routine_event` write that triggered it, never on its own. `reconciled_
+ * through_date` is preserved from the existing cache row; it is only ever
+ * meaningfully advanced by the reconciliation service (T038), not by a
+ * direct user action. The very first cache computation for a routine (no
+ * existing row) seeds it to the day before that routine's earliest known
+ * event, so nothing before it is ever mistaken for already reconciled.
+ */
+function recomputeRoutineCacheTx(tx: RoutineServiceTx, routineId: string): RoutineStateCache {
+  const events = tx.select().from(routineEvent).where(eq(routineEvent.routineId, routineId)).all();
+  const state = replayRoutineStreak(events);
+
+  const [existingCache] = tx
+    .select()
+    .from(routineStateCache)
+    .where(eq(routineStateCache.routineId, routineId))
+    .all();
+
+  const earliestEventDate =
+    events.length > 0
+      ? events.reduce(
+          (min: string, event) => (event.occurrenceDate < min ? event.occurrenceDate : min),
+          events[0].occurrenceDate,
+        )
+      : todayDateString();
+  const reconciledThroughDate =
+    existingCache?.reconciledThroughDate ?? addDaysToDateString(earliestEventDate, -1);
+
+  const cache = buildRoutineStateCache(routineId, state, reconciledThroughDate);
+  if (existingCache) {
+    tx.update(routineStateCache).set(cache).where(eq(routineStateCache.routineId, routineId)).run();
+  } else {
+    tx.insert(routineStateCache).values(cache).run();
+  }
+  return cache;
+}
+
+/**
+ * Recomputes the singleton app streak cache after an actual completion
+ * (`completed`/`exceeded` only — docs/ROUTINE_RULES.md excludes skips and
+ * joker-protected occurrences), per the same atomicity requirement as
+ * `recomputeRoutineCacheTx`. Only ever extends the streak for a *new*, later
+ * day's first completion: an already-accounted-for date, or one older than
+ * the current watermark (a backdated/retroactive completion), is a no-op
+ * here — correctly bridging a reconciliation-aware gap is the reconciliation
+ * service's job (T038; see docs/IMPLEMENTATION_PLAN.md's Open Product
+ * Questions), not a direct user action's.
+ */
+function recomputeAppStreakCacheOnCompletionTx(tx: RoutineServiceTx, occurrenceDate: string): void {
+  const [existing] = tx
+    .select()
+    .from(appStreakCache)
+    .where(eq(appStreakCache.id, APP_STREAK_CACHE_ID))
+    .all();
+
+  if (!existing) {
+    const cache = buildAppStreakCache(1, occurrenceDate, addDaysToDateString(occurrenceDate, -1));
+    tx.insert(appStreakCache).values(cache).run();
+    return;
+  }
+
+  if (occurrenceDate <= existing.lastIncrementedDate) {
+    return;
+  }
+
+  const cache = buildAppStreakCache(existing.currentStreak + 1, occurrenceDate, existing.reconciledThroughDate);
+  tx.update(appStreakCache).set(cache).where(eq(appStreakCache.id, APP_STREAK_CACHE_ID)).run();
+}
+
+/**
+ * Recomputes and persists a routine's cache on its own, outside any specific
+ * event write — used to re-derive a cache row that was discarded (proving
+ * the always-re-derivable guarantee, docs/DATA_MODEL.md) and, later, by the
+ * reconciliation service (T038) after it writes missed/joker events.
+ */
+export async function recomputeRoutineCache(
+  db: RoutineServiceDb,
+  routineId: string,
+): Promise<RoutineStateCache> {
+  return db.transaction((tx) => recomputeRoutineCacheTx(tx, routineId));
+}
 
 export type CreateRoutineInput = Omit<RoutineInput, 'sortOrder'>;
 
@@ -47,13 +145,34 @@ export async function createRoutine(db: RoutineServiceDb, input: CreateRoutineIn
   return repoCreateRoutine(db, { ...input, sortOrder: maxSortOrder + 1 });
 }
 
+/**
+ * Writes a completion event (`completed` or `exceeded`) and recomputes both
+ * the routine cache and (since this is an actual completion) the app streak
+ * cache, all in one transaction (docs/ARCHITECTURE.md's Event and Cache
+ * Write Atomicity).
+ */
+function writeCompletionEventTx(
+  db: RoutineServiceDb,
+  routineId: string,
+  occurrenceDate: string,
+  eventType: 'completed' | 'exceeded',
+): RoutineEvent {
+  return db.transaction((tx) => {
+    const event = buildRoutineEvent({ routineId, occurrenceDate, eventType });
+    tx.insert(routineEvent).values(event).run();
+    recomputeRoutineCacheTx(tx, routineId);
+    recomputeAppStreakCacheOnCompletionTx(tx, occurrenceDate);
+    return event;
+  });
+}
+
 /** Normal completion: counts as one successful completion (docs/ROUTINE_RULES.md). */
 export async function completeRoutineOccurrence(
   db: RoutineServiceDb,
   routineId: string,
   occurrenceDate: string,
 ): Promise<RoutineEvent> {
-  return appendRoutineEvent(db, { routineId, occurrenceDate, eventType: 'completed' });
+  return writeCompletionEventTx(db, routineId, occurrenceDate, 'completed');
 }
 
 /** Exceeded completion: also counts as one successful completion, but with stronger feedback only — no extra streak/level progress. */
@@ -62,13 +181,15 @@ export async function exceedRoutineOccurrence(
   routineId: string,
   occurrenceDate: string,
 ): Promise<RoutineEvent> {
-  return appendRoutineEvent(db, { routineId, occurrenceDate, eventType: 'exceeded' });
+  return writeCompletionEventTx(db, routineId, occurrenceDate, 'exceeded');
 }
 
 /**
  * Conscious skip: rejected outright when the routine doesn't allow it (see
  * `requestConsciousSkip`), otherwise recorded without affecting streak,
- * jokers, or missed-occurrence status, per docs/ROUTINE_RULES.md.
+ * jokers, or missed-occurrence status, per docs/ROUTINE_RULES.md. The
+ * routine lookup, event write, and cache recompute all happen in one
+ * transaction.
  */
 export async function skipRoutineOccurrence(
   db: RoutineServiceDb,
@@ -76,17 +197,22 @@ export async function skipRoutineOccurrence(
   occurrenceDate: string,
   skipReason?: string,
 ): Promise<RoutineEvent> {
-  const target = await getRoutine(db, routineId);
-  if (!target) {
-    throw new RoutineNotFoundError(routineId);
-  }
+  return db.transaction((tx) => {
+    const [target] = tx.select().from(routine).where(eq(routine.id, routineId)).all();
+    if (!target) {
+      throw new RoutineNotFoundError(routineId);
+    }
 
-  const request = requestConsciousSkip(target.allowConsciousSkip, occurrenceDate, skipReason);
-  return appendRoutineEvent(db, {
-    routineId,
-    occurrenceDate: request.occurrenceDate,
-    eventType: 'skipped',
-    skipReason: request.skipReason,
+    const request = requestConsciousSkip(target.allowConsciousSkip, occurrenceDate, skipReason);
+    const event = buildRoutineEvent({
+      routineId,
+      occurrenceDate: request.occurrenceDate,
+      eventType: 'skipped',
+      skipReason: request.skipReason,
+    });
+    tx.insert(routineEvent).values(event).run();
+    recomputeRoutineCacheTx(tx, routineId);
+    return event;
   });
 }
 
@@ -101,11 +227,16 @@ export async function moveRoutineOccurrence(
   fromDate: string,
   toDate: string,
 ): Promise<RoutineEvent> {
-  return appendRoutineEvent(db, {
-    routineId,
-    occurrenceDate: fromDate,
-    eventType: 'moved',
-    movedToDate: toDate,
+  return db.transaction((tx) => {
+    const event = buildRoutineEvent({
+      routineId,
+      occurrenceDate: fromDate,
+      eventType: 'moved',
+      movedToDate: toDate,
+    });
+    tx.insert(routineEvent).values(event).run();
+    recomputeRoutineCacheTx(tx, routineId);
+    return event;
   });
 }
 
@@ -158,6 +289,7 @@ function setPauseState(
     }
     tx.insert(routineEvent).values(event).run();
     tx.update(routine).set({ isPaused, updatedAt }).where(eq(routine.id, routineId)).run();
+    recomputeRoutineCacheTx(tx, routineId);
   });
 }
 
@@ -201,6 +333,12 @@ export async function retroactivelyCompleteOccurrence(
           .run();
       }
     }
+
+    recomputeRoutineCacheTx(tx, routineId);
+    // planRetroactiveCompletion always writes a 'completed' event for
+    // occurrenceDate, so this occurrence is now (or remains) an actual
+    // completion for the app streak's purposes.
+    recomputeAppStreakCacheOnCompletionTx(tx, occurrenceDate);
   });
 
   return {
