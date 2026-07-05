@@ -6,6 +6,7 @@ import { todayDateString } from '../../../../src/domain/dates';
 import { getRoutine } from '../../../../src/data/repositories/routineRepository';
 import { listCategories } from '../../../../src/data/repositories/categoryRepository';
 import { listRoutineEvents } from '../../../../src/data/repositories/routineEventRepository';
+import { getRoutineStateCache } from '../../../../src/data/repositories/routineStateCacheRepository';
 import { retroactivelyCompleteOccurrence } from '../../../../src/services/routineService';
 
 jest.mock('../../../../src/data/db/client', () => ({ db: {} }));
@@ -17,6 +18,9 @@ jest.mock('../../../../src/data/repositories/categoryRepository', () => ({
 }));
 jest.mock('../../../../src/data/repositories/routineEventRepository', () => ({
   listRoutineEvents: jest.fn().mockResolvedValue([]),
+}));
+jest.mock('../../../../src/data/repositories/routineStateCacheRepository', () => ({
+  getRoutineStateCache: jest.fn(),
 }));
 jest.mock('../../../../src/services/routineService', () => ({
   retroactivelyCompleteOccurrence: jest.fn().mockResolvedValue(undefined),
@@ -59,20 +63,85 @@ const routine = {
   deletedAt: null,
 };
 
+function buildCache(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    routineId: routine.id,
+    currentStreak: 0,
+    bestStreak: 0,
+    totalCompletions: 0,
+    levelRank: 0,
+    jokerInventory: 0,
+    jokerProgress: 0,
+    consecutiveMissedAfter66: 0,
+    reconciledThroughDate: '2020-01-01',
+    recalculatedAt: '2020-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
 describe('RoutineDetailScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (getRoutine as jest.Mock).mockResolvedValue(routine);
     (listCategories as jest.Mock).mockResolvedValue([]);
     (listRoutineEvents as jest.Mock).mockResolvedValue([]);
+    (getRoutineStateCache as jest.Mock).mockResolvedValue(buildCache());
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   });
 
-  it('shows the routine name and placeholder streak once loaded', async () => {
+  it('shows the routine name and current streak once loaded', async () => {
+    (getRoutineStateCache as jest.Mock).mockResolvedValue(buildCache({ currentStreak: 3 }));
+
     await render(<RoutineDetailScreen />);
 
     expect(await screen.findByText('Laufen')).toBeTruthy();
-    expect(screen.getByTestId('routine-detail-streak')).toBeTruthy();
+    expect(await screen.findByText('Streak: 3')).toBeTruthy();
+  });
+
+  it.each([
+    [0, 'Im Aufbau'],
+    [1, 'Stabil'],
+    [2, 'Gefestigt'],
+    [3, 'Meister'],
+    [4, 'Meister'],
+  ])('shows the level name for level_rank %i', async (levelRank, expectedName) => {
+    (getRoutineStateCache as jest.Mock).mockResolvedValue(buildCache({ levelRank }));
+
+    await render(<RoutineDetailScreen />);
+
+    expect(await screen.findByTestId('routine-detail-level')).toHaveTextContent(expectedName);
+  });
+
+  it('shows available jokers before streak 66', async () => {
+    (getRoutineStateCache as jest.Mock).mockResolvedValue(
+      buildCache({ currentStreak: 10, jokerInventory: 2 }),
+    );
+
+    await render(<RoutineDetailScreen />);
+
+    expect(await screen.findByTestId('routine-detail-jokers')).toHaveTextContent('Joker: 2/2');
+  });
+
+  it('hides the joker line once the streak has reached 66', async () => {
+    (getRoutineStateCache as jest.Mock).mockResolvedValue(buildCache({ currentStreak: 66 }));
+
+    await render(<RoutineDetailScreen />);
+    await screen.findByText('Laufen');
+
+    expect(screen.queryByTestId('routine-detail-jokers')).toBeNull();
+  });
+
+  it('shows the personal streak record and total successful completions', async () => {
+    (getRoutineStateCache as jest.Mock).mockResolvedValue(
+      buildCache({ bestStreak: 12, totalCompletions: 40 }),
+    );
+
+    await render(<RoutineDetailScreen />);
+
+    expect(await screen.findByTestId('routine-detail-best-streak')).toHaveTextContent('Rekord: 12');
+    expect(await screen.findByTestId('routine-detail-total-completions')).toHaveTextContent(
+      'Erledigt insgesamt: 40',
+    );
   });
 
   it('maps calendar cell states from the routine events', async () => {

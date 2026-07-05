@@ -9,13 +9,20 @@ import {
   listRoutineEvents,
   type RoutineEvent,
 } from '../../../src/data/repositories/routineEventRepository';
+import {
+  getRoutineStateCache,
+  type RoutineStateCache,
+} from '../../../src/data/repositories/routineStateCacheRepository';
 import { retroactivelyCompleteOccurrence } from '../../../src/services/routineService';
 import { reconcileRoutine } from '../../../src/services/reconciliationService';
 import { toLocalDateString, todayDateString } from '../../../src/domain/dates';
 import { getCalendarDayState, listMonthDates } from '../../../src/domain/routines/calendar';
 import { scheduleFromRoutineRow } from '../../../src/domain/routines/schedule';
+import { LEVEL_SEGMENT_SIZE } from '../../../src/domain/streaks/replay';
+import { levelName } from '../../../src/domain/streaks/levelName';
 import { Card } from '../../../src/ui/components/Card';
 import { CategoryBadge } from '../../../src/ui/components/CategoryBadge';
+import { ProgressBar } from '../../../src/ui/components/ProgressBar';
 import { RoutineCalendar, type CalendarDay } from '../../../src/ui/components/RoutineCalendar';
 import { colors, spacing, typography } from '../../../src/ui/theme';
 
@@ -39,6 +46,7 @@ export default function RoutineDetailScreen() {
   const [routine, setRoutine] = useState<Routine | undefined>(undefined);
   const [categories, setCategories] = useState<Category[]>([]);
   const [events, setEvents] = useState<RoutineEvent[]>([]);
+  const [cache, setCache] = useState<RoutineStateCache | undefined>(undefined);
   const [reasonExpanded, setReasonExpanded] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const [year, month] = todayDateString().split('-').map(Number);
@@ -49,6 +57,7 @@ export default function RoutineDetailScreen() {
     getRoutine(db, id).then(setRoutine);
     listCategories(db).then(setCategories);
     listRoutineEvents(db, id).then(setEvents);
+    getRoutineStateCache(db, id).then(setCache);
   }, [id]);
 
   // Re-reconciles this routine's missed occurrences before showing its
@@ -128,10 +137,26 @@ export default function RoutineDetailScreen() {
             colorVariantSeed={routine.colorVariantSeed}
           />
         )}
-        {/* TODO(T037/T039): real streak, level name, jokers, record, and
-            total completions from routine_state_cache land in Phase 6. */}
         <Text style={styles.streak} testID="routine-detail-streak">
-          Streak: 0
+          Streak: {cache?.currentStreak ?? 0}
+        </Text>
+        <Text style={styles.level} testID="routine-detail-level">
+          {levelName(cache?.levelRank ?? 0)}
+        </Text>
+        <ProgressBar
+          value={((cache?.totalCompletions ?? 0) % LEVEL_SEGMENT_SIZE) / LEVEL_SEGMENT_SIZE}
+          testID="routine-detail-level-progress"
+        />
+        {(cache?.currentStreak ?? 0) < LEVEL_SEGMENT_SIZE && (
+          <Text style={styles.statLine} testID="routine-detail-jokers">
+            Joker: {cache?.jokerInventory ?? 0}/2
+          </Text>
+        )}
+        <Text style={styles.statLine} testID="routine-detail-best-streak">
+          Rekord: {cache?.bestStreak ?? 0}
+        </Text>
+        <Text style={styles.statLine} testID="routine-detail-total-completions">
+          Erledigt insgesamt: {cache?.totalCompletions ?? 0}
         </Text>
       </Card>
 
@@ -188,6 +213,15 @@ const styles = StyleSheet.create({
   },
   streak: {
     fontSize: typography.body.fontSize,
+    color: colors.textSecondary,
+  },
+  level: {
+    fontSize: typography.bodySmall.fontSize,
+    fontWeight: typography.bodySmall.fontWeight,
+    color: colors.textPrimary,
+  },
+  statLine: {
+    fontSize: typography.bodySmall.fontSize,
     color: colors.textSecondary,
   },
   reasonCard: {
