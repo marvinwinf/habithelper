@@ -45,3 +45,19 @@ export function reconcileAppStreakDays(
     return state;
   }, initialState);
 }
+
+/**
+ * Whether writing an actual completion for `occurrenceDate` would be the
+ * first one recorded for that calendar day, given the app streak cache's
+ * current `lastIncrementedDate` — the same forward-only comparison
+ * `src/services/routineService.ts`'s cache update uses to decide whether to
+ * extend the streak, reused here as the UI's signal for exactly when to
+ * play the first-completion-of-day burst animation (T041): once per day,
+ * on whichever completion happens to land first.
+ */
+export function isFirstCompletionOfDay(
+  lastIncrementedDate: string | null | undefined,
+  occurrenceDate: string,
+): boolean {
+  return !lastIncrementedDate || occurrenceDate > lastIncrementedDate;
+}

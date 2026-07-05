@@ -1,12 +1,21 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from './Button';
 import { Card } from './Card';
 import { CategoryBadge } from './CategoryBadge';
 import { CompletionControl } from './CompletionControl';
 import { Sheet } from './Sheet';
+import { triggerExceededCompletionHaptic, triggerRoutineCompletionHaptic } from '../animation/haptics';
+import { useCompletionAnimation } from '../animation/useCompletionAnimation';
 import { colors, spacing, typography } from '../theme';
+
+// Same short pulse for both, scaled to a visibly bigger peak for exceeded —
+// "exceeded completion receives a stronger animation" (docs/ROUTINE_RULES.md)
+// — rather than a second animation hook, since the two only ever differ in
+// magnitude, not timing or shape.
+const NORMAL_SCALE_PEAK = 1.12;
+const EXCEEDED_SCALE_PEAK = 1.35;
 
 export type RoutineCardOccurrenceState = 'pending' | 'completed' | 'exceeded' | 'skipped';
 
@@ -61,12 +70,33 @@ export function RoutineCard({
   testID,
 }: RoutineCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [lastAction, setLastAction] = useState<'complete' | 'exceed' | null>(null);
+  const completionAnimation = useCompletionAnimation();
   const isResolved = state !== 'pending';
 
   function closeMenuThen(action: () => void) {
     setMenuOpen(false);
     action();
   }
+
+  function handleComplete() {
+    setLastAction('complete');
+    completionAnimation.start();
+    triggerRoutineCompletionHaptic();
+    onComplete();
+  }
+
+  function handleExceed() {
+    setLastAction('exceed');
+    completionAnimation.start();
+    triggerExceededCompletionHaptic();
+    onExceed();
+  }
+
+  const completionScale = completionAnimation.progress.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [1, lastAction === 'exceed' ? EXCEEDED_SCALE_PEAK : NORMAL_SCALE_PEAK, 1],
+  });
 
   return (
     <>
@@ -88,14 +118,16 @@ export function RoutineCard({
             <Text style={styles.streak}>Streak: {streak}</Text>
           </View>
           <View style={styles.actions}>
-            <CompletionControl
-              completed={state === 'completed'}
-              exceeded={state === 'exceeded'}
-              disabled={isResolved}
-              onComplete={onComplete}
-              onExceed={onExceed}
-              testID={`${testID}-complete`}
-            />
+            <Animated.View style={{ transform: [{ scale: completionScale }] }}>
+              <CompletionControl
+                completed={state === 'completed'}
+                exceeded={state === 'exceeded'}
+                disabled={isResolved}
+                onComplete={handleComplete}
+                onExceed={handleExceed}
+                testID={`${testID}-complete`}
+              />
+            </Animated.View>
             <Button
               label="⋯"
               variant="secondary"

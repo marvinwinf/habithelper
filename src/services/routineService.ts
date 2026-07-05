@@ -21,6 +21,7 @@ import { APP_STREAK_CACHE_ID, buildAppStreakCache } from '../data/repositories/a
 import { addDaysToDateString, todayDateString } from '../domain/dates';
 import { requestConsciousSkip } from '../domain/routines/completion';
 import { planRetroactiveCompletion } from '../domain/routines/retroactive';
+import { isFirstCompletionOfDay } from '../domain/streaks/appStreak';
 import { JOKER_EARN_THRESHOLD, replayRoutineStreak } from '../domain/streaks/replay';
 
 // Accepts any sync-dialect SQLite drizzle database (both the real
@@ -119,7 +120,7 @@ function recomputeAppStreakCacheOnCompletionTx(tx: RoutineServiceTx, occurrenceD
     return;
   }
 
-  if (occurrenceDate <= existing.lastIncrementedDate) {
+  if (!isFirstCompletionOfDay(existing.lastIncrementedDate, occurrenceDate)) {
     return;
   }
 

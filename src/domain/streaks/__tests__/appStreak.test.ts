@@ -1,4 +1,9 @@
-import { reconcileAppStreakDays, type AppStreakDayInput, type AppStreakState } from '../appStreak';
+import {
+  isFirstCompletionOfDay,
+  reconcileAppStreakDays,
+  type AppStreakDayInput,
+  type AppStreakState,
+} from '../appStreak';
 
 const EMPTY_STATE: AppStreakState = { currentStreak: 0, lastIncrementedDate: null };
 
@@ -54,5 +59,24 @@ describe('reconcileAppStreakDays', () => {
       currentStreak: 4,
       lastIncrementedDate: '2026-07-03',
     });
+  });
+});
+
+describe('isFirstCompletionOfDay', () => {
+  it('is true when the app streak has never been incremented before', () => {
+    expect(isFirstCompletionOfDay(null, '2026-07-01')).toBe(true);
+    expect(isFirstCompletionOfDay(undefined, '2026-07-01')).toBe(true);
+  });
+
+  it('is true for the first completion of a new, later day', () => {
+    expect(isFirstCompletionOfDay('2026-07-01', '2026-07-02')).toBe(true);
+  });
+
+  it('is false for a second completion on the same already-incremented day', () => {
+    expect(isFirstCompletionOfDay('2026-07-02', '2026-07-02')).toBe(false);
+  });
+
+  it('is false for a backdated completion older than the current watermark', () => {
+    expect(isFirstCompletionOfDay('2026-07-05', '2026-07-01')).toBe(false);
   });
 });

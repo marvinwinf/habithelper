@@ -1,13 +1,17 @@
 import { Alert } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import TodayScreen from '../today';
 import { todayDateString } from '../../../src/domain/dates';
 import { listCategories } from '../../../src/data/repositories/categoryRepository';
 import { listRoutines, softDeleteRoutine } from '../../../src/data/repositories/routineRepository';
 import { listRoutineEventsInRange } from '../../../src/data/repositories/routineEventRepository';
-import { getAppStreakCache } from '../../../src/data/repositories/appStreakCacheRepository';
+import {
+  getAppStreakCache,
+  type AppStreakCache,
+} from '../../../src/data/repositories/appStreakCacheRepository';
 import { completeRoutineOccurrence, moveRoutineOccurrence } from '../../../src/services/routineService';
+import { triggerFirstCompletionOfDayHaptic } from '../../../src/ui/animation/haptics';
 
 jest.mock('../../../src/data/db/client', () => ({ db: {} }));
 jest.mock('../../../src/data/repositories/categoryRepository', () => ({
@@ -30,6 +34,16 @@ jest.mock('../../../src/services/routineService', () => ({
   skipRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
   pauseRoutine: jest.fn().mockResolvedValue(undefined),
 }));
+jest.mock('../../../src/ui/animation/haptics', () => ({
+  triggerRoutineCompletionHaptic: jest.fn(),
+  triggerExceededCompletionHaptic: jest.fn(),
+  triggerFirstCompletionOfDayHaptic: jest.fn(),
+  triggerLevelMilestoneHaptic: jest.fn(),
+}));
+jest.mock('../../../src/domain/dates', () => {
+  const actual = jest.requireActual('../../../src/domain/dates');
+  return { ...actual, todayDateString: jest.fn(actual.todayDateString) };
+});
 jest.mock('expo-router', () => ({
   ...jest.requireActual('expo-router'),
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
@@ -169,5 +183,59 @@ describe('TodayScreen', () => {
     await buttons.find((b) => b.text === 'Löschen')?.onPress?.();
 
     expect(softDeleteRoutine).toHaveBeenCalledWith({}, dailyRoutine.id);
+  });
+
+  it('fires the first-completion-of-day signal exactly once per day, across multiple completions', async () => {
+    const routineA = dailyRoutine;
+    const routineB = { ...dailyRoutine, id: 'routine-b', name: 'Lesen' };
+    (listRoutines as jest.Mock).mockResolvedValue([routineA, routineB]);
+
+    let currentDay = '2026-07-01';
+    (todayDateString as jest.Mock).mockImplementation(() => currentDay);
+
+    let lastIncrementedDate: string | null = null;
+    (getAppStreakCache as jest.Mock).mockImplementation(() =>
+      Promise.resolve<AppStreakCache | undefined>(
+        lastIncrementedDate === null
+          ? undefined
+          : {
+              id: 'app_streak_cache',
+              currentStreak: 1,
+              lastIncrementedDate,
+              reconciledThroughDate: lastIncrementedDate,
+              recalculatedAt: lastIncrementedDate,
+            },
+      ),
+    );
+    (completeRoutineOccurrence as jest.Mock).mockImplementation((_db, _id, date: string) => {
+      // Mirrors the real cache update (src/services/routineService.ts):
+      // only a later day's first completion advances the watermark.
+      if (lastIncrementedDate === null || date > lastIncrementedDate) {
+        lastIncrementedDate = date;
+      }
+      return Promise.resolve(undefined);
+    });
+
+    await render(<TodayScreen />);
+
+    await fireEvent(await screen.findByTestId(`routine-card-${routineA.id}-complete`), 'pressIn');
+    await fireEvent(screen.getByTestId(`routine-card-${routineA.id}-complete`), 'pressOut');
+    await waitFor(() => expect(screen.getByTestId('today-app-streak')).toHaveTextContent('Streak: 1'));
+
+    expect(triggerFirstCompletionOfDayHaptic).toHaveBeenCalledTimes(1);
+
+    await fireEvent(screen.getByTestId(`routine-card-${routineB.id}-complete`), 'pressIn');
+    await fireEvent(screen.getByTestId(`routine-card-${routineB.id}-complete`), 'pressOut');
+    // Give the second action's promise chain (service -> loadData -> setAppStreak) time to settle.
+    await waitFor(() => expect((getAppStreakCache as jest.Mock).mock.calls.length).toBeGreaterThanOrEqual(3));
+
+    // Second completion, same day: the signal does not fire again.
+    expect(triggerFirstCompletionOfDayHaptic).toHaveBeenCalledTimes(1);
+
+    // A new day: the next completion fires the signal once more.
+    currentDay = '2026-07-02';
+    await fireEvent(screen.getByTestId(`routine-card-${routineA.id}-complete`), 'pressIn');
+    await fireEvent(screen.getByTestId(`routine-card-${routineA.id}-complete`), 'pressOut');
+    await waitFor(() => expect(triggerFirstCompletionOfDayHaptic).toHaveBeenCalledTimes(2));
   });
 });
