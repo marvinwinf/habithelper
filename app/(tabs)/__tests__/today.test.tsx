@@ -145,7 +145,8 @@ describe('TodayScreen', () => {
 
     await render(<TodayScreen />);
 
-    expect(await screen.findByTestId('today-app-streak')).toHaveTextContent('Streak: 5');
+    expect(await screen.findByTestId('today-app-streak')).toHaveTextContent('5');
+    expect(screen.getByText('Gesamt-Streak')).toBeTruthy();
   });
 
   it('shows a zero streak when the cache has never been computed', async () => {
@@ -153,7 +154,7 @@ describe('TodayScreen', () => {
 
     await render(<TodayScreen />);
 
-    expect(await screen.findByTestId('today-app-streak')).toHaveTextContent('Streak: 0');
+    expect(await screen.findByTestId('today-app-streak')).toHaveTextContent('0');
   });
 
   it('shows a time-based greeting with the profile display name', async () => {
@@ -165,7 +166,7 @@ describe('TodayScreen', () => {
     expect(await screen.findByTestId('today-greeting')).toHaveTextContent('Guten Morgen, Marvin');
   });
 
-  it('shows the daily routine progress as completed/total', async () => {
+  it('shows the daily routine progress as completed/total with a filled progress bar', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
     (listRoutineEventsInRange as jest.Mock).mockResolvedValue([
       {
@@ -183,8 +184,11 @@ describe('TodayScreen', () => {
     await render(<TodayScreen />);
 
     expect(await screen.findByTestId('today-routine-progress')).toHaveTextContent(
-      '1/1 Routinen erledigt',
+      '1 von 1 erledigt',
     );
+    expect(
+      screen.getByTestId('today-routine-progress-bar').props.accessibilityValue.now,
+    ).toBe(100);
   });
 
   it('shows a pending due routine and excludes a paused one', async () => {
@@ -393,7 +397,7 @@ describe('TodayScreen', () => {
 
     await fireEvent(await screen.findByTestId(`routine-card-${routineA.id}-complete`), 'pressIn');
     await fireEvent(screen.getByTestId(`routine-card-${routineA.id}-complete`), 'pressOut');
-    await waitFor(() => expect(screen.getByTestId('today-app-streak')).toHaveTextContent('Streak: 1'));
+    await waitFor(() => expect(screen.getByTestId('today-app-streak')).toHaveTextContent('1'));
 
     expect(triggerFirstCompletionOfDayHaptic).toHaveBeenCalledTimes(1);
 

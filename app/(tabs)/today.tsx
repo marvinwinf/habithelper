@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -40,10 +41,12 @@ import { isDueTodayOrEarlier } from '../../src/domain/tasks/section';
 import { confirmRoutineDeletion, confirmTaskDeletion } from '../../src/ui/alerts';
 import { triggerFirstCompletionOfDayHaptic } from '../../src/ui/animation/haptics';
 import { useStreakBurst } from '../../src/ui/animation/useStreakBurst';
+import { Card } from '../../src/ui/components/Card';
 import { EmptyState } from '../../src/ui/components/EmptyState';
+import { ProgressBar } from '../../src/ui/components/ProgressBar';
 import { RoutineCard, type RoutineCardOccurrenceState } from '../../src/ui/components/RoutineCard';
 import { TaskCard } from '../../src/ui/components/TaskCard';
-import { colors, spacing, typography } from '../../src/ui/theme';
+import { colors, iconBadgeSizes, spacing, typography } from '../../src/ui/theme';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('de-DE', {
   weekday: 'long',
@@ -207,22 +210,43 @@ export default function TodayScreen() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.greeting} testID="today-greeting">
-          {greeting}
-        </Text>
-        <Text style={styles.date} testID="today-date">
-          {formattedDate}
-        </Text>
-        <View style={styles.headerMetaRow}>
-          <Animated.View style={{ transform: [{ scale: streakScale }] }}>
-            <Text style={styles.appStreak} testID="today-app-streak">
-              Streak: {appStreak?.currentStreak ?? 0}
+        <View style={styles.headerTopRow}>
+          <View style={styles.headerGreetingBlock}>
+            <Text style={styles.greeting} testID="today-greeting">
+              {greeting}
             </Text>
+            <Text style={styles.date} testID="today-date">
+              {formattedDate}
+            </Text>
+          </View>
+          {/* Subtle per docs/SCREEN_SPECIFICATIONS.md — a compact card, not a
+              dominant element; the first-completion-of-day burst (T041)
+              scales this whole card. */}
+          <Animated.View style={{ transform: [{ scale: streakScale }] }}>
+            <Card style={styles.streakCard}>
+              <Ionicons name="flame" size={iconBadgeSizes.sm.icon} color={colors.streakFlame} />
+              <View>
+                <Text style={styles.streakLabel}>Gesamt-Streak</Text>
+                <Text style={styles.streakValue} testID="today-app-streak">
+                  {appStreak?.currentStreak ?? 0}
+                </Text>
+              </View>
+            </Card>
           </Animated.View>
-          <Text style={styles.routineProgress} testID="today-routine-progress">
-            {completedRoutineCount}/{dueRoutines.length} Routinen erledigt
-          </Text>
         </View>
+
+        <Card style={styles.progressCard}>
+          <View style={styles.progressHeaderRow}>
+            <Text style={styles.progressTitle}>Heutige Routinen</Text>
+            <Text style={styles.progressCount} testID="today-routine-progress">
+              {completedRoutineCount} von {dueRoutines.length} erledigt
+            </Text>
+          </View>
+          <ProgressBar
+            value={dueRoutines.length === 0 ? 0 : completedRoutineCount / dueRoutines.length}
+            testID="today-routine-progress-bar"
+          />
+        </Card>
       </View>
 
       {dueRoutines.length === 0 && todayTasks.length === 0 && laterTasks.length === 0 ? (
@@ -358,6 +382,16 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: spacing.md,
+    gap: spacing.md,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  headerGreetingBlock: {
+    flex: 1,
     gap: spacing.xxs,
   },
   greeting: {
@@ -370,19 +404,40 @@ const styles = StyleSheet.create({
     fontSize: typography.body.fontSize,
     color: colors.textSecondary,
   },
-  headerMetaRow: {
+  streakCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  streakLabel: {
+    fontSize: typography.caption.fontSize,
+    lineHeight: typography.caption.lineHeight,
+    fontWeight: typography.caption.fontWeight,
+    color: colors.textSecondary,
+  },
+  streakValue: {
+    fontSize: typography.heading.fontSize,
+    lineHeight: typography.heading.lineHeight,
+    fontWeight: typography.heading.fontWeight,
+    color: colors.textPrimary,
+  },
+  progressCard: {
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+  },
+  progressHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: spacing.xs,
   },
-  // Subtle per docs/SCREEN_SPECIFICATIONS.md's "Subtle overall app streak" —
-  // small, muted text, not a visually dominant element.
-  appStreak: {
+  progressTitle: {
     fontSize: typography.bodySmall.fontSize,
-    color: colors.textSecondary,
+    fontWeight: typography.bodySmall.fontWeight,
+    color: colors.textPrimary,
   },
-  routineProgress: {
+  progressCount: {
     fontSize: typography.bodySmall.fontSize,
     color: colors.textSecondary,
   },

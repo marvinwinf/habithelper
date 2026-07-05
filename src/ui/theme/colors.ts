@@ -16,6 +16,10 @@ export const colors = {
   accent: '#7C9885',
   destructive: '#C1544A',
   success: '#5B8C6B',
+  // Streak flame accent per the design reference mockup — warm orange,
+  // deliberately outside the pastel category families so the streak reads
+  // as its own signal, not as a category color.
+  streakFlame: '#E8853D',
 
   categories: {
     mint: {
