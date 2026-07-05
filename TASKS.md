@@ -5,7 +5,7 @@ Small, independently implementable and verifiable tasks for the Android MVP, seq
 Global rules for every task:
 
 - `tsc --noEmit`, ESLint, and the full Jest suite must pass before the task's commit, in addition to whatever is listed under "Required automated tests" for that task.
-- Any task that changes `src/data/db/schema.ts` must include a corresponding versioned migration file and a migration test proving prior data survives (per `docs/ARCHITECTURE.md`'s Migration Strategy), even outside Phase 1. No task in the list below currently introduces a schema change after Phase 1 (all tables and columns are created together in `0001_init`), but this rule applies if scope ever changes that.
+- Any task that changes `src/data/db/schema.ts` must include a corresponding versioned migration file and a migration test proving prior data survives (per `docs/ARCHITECTURE.md`'s Migration Strategy), even outside Phase 1. T063 (category icons, Phase 8b) is currently the only task after Phase 1 that introduces a schema change and is explicitly bound by this rule.
 
 No implementation begins from this document; it is the plan the Phase 0 work will follow.
 
@@ -496,6 +496,93 @@ No implementation begins from this document; it is the plan the Phase 0 work wil
 **Manual verification:** on-device, tap the floating button from each tab, confirm the sheet appears consistently and both options open the correct create screen.
 **Dependencies:** T031, T045, T017.
 **Commit message:** `feat: add floating create button with type selection`
+
+---
+
+## Phase 8b — Design Polish (design reference implementation)
+
+Brings every existing screen up to the visual level of `docs/design_reference.png` (see `docs/DESIGN_SYSTEM.md`'s Reference Image section). This phase is sequenced before Phase 9; task IDs continue after T061 so every ID in this file stays unique. All icons come from `@expo/vector-icons` (Ionicons), which is already a dependency — no new external dependencies. Where the mockup shows data the MVP data model does not have (e.g. per-routine duration "20 Min."), the closest existing field is rendered instead (the optional time of day) — a deliberate adaptation, not a silent scope change.
+
+### T062 — Design tokens and icon badge groundwork
+**Goal:** the shared visual building blocks the rest of the phase reuses: a soft-shadow/elevation token, an icon-size scale, and a reusable rounded icon container per the mockup's card icons.
+**Files/areas:** `src/ui/theme/` (new `shadows.ts` and icon-size additions, exported via `index.ts`), `src/ui/components/IconBadge.tsx` (rounded container rendering an Ionicons icon on a tinted background), `docs/DESIGN_SYSTEM.md` if token guidance needs extending.
+**Acceptance criteria:** `IconBadge` renders a given Ionicons name inside a rounded container with configurable tint (category variant colors or neutral); shadow token produces the mockup's low-contrast elevation on `Card` without changing existing card layouts; no raw shadow/size literals in later phase tasks.
+**Required automated tests:** component test for `IconBadge` (renders icon, applies tint); token test additions in `src/ui/theme/__tests__/tokens.test.ts`.
+**Manual verification:** dev preview screen (T019) shows `IconBadge` variants alongside existing primitives.
+**Dependencies:** T013, T015.
+**Commit message:** `feat: add shadow tokens and icon badge primitive`
+
+### T063 — Category icons
+**Goal:** categories carry an icon (mockup shows a book for Persönliche Entwicklung, a walker, a basket, etc.), selectable in the category form and rendered wherever the category appears.
+**Files/areas:** `src/data/db/schema.ts` (nullable `icon` text column on `category`), new versioned migration + migration test proving existing rows survive with `NULL` icon, `src/data/repositories/categoryRepository.ts`, `src/ui/components/CategoryForm.tsx` (picker over a curated Ionicons set), a fallback icon for categories without one, `src/ui/components/CategoryBadge.tsx`/`IconBadge` call sites.
+**Acceptance criteria:** creating/editing a category lets the user pick from a curated icon set; existing categories keep working and render the fallback icon; the icon shows in category management, category badges, and (via later tasks) card icon containers.
+**Required automated tests:** migration test (pre-migration seeded DB keeps its categories, `icon` is NULL); repository test for icon round-trip; CategoryForm component test for icon selection.
+**Manual verification:** on-device, edit an existing category, pick an icon, and confirm it appears in category management and on cards after later tasks land.
+**Dependencies:** T062, T022, T024.
+**Commit message:** `feat: add selectable category icons`
+
+### T064 — Today header redesign
+**Goal:** match the mockup's header: large greeting with the date below it, a compact "Gesamt-Streak" card top-right with a flame icon, and a "Heutige Routinen" card containing a progress bar plus "x von y erledigt".
+**Files/areas:** `app/(tabs)/today.tsx` (header section), reusing `ProgressBar` (T017) and the streak-burst animation wiring from T041 (the burst now scales the streak card).
+**Acceptance criteria:** greeting/date/streak/progress render as in the mockup; the streak card keeps testID `today-app-streak` behavior (count still correct, first-completion burst still animates it); progress text reads "x von y erledigt" and the bar fills proportionally.
+**Required automated tests:** update `today.test.tsx` header assertions (streak value, progress text format, progress bar value).
+**Manual verification:** on-device, complete a routine and confirm the progress bar and count update and the streak card bursts on the day's first completion.
+**Dependencies:** T048, T040.
+**Commit message:** `feat: redesign Today header to design reference`
+
+### T065 — Routine card redesign with real streak
+**Goal:** match the mockup's routine cards: category-tinted card background (light variant stops), rounded icon container with the category icon, subtitle line "Zeit · Häufigkeit" (e.g. "20:00 · Jeden Tag"), a flame + "Streak N" line fed by the routine's real `routine_state_cache` streak (replacing the hardcoded `streak={0}` placeholder from T033), and a completion circle tinted by category (outlined when pending, filled with a checkmark when completed).
+**Files/areas:** `src/ui/components/RoutineCard.tsx`, `app/(tabs)/today.tsx` (load state caches for due routines), possibly a small `listRoutineStateCaches` helper in `src/data/repositories/routineStateCacheRepository.ts`.
+**Acceptance criteria:** card background uses the routine's stable category variant (T014) with readable text contrast; icon container shows the category icon (fallback when none); subtitle shows optional time and a human schedule label ("Jeden Tag" / weekday initials / "3x pro Woche"); streak line shows the real current streak; completed/exceeded/skipped cards stay visible in the subdued state; completion control behavior (tap/long-press, animations, haptics) is unchanged.
+**Required automated tests:** RoutineCard tests for schedule label variants and streak rendering; today.test.tsx asserting the real cache streak reaches the card.
+**Manual verification:** on-device with seed data (T047), confirm tinted cards per category, correct streaks, and unchanged completion interactions.
+**Dependencies:** T062, T063, T037, T033.
+**Commit message:** `feat: redesign routine cards to design reference`
+
+### T066 — Task card redesign
+**Goal:** match the mockup's task rows: rounded icon container (category icon, neutral fallback), title with a short subtitle ("Heute", the date, or "Für später"), circle completion toggle on the right, and a bookmark icon on "Für später" entries; task cards stay visually more neutral than routine cards per `docs/DESIGN_SYSTEM.md`.
+**Files/areas:** `src/ui/components/TaskCard.tsx`, `app/(tabs)/today.tsx`, `app/(tabs)/tasks.tsx`.
+**Acceptance criteria:** icon container + subtitle render on both Today and Tasks screens; the overdue label remains a text label (color never the sole signal); For-later cards show the bookmark; completion toggle/undo, overflow menu, and all existing testIDs keep working.
+**Required automated tests:** TaskCard tests for subtitle variants and the bookmark; existing tasks/today screen tests updated where markup changed.
+**Manual verification:** on-device, check Today's Aufgaben/Für später sections and the Tasks tab against the mockup.
+**Dependencies:** T062, T063, T046, T049.
+**Commit message:** `feat: redesign task cards to design reference`
+
+### T067 — Floating tab bar and FAB polish
+**Goal:** match the mockup's bottom navigation: a rounded, floating card-style tab bar with the active tab highlighted by a soft green pill, and the create FAB overlapping the content just above it.
+**Files/areas:** `app/(tabs)/_layout.tsx` (custom `tabBarStyle`/item styling), `src/ui/components/CreateFab.tsx` (position relative to the floating bar).
+**Acceptance criteria:** tab bar floats with rounded corners and the soft shadow token; active tab shows label+icon in accent green with a pill background; FAB does not overlap the bar's touch targets; all four tabs remain reachable and the FAB sheet still works.
+**Required automated tests:** existing CreateFab tests still pass; smoke render test of the tab layout if practical.
+**Manual verification:** on-device, verify bar/FAB appearance on tall and short screens and that Android back/gesture navigation does not clip the floating bar.
+**Dependencies:** T062, T050.
+**Commit message:** `feat: restyle tab bar and floating create button`
+
+### T068 — Routine form redesign
+**Goal:** match the mockup's Neue Routine screen: labeled sections; icon-leading name input; category selector row with icon and chevron; frequency as three side-by-side option cards (Täglich / Wochentage / 3x pro Woche) with calendar icons and a green selected outline; weekday selection as circular Mo–So toggles inside a sub-card; time row with clock icon; "Weitere Einstellungen" as a collapsible row; a dashed-outline "+ Neue Kategorie erstellen" button; a full-width green Speichern button; stack header with a circular back button and centered title.
+**Files/areas:** `src/ui/components/RoutineForm.tsx` (restyle existing controls — behavior and testIDs stay), `app/routine/create.tsx`, `app/routine/[id]/edit.tsx`, shared stack header options (`app/_layout.tsx`).
+**Acceptance criteria:** every existing form behavior (validation, weekly-target suggestion, weekday toggling, advanced section, save) works unchanged under the new styling; the form remains usable with the keyboard open; header shows back button + centered title on create and edit.
+**Required automated tests:** existing RoutineForm/create/edit tests pass (updated only where markup changed); new assertions for the selected-frequency-card state.
+**Manual verification:** on-device, create and edit a routine end-to-end and compare each section against the mockup's middle screen.
+**Dependencies:** T062, T063, T031.
+**Commit message:** `feat: redesign routine form to design reference`
+
+### T069 — Routine detail hero and stat tiles
+**Goal:** match the mockup's detail screen top: a category-tinted hero card (large icon badge, category chip, flame streak with "N Tage", a level badge with the rank number next to the level name and "Level N", "Noch X Abschlüsse bis Level Y" with "n / 66" and the progress bar), a row of stat tiles below it (Streak / Rekord / Wiederholungen with flame/trophy/repeat icons), and outlined "Bearbeiten" (green, pencil) and "Pausieren"/"Reaktivieren" (orange, pause) action buttons; joker inventory remains visible pre-66 (moved into the hero or a tile — it must not be dropped).
+**Files/areas:** `app/routine/[id]/index.tsx`, small presentational components as needed (e.g. `src/ui/components/StatTile.tsx`), header with back button + routine name + overflow.
+**Acceptance criteria:** hero shows the real cache values including the "Noch X Abschlüsse bis Level Y" remaining-count line; stat tiles show current streak, best streak (Rekord), total completions (Wiederholungen); level-up animation from T042 still plays on the hero; edit navigates to the edit screen; pause/reactivate works from the action button and reflects paused state.
+**Required automated tests:** detail-screen tests updated for the new structure (streak "Tage" text, remaining-to-next-level computation, tiles, action buttons); a unit assertion for the remaining-completions computation (66 − totalCompletions % 66).
+**Manual verification:** on-device with a seeded near-level-boundary routine (T047), verify hero numbers, tiles, and both action buttons against the mockup's right screen.
+**Dependencies:** T062, T063, T039, T034.
+**Commit message:** `feat: redesign routine detail hero and stats`
+
+### T070 — Calendar status icons and legend
+**Goal:** match the mockup's calendar: each day cell shows a status icon (green check = erledigt, red x = verpasst, purple circle = übersprungen, gold star = joker-geschützt, pause bars = pausiert, dash = nicht fällig), today gets a ring highlight, and a legend row below the calendar explains every symbol; joker-protected becomes a distinct calendar state (currently folded into other states, deferred by T034).
+**Files/areas:** `src/domain/routines/calendar.ts` (+ tests) adding a `joker_protected` day state, `src/ui/components/RoutineCalendar.tsx` (icon cells, today ring, legend), `app/routine/[id]/index.tsx` (unchanged wiring).
+**Acceptance criteria:** every `CalendarDayState` maps to a distinct icon+color pair (satisfying the color-never-sole-signal rule); joker-protected days render the star; the legend lists Erledigt/Verpasst/Übersprungen/Joker/Pausiert; retroactive completion via day tap (T034) still works on missed days.
+**Required automated tests:** domain tests for the new `joker_protected` state derivation; RoutineCalendar component tests for icon-per-state and the legend.
+**Manual verification:** on-device with seed data containing a joker-protected day, walk months back and forth and check each state's icon and the legend against the mockup.
+**Dependencies:** T062, T036, T034.
+**Commit message:** `feat: add calendar status icons and legend`
 
 ---
 

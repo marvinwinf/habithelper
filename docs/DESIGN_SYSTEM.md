@@ -99,6 +99,8 @@ Use short haptic feedback for:
 
 ## Reference Image
 
-Use the provided three-screen concept mockup as a visual direction reference, not as a pixel-perfect implementation requirement.
+Use the provided three-screen concept mockup (`docs/design_reference.png`: Today screen, routine create form, routine detail with calendar) as a visual direction reference, not as a pixel-perfect implementation requirement.
 
 The implementation should preserve the style principles while remaining practical and consistent across real Android screen sizes.
+
+Where the mockup shows data the MVP data model does not have (for example a per-routine duration like "20 Min."), render the closest existing field (the optional time of day) rather than adding new features for the sake of the mockup.
