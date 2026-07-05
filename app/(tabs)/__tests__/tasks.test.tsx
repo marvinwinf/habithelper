@@ -144,7 +144,7 @@ describe('TasksScreen', () => {
 
     await render(<TasksScreen />);
     await fireEvent.press(await screen.findByTestId('task-row-task-1-menu-button'));
-    await fireEvent.press(screen.getByTestId('task-menu-move'));
+    await fireEvent.press(screen.getByTestId('task-row-task-1-menu-move'));
 
     expect(moveTask).toHaveBeenCalledWith({}, 'task-1', TOMORROW);
   });
@@ -155,7 +155,7 @@ describe('TasksScreen', () => {
 
     await render(<TasksScreen />);
     await fireEvent.press(await screen.findByTestId('task-row-task-1-menu-button'));
-    await fireEvent.press(screen.getByTestId('task-menu-delete'));
+    await fireEvent.press(screen.getByTestId('task-row-task-1-menu-delete'));
 
     expect(deleteTask).not.toHaveBeenCalled();
 
@@ -178,8 +178,8 @@ describe('TasksScreen', () => {
     await fireEvent.press(await screen.findByTestId('tasks-completed-toggle'));
     await fireEvent.press(await screen.findByTestId('task-row-done-1-menu-button'));
 
-    expect(screen.queryByTestId('task-menu-move')).toBeNull();
-    expect(screen.getByTestId('task-menu-edit')).toBeTruthy();
-    expect(screen.getByTestId('task-menu-delete')).toBeTruthy();
+    expect(screen.queryByTestId('task-row-done-1-menu-move')).toBeNull();
+    expect(screen.getByTestId('task-row-done-1-menu-edit')).toBeTruthy();
+    expect(screen.getByTestId('task-row-done-1-menu-delete')).toBeTruthy();
   });
 });

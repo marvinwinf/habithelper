@@ -15,27 +15,35 @@ import {
 } from '../../src/data/repositories/appStreakCacheRepository';
 import { ensureProfile } from '../../src/data/repositories/profileRepository';
 import {
+  listCompletedTasks,
+  listOverdueTasks,
+  listTasksForToday,
+  listUndatedTasks,
+  listUpcomingTasks,
+  type Task,
+} from '../../src/data/repositories/taskRepository';
+import {
   completeRoutineOccurrence,
   exceedRoutineOccurrence,
   moveRoutineOccurrence,
   pauseRoutine,
   skipRoutineOccurrence,
 } from '../../src/services/routineService';
+import { deleteTask, moveTask, toggleTaskCompletion } from '../../src/services/taskService';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
 import { getGreeting } from '../../src/domain/greeting';
 import { classifyOccurrence, type OccurrenceState } from '../../src/domain/routines/completion';
 import { scheduleFromRoutineRow } from '../../src/domain/routines/schedule';
 import { isFirstCompletionOfDay } from '../../src/domain/streaks/appStreak';
-import { confirmRoutineDeletion } from '../../src/ui/alerts';
+import { compareByDateThenTime } from '../../src/domain/tasks/ordering';
+import { isDueTodayOrEarlier } from '../../src/domain/tasks/section';
+import { confirmRoutineDeletion, confirmTaskDeletion } from '../../src/ui/alerts';
 import { triggerFirstCompletionOfDayHaptic } from '../../src/ui/animation/haptics';
 import { useStreakBurst } from '../../src/ui/animation/useStreakBurst';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { RoutineCard, type RoutineCardOccurrenceState } from '../../src/ui/components/RoutineCard';
+import { TaskCard } from '../../src/ui/components/TaskCard';
 import { colors, spacing, typography } from '../../src/ui/theme';
-
-// TODO(T049): the combined routines/tasks/for-later ordering lands with the
-// rest of Phase 8; this is still the routines-only slice from T033, with
-// the full header (greeting, date, app streak, daily progress) now in place.
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('de-DE', {
   weekday: 'long',
@@ -60,13 +68,24 @@ export default function TodayScreen() {
   const [eventsByRoutineId, setEventsByRoutineId] = useState<Record<string, RoutineEvent[]>>({});
   const [appStreak, setAppStreak] = useState<AppStreakCache | undefined>(undefined);
   const [displayName, setDisplayName] = useState('');
+  const [overdueTasks, setOverdueTasks] = useState<Task[]>([]);
+  const [tasksDueToday, setTasksDueToday] = useState<Task[]>([]);
+  const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
+  const [undatedTasks, setUndatedTasks] = useState<Task[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const streakBurst = useStreakBurst();
 
   const loadData = useCallback(() => {
+    const today = todayDateString();
     listRoutines(db).then((allRoutines) => setRoutines(allRoutines.filter((r) => !r.isPaused)));
     listCategories(db).then(setCategories);
     getAppStreakCache(db).then(setAppStreak);
     ensureProfile(db).then((profile) => setDisplayName(profile.displayName));
+    listOverdueTasks(db, today).then(setOverdueTasks);
+    listTasksForToday(db, today).then(setTasksDueToday);
+    listUpcomingTasks(db, today).then(setUpcomingTasks);
+    listUndatedTasks(db).then(setUndatedTasks);
+    listCompletedTasks(db).then(setCompletedTasks);
   }, []);
 
   useEffect(() => {
@@ -112,9 +131,52 @@ export default function TodayScreen() {
       });
   }, [routines, eventsByRoutineId]);
 
+  // The Today screen's Tasks section shows what needs attention now
+  // (overdue + due today); For later holds everything else (upcoming +
+  // undated) — per T049 / docs/SCREEN_SPECIFICATIONS.md's Content Order.
+  // Completed tasks stay visible (subdued) in whichever bucket their own
+  // date belongs to, sorted to the end, mirroring how completed routines
+  // remain visible above.
+  const todayTasks = useMemo<Task[]>(() => {
+    const today = todayDateString();
+    const incomplete = [...overdueTasks, ...tasksDueToday].sort(compareByDateThenTime);
+    const completedHere = completedTasks
+      .filter((t) => isDueTodayOrEarlier(t.date, today))
+      .sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''));
+    return [...incomplete, ...completedHere];
+  }, [overdueTasks, tasksDueToday, completedTasks]);
+
+  const laterTasks = useMemo<Task[]>(() => {
+    const today = todayDateString();
+    const incomplete = [...upcomingTasks, ...undatedTasks].sort(compareByDateThenTime);
+    const completedHere = completedTasks
+      .filter((t) => !isDueTodayOrEarlier(t.date, today))
+      .sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''));
+    return [...incomplete, ...completedHere];
+  }, [upcomingTasks, undatedTasks, completedTasks]);
+
+  const overdueTaskIds = useMemo(() => new Set(overdueTasks.map((t) => t.id)), [overdueTasks]);
+
   function handleDelete(routine: Routine) {
     confirmRoutineDeletion(routine.name, async () => {
       await softDeleteRoutine(db, routine.id);
+      loadData();
+    });
+  }
+
+  async function handleToggleTaskComplete(taskItem: Task) {
+    await toggleTaskCompletion(db, taskItem.id);
+    loadData();
+  }
+
+  async function handleMoveTaskToTomorrow(taskItem: Task) {
+    await moveTask(db, taskItem.id, addDaysToDateString(todayDateString(), 1));
+    loadData();
+  }
+
+  function handleDeleteTask(taskItem: Task) {
+    confirmTaskDeletion(taskItem.title, async () => {
+      await deleteTask(db, taskItem.id);
       loadData();
     });
   }
@@ -163,54 +225,123 @@ export default function TodayScreen() {
         </View>
       </View>
 
-      {dueRoutines.length === 0 ? (
+      {dueRoutines.length === 0 && todayTasks.length === 0 && laterTasks.length === 0 ? (
         <EmptyState
           title="Für heute nichts geplant"
-          message="Erstelle eine Routine im Tab „Routinen“, um loszulegen."
+          message="Erstelle eine Routine oder Aufgabe, um loszulegen."
         />
       ) : (
-        <View style={styles.list}>
-          {dueRoutines.map(({ routine, state }) => {
-            const category = routine.categoryId ? categoryById.get(routine.categoryId) : undefined;
-            return (
-              <RoutineCard
-                key={routine.id}
-                testID={`routine-card-${routine.id}`}
-                routine={routine}
-                category={category}
-                streak={0}
-                state={state}
-                onComplete={async () => {
-                  maybeStartFirstCompletionOfDayBurst(todayDateString());
-                  const result = await completeRoutineOccurrence(db, routine.id, todayDateString());
-                  loadData();
-                  return result.leveledUp;
-                }}
-                onExceed={async () => {
-                  maybeStartFirstCompletionOfDayBurst(todayDateString());
-                  const result = await exceedRoutineOccurrence(db, routine.id, todayDateString());
-                  loadData();
-                  return result.leveledUp;
-                }}
-                onOpenDetail={() => router.push(`/routine/${routine.id}`)}
-                onMoveToTomorrow={() => {
-                  const today = todayDateString();
-                  return moveRoutineOccurrence(
-                    db,
-                    routine.id,
-                    today,
-                    addDaysToDateString(today, 1),
-                  ).then(loadData);
-                }}
-                onSkip={() =>
-                  skipRoutineOccurrence(db, routine.id, todayDateString()).then(loadData)
-                }
-                onEdit={() => router.push(`/routine/${routine.id}/edit`)}
-                onPause={() => pauseRoutine(db, routine.id, todayDateString()).then(loadData)}
-                onDelete={() => handleDelete(routine)}
-              />
-            );
-          })}
+        <View style={styles.sections}>
+          {dueRoutines.length > 0 && (
+            <View testID="today-section-routines">
+              <Text style={styles.sectionTitle}>Routinen</Text>
+              <View style={styles.list}>
+                {dueRoutines.map(({ routine, state }) => {
+                  const category = routine.categoryId
+                    ? categoryById.get(routine.categoryId)
+                    : undefined;
+                  return (
+                    <RoutineCard
+                      key={routine.id}
+                      testID={`routine-card-${routine.id}`}
+                      routine={routine}
+                      category={category}
+                      streak={0}
+                      state={state}
+                      onComplete={async () => {
+                        maybeStartFirstCompletionOfDayBurst(todayDateString());
+                        const result = await completeRoutineOccurrence(
+                          db,
+                          routine.id,
+                          todayDateString(),
+                        );
+                        loadData();
+                        return result.leveledUp;
+                      }}
+                      onExceed={async () => {
+                        maybeStartFirstCompletionOfDayBurst(todayDateString());
+                        const result = await exceedRoutineOccurrence(
+                          db,
+                          routine.id,
+                          todayDateString(),
+                        );
+                        loadData();
+                        return result.leveledUp;
+                      }}
+                      onOpenDetail={() => router.push(`/routine/${routine.id}`)}
+                      onMoveToTomorrow={() => {
+                        const today = todayDateString();
+                        return moveRoutineOccurrence(
+                          db,
+                          routine.id,
+                          today,
+                          addDaysToDateString(today, 1),
+                        ).then(loadData);
+                      }}
+                      onSkip={() =>
+                        skipRoutineOccurrence(db, routine.id, todayDateString()).then(loadData)
+                      }
+                      onEdit={() => router.push(`/routine/${routine.id}/edit`)}
+                      onPause={() => pauseRoutine(db, routine.id, todayDateString()).then(loadData)}
+                      onDelete={() => handleDelete(routine)}
+                    />
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {todayTasks.length > 0 && (
+            <View testID="today-section-tasks">
+              <Text style={styles.sectionTitle}>Aufgaben</Text>
+              <View style={styles.list}>
+                {todayTasks.map((taskItem) => {
+                  const category = taskItem.categoryId
+                    ? categoryById.get(taskItem.categoryId)
+                    : undefined;
+                  return (
+                    <TaskCard
+                      key={taskItem.id}
+                      testID={`today-task-${taskItem.id}`}
+                      task={taskItem}
+                      category={category}
+                      isOverdue={overdueTaskIds.has(taskItem.id)}
+                      onToggleComplete={() => handleToggleTaskComplete(taskItem)}
+                      onMoveToTomorrow={() => handleMoveTaskToTomorrow(taskItem)}
+                      onEdit={() => router.push(`/task/${taskItem.id}/edit`)}
+                      onDelete={() => handleDeleteTask(taskItem)}
+                    />
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {laterTasks.length > 0 && (
+            <View testID="today-section-later">
+              <Text style={styles.sectionTitle}>Für später</Text>
+              <View style={styles.list}>
+                {laterTasks.map((taskItem) => {
+                  const category = taskItem.categoryId
+                    ? categoryById.get(taskItem.categoryId)
+                    : undefined;
+                  return (
+                    <TaskCard
+                      key={taskItem.id}
+                      testID={`today-task-${taskItem.id}`}
+                      task={taskItem}
+                      category={category}
+                      isOverdue={false}
+                      onToggleComplete={() => handleToggleTaskComplete(taskItem)}
+                      onMoveToTomorrow={() => handleMoveTaskToTomorrow(taskItem)}
+                      onEdit={() => router.push(`/task/${taskItem.id}/edit`)}
+                      onDelete={() => handleDeleteTask(taskItem)}
+                    />
+                  );
+                })}
+              </View>
+            </View>
+          )}
         </View>
       )}
     </ScrollView>
@@ -254,6 +385,15 @@ const styles = StyleSheet.create({
   routineProgress: {
     fontSize: typography.bodySmall.fontSize,
     color: colors.textSecondary,
+  },
+  sections: {
+    gap: spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: typography.bodySmall.fontSize,
+    fontWeight: typography.bodySmall.fontWeight,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
   },
   list: {
     gap: spacing.sm,

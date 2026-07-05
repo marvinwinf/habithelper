@@ -11,7 +11,15 @@ import {
   type AppStreakCache,
 } from '../../../src/data/repositories/appStreakCacheRepository';
 import { ensureProfile } from '../../../src/data/repositories/profileRepository';
+import {
+  listCompletedTasks,
+  listOverdueTasks,
+  listTasksForToday,
+  listUndatedTasks,
+  listUpcomingTasks,
+} from '../../../src/data/repositories/taskRepository';
 import { completeRoutineOccurrence, moveRoutineOccurrence } from '../../../src/services/routineService';
+import { deleteTask, moveTask, toggleTaskCompletion } from '../../../src/services/taskService';
 import { triggerFirstCompletionOfDayHaptic } from '../../../src/ui/animation/haptics';
 
 jest.mock('../../../src/data/db/client', () => ({ db: {} }));
@@ -31,12 +39,24 @@ jest.mock('../../../src/data/repositories/routineEventRepository', () => ({
 jest.mock('../../../src/data/repositories/appStreakCacheRepository', () => ({
   getAppStreakCache: jest.fn(),
 }));
+jest.mock('../../../src/data/repositories/taskRepository', () => ({
+  listOverdueTasks: jest.fn().mockResolvedValue([]),
+  listTasksForToday: jest.fn().mockResolvedValue([]),
+  listUpcomingTasks: jest.fn().mockResolvedValue([]),
+  listUndatedTasks: jest.fn().mockResolvedValue([]),
+  listCompletedTasks: jest.fn().mockResolvedValue([]),
+}));
 jest.mock('../../../src/services/routineService', () => ({
   completeRoutineOccurrence: jest.fn().mockResolvedValue({ event: undefined, leveledUp: false }),
   exceedRoutineOccurrence: jest.fn().mockResolvedValue({ event: undefined, leveledUp: false }),
   moveRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
   skipRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
   pauseRoutine: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../../../src/services/taskService', () => ({
+  toggleTaskCompletion: jest.fn().mockResolvedValue(undefined),
+  moveTask: jest.fn().mockResolvedValue(undefined),
+  deleteTask: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('../../../src/ui/animation/haptics', () => ({
   triggerRoutineCompletionHaptic: jest.fn(),
@@ -75,6 +95,25 @@ const dailyRoutine = {
 
 const pausedRoutine = { ...dailyRoutine, id: 'routine-paused', name: 'Meditieren', isPaused: true };
 
+function makeTask(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: 'task-1',
+    title: 'Wäsche waschen',
+    categoryId: null,
+    date: null,
+    timeOfDay: null,
+    description: null,
+    isCompleted: false,
+    completedAt: null,
+    sortOrder: 0,
+    colorVariantSeed: 0,
+    createdAt: 'x',
+    updatedAt: 'x',
+    deletedAt: null,
+    ...overrides,
+  };
+}
+
 describe('TodayScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -86,6 +125,11 @@ describe('TodayScreen', () => {
       displayName: 'Marvin',
       createdAt: 'x',
     });
+    (listOverdueTasks as jest.Mock).mockResolvedValue([]);
+    (listTasksForToday as jest.Mock).mockResolvedValue([]);
+    (listUpcomingTasks as jest.Mock).mockResolvedValue([]);
+    (listUndatedTasks as jest.Mock).mockResolvedValue([]);
+    (listCompletedTasks as jest.Mock).mockResolvedValue([]);
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   });
 
@@ -223,6 +267,95 @@ describe('TodayScreen', () => {
     await buttons.find((b) => b.text === 'Löschen')?.onPress?.();
 
     expect(softDeleteRoutine).toHaveBeenCalledWith({}, dailyRoutine.id);
+  });
+
+  it('renders Routines, then Tasks, then For later, in that order', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
+    (listTasksForToday as jest.Mock).mockResolvedValue([makeTask({ id: 'today-task', date: TODAY })]);
+    (listUndatedTasks as jest.Mock).mockResolvedValue([makeTask({ id: 'later-task' })]);
+
+    await render(<TodayScreen />);
+    await screen.findByTestId('today-section-routines');
+
+    const sectionOrder = ['today-section-routines', 'today-section-tasks', 'today-section-later'];
+    for (const testId of sectionOrder) {
+      expect(screen.getByTestId(testId)).toBeTruthy();
+    }
+  });
+
+  it('puts an overdue task in the Tasks section, flagged overdue, and an undated task in For later', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([]);
+    (listOverdueTasks as jest.Mock).mockResolvedValue([
+      makeTask({ id: 'overdue-1', title: 'Überfällige Aufgabe' }),
+    ]);
+    (listUndatedTasks as jest.Mock).mockResolvedValue([
+      makeTask({ id: 'undated-1', title: 'Später erledigen' }),
+    ]);
+
+    await render(<TodayScreen />);
+
+    const tasksSection = await screen.findByTestId('today-section-tasks');
+    expect(tasksSection).toBeTruthy();
+    expect(await screen.findByTestId('today-task-overdue-1-overdue-label')).toBeTruthy();
+
+    const laterSection = await screen.findByTestId('today-section-later');
+    expect(laterSection).toBeTruthy();
+    expect(screen.queryByTestId('today-task-undated-1-overdue-label')).toBeNull();
+  });
+
+  it('shows a completed task in a subdued, checked state, sorted after the incomplete ones', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([]);
+    (listTasksForToday as jest.Mock).mockResolvedValue([
+      makeTask({ id: 'pending-1', title: 'Offen', date: TODAY }),
+    ]);
+    (listCompletedTasks as jest.Mock).mockResolvedValue([
+      makeTask({
+        id: 'done-1',
+        title: 'Erledigt',
+        date: TODAY,
+        isCompleted: true,
+        completedAt: '2026-07-01T00:00:00.000Z',
+      }),
+    ]);
+
+    await render(<TodayScreen />);
+    await screen.findByTestId('today-section-tasks');
+
+    const toggles = await screen.findAllByRole('checkbox');
+    expect(toggles).toHaveLength(2);
+    expect(toggles[0].props.testID).toBe('today-task-pending-1-toggle');
+    expect(toggles[1].props.testID).toBe('today-task-done-1-toggle');
+    expect(toggles[1].props.accessibilityState.checked).toBe(true);
+  });
+
+  it('toggles a task complete from the Today screen', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([]);
+    (listTasksForToday as jest.Mock).mockResolvedValue([makeTask({ id: 'task-1', date: TODAY })]);
+
+    await render(<TodayScreen />);
+    await fireEvent.press(await screen.findByTestId('today-task-task-1-toggle'));
+
+    expect(toggleTaskCompletion).toHaveBeenCalledWith({}, 'task-1');
+  });
+
+  it('moves and deletes a task from the Today screen overflow menu', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([]);
+    (listTasksForToday as jest.Mock).mockResolvedValue([makeTask({ id: 'task-1', date: TODAY })]);
+
+    await render(<TodayScreen />);
+    await fireEvent.press(await screen.findByTestId('today-task-task-1-menu-button'));
+    await fireEvent.press(screen.getByTestId('today-task-task-1-menu-move'));
+
+    expect(moveTask).toHaveBeenCalledWith({}, 'task-1', expect.any(String));
+
+    await fireEvent.press(await screen.findByTestId('today-task-task-1-menu-button'));
+    await fireEvent.press(screen.getByTestId('today-task-task-1-menu-delete'));
+
+    const alertCall = (Alert.alert as jest.Mock).mock.calls.at(-1);
+    const buttons = alertCall[2] as { text: string; onPress?: () => void }[];
+    await buttons.find((b) => b.text === 'Löschen')?.onPress?.();
+
+    expect(deleteTask).toHaveBeenCalledWith({}, 'task-1');
   });
 
   it('fires the first-completion-of-day signal exactly once per day, across multiple completions', async () => {

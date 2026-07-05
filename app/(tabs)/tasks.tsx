@@ -14,35 +14,16 @@ import {
 } from '../../src/data/repositories/taskRepository';
 import { deleteTask, moveTask, toggleTaskCompletion } from '../../src/services/taskService';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
+import { compareByDateThenTime } from '../../src/domain/tasks/ordering';
 import { confirmTaskDeletion } from '../../src/ui/alerts';
-import { Button } from '../../src/ui/components/Button';
-import { Card } from '../../src/ui/components/Card';
-import { CategoryBadge } from '../../src/ui/components/CategoryBadge';
 import { EmptyState } from '../../src/ui/components/EmptyState';
-import { Sheet } from '../../src/ui/components/Sheet';
-import { colors, radius, spacing, typography } from '../../src/ui/theme';
+import { TaskCard } from '../../src/ui/components/TaskCard';
+import { colors, spacing, typography } from '../../src/ui/theme';
 
 interface Section {
   key: string;
   title: string;
   tasks: Task[];
-}
-
-// Ascending by date (nulls last, since undated tasks only ever appear in
-// their own section anyway), then by time (nulls last), per
-// docs/SCREEN_SPECIFICATIONS.md's "sorting is based on date and time."
-function compareByDateThenTime(a: Task, b: Task): number {
-  if (a.date !== b.date) {
-    if (a.date === null) return 1;
-    if (b.date === null) return -1;
-    return a.date.localeCompare(b.date);
-  }
-  if (a.timeOfDay !== b.timeOfDay) {
-    if (a.timeOfDay === null) return 1;
-    if (b.timeOfDay === null) return -1;
-    return a.timeOfDay.localeCompare(b.timeOfDay);
-  }
-  return 0;
 }
 
 export default function TasksScreen() {
@@ -54,7 +35,6 @@ export default function TasksScreen() {
   const [undated, setUndated] = useState<Task[]>([]);
   const [completed, setCompleted] = useState<Task[]>([]);
   const [completedExpanded, setCompletedExpanded] = useState(false);
-  const [menuTaskId, setMenuTaskId] = useState<string | null>(null);
 
   const loadData = useCallback(() => {
     const today = todayDateString();
@@ -81,11 +61,6 @@ export default function TasksScreen() {
     { key: 'undated', title: 'Ohne Datum', tasks: undated },
   ];
   const allTasks = [...overdue, ...dueToday, ...upcoming, ...undated, ...completed];
-  const menuTask = allTasks.find((t) => t.id === menuTaskId);
-
-  function closeMenu() {
-    setMenuTaskId(null);
-  }
 
   async function handleToggleComplete(task: Task) {
     await toggleTaskCompletion(db, task.id);
@@ -93,18 +68,15 @@ export default function TasksScreen() {
   }
 
   function handleEdit(task: Task) {
-    closeMenu();
     router.push(`/task/${task.id}/edit`);
   }
 
   async function handleMoveToTomorrow(task: Task) {
-    closeMenu();
     await moveTask(db, task.id, addDaysToDateString(todayDateString(), 1));
     loadData();
   }
 
   function handleDelete(task: Task) {
-    closeMenu();
     confirmTaskDeletion(task.title, async () => {
       await deleteTask(db, task.id);
       loadData();
@@ -114,47 +86,17 @@ export default function TasksScreen() {
   function renderTask(item: Task, isOverdue: boolean) {
     const category = item.categoryId ? categoryById.get(item.categoryId) : undefined;
     return (
-      <Card key={item.id} style={styles.row} testID={`task-row-${item.id}`}>
-        <Pressable
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: item.isCompleted }}
-          onPress={() => handleToggleComplete(item)}
-          style={[styles.toggle, item.isCompleted && styles.toggleChecked]}
-          testID={`task-row-${item.id}-toggle`}
-        >
-          {item.isCompleted ? <Text style={styles.checkmark}>✓</Text> : null}
-        </Pressable>
-        <View style={styles.rowMain}>
-          <Text style={[styles.taskTitle, item.isCompleted && styles.taskTitleDone]} numberOfLines={1}>
-            {item.title}
-          </Text>
-          <View style={styles.metaRow}>
-            {category && (
-              <CategoryBadge
-                label={category.name}
-                baseColor={category.baseColor}
-                colorVariantSeed={item.colorVariantSeed}
-              />
-            )}
-            {item.date && <Text style={styles.metaText}>{item.date}</Text>}
-            {item.timeOfDay && <Text style={styles.metaText}>{item.timeOfDay}</Text>}
-          </View>
-          {/* Subtle text label, not a colored background — no visually
-              aggressive warning states, and color is never the only signal
-              (docs/DESIGN_SYSTEM.md's Accessibility section). */}
-          {isOverdue && (
-            <Text style={styles.overdueLabel} testID={`task-row-${item.id}-overdue-label`}>
-              Überfällig
-            </Text>
-          )}
-        </View>
-        <Button
-          label="⋯"
-          variant="secondary"
-          onPress={() => setMenuTaskId(item.id)}
-          testID={`task-row-${item.id}-menu-button`}
-        />
-      </Card>
+      <TaskCard
+        key={item.id}
+        testID={`task-row-${item.id}`}
+        task={item}
+        category={category}
+        isOverdue={isOverdue}
+        onToggleComplete={() => handleToggleComplete(item)}
+        onMoveToTomorrow={() => handleMoveToTomorrow(item)}
+        onEdit={() => handleEdit(item)}
+        onDelete={() => handleDelete(item)}
+      />
     );
   }
 
@@ -203,28 +145,6 @@ export default function TasksScreen() {
           )}
         </View>
       )}
-
-      <Sheet visible={menuTaskId !== null} onClose={closeMenu} testID="task-menu-sheet">
-        {menuTask && (
-          <View style={styles.menu}>
-            <Button label="Bearbeiten" onPress={() => handleEdit(menuTask)} testID="task-menu-edit" />
-            {!menuTask.isCompleted && (
-              <Button
-                label="Auf morgen verschieben"
-                variant="secondary"
-                onPress={() => handleMoveToTomorrow(menuTask)}
-                testID="task-menu-move"
-              />
-            )}
-            <Button
-              label="Löschen"
-              variant="destructive"
-              onPress={() => handleDelete(menuTask)}
-              testID="task-menu-delete"
-            />
-          </View>
-        )}
-      </Sheet>
     </View>
   );
 }
@@ -262,58 +182,5 @@ const styles = StyleSheet.create({
   },
   sectionToggle: {
     paddingVertical: spacing.xs,
-  },
-  row: {
-    marginBottom: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  toggle: {
-    width: 28,
-    height: 28,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toggleChecked: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  checkmark: {
-    color: colors.textOnAccent,
-    fontSize: typography.bodySmall.fontSize,
-    fontWeight: typography.bodySmall.fontWeight,
-  },
-  rowMain: {
-    flex: 1,
-    gap: spacing.xxs,
-  },
-  taskTitle: {
-    fontSize: typography.body.fontSize,
-    fontWeight: typography.body.fontWeight,
-    color: colors.textPrimary,
-  },
-  taskTitleDone: {
-    opacity: 0.5,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  metaText: {
-    fontSize: typography.caption.fontSize,
-    color: colors.textSecondary,
-  },
-  overdueLabel: {
-    fontSize: typography.caption.fontSize,
-    color: colors.destructive,
-  },
-  menu: {
-    gap: spacing.sm,
   },
 });
