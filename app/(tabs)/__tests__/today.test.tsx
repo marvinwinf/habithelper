@@ -10,6 +10,7 @@ import {
   getAppStreakCache,
   type AppStreakCache,
 } from '../../../src/data/repositories/appStreakCacheRepository';
+import { listRoutineStateCaches } from '../../../src/data/repositories/routineStateCacheRepository';
 import { ensureProfile } from '../../../src/data/repositories/profileRepository';
 import {
   listCompletedTasks,
@@ -38,6 +39,9 @@ jest.mock('../../../src/data/repositories/routineEventRepository', () => ({
 }));
 jest.mock('../../../src/data/repositories/appStreakCacheRepository', () => ({
   getAppStreakCache: jest.fn(),
+}));
+jest.mock('../../../src/data/repositories/routineStateCacheRepository', () => ({
+  listRoutineStateCaches: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('../../../src/data/repositories/taskRepository', () => ({
   listOverdueTasks: jest.fn().mockResolvedValue([]),
@@ -130,6 +134,7 @@ describe('TodayScreen', () => {
     (listUpcomingTasks as jest.Mock).mockResolvedValue([]);
     (listUndatedTasks as jest.Mock).mockResolvedValue([]);
     (listCompletedTasks as jest.Mock).mockResolvedValue([]);
+    (listRoutineStateCaches as jest.Mock).mockResolvedValue([]);
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   });
 
@@ -198,6 +203,30 @@ describe('TodayScreen', () => {
 
     expect(await screen.findByText('Laufen')).toBeTruthy();
     expect(screen.queryByText('Meditieren')).toBeNull();
+  });
+
+  it("shows each routine card's real streak from the state cache", async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
+    (listRoutineStateCaches as jest.Mock).mockResolvedValue([
+      {
+        routineId: dailyRoutine.id,
+        currentStreak: 8,
+        bestStreak: 16,
+        totalCompletions: 48,
+        levelRank: 0,
+        jokerInventory: 1,
+        jokerProgress: 3,
+        consecutiveMissedAfter66: 0,
+        reconciledThroughDate: TODAY,
+        recalculatedAt: TODAY,
+      },
+    ]);
+
+    await render(<TodayScreen />);
+
+    expect(
+      await screen.findByTestId(`routine-card-${dailyRoutine.id}-streak`),
+    ).toHaveTextContent('Streak 8');
   });
 
   it('shows an empty state when nothing is due', async () => {

@@ -16,6 +16,10 @@ import {
 } from '../../src/data/repositories/appStreakCacheRepository';
 import { ensureProfile } from '../../src/data/repositories/profileRepository';
 import {
+  listRoutineStateCaches,
+  type RoutineStateCache,
+} from '../../src/data/repositories/routineStateCacheRepository';
+import {
   listCompletedTasks,
   listOverdueTasks,
   listTasksForToday,
@@ -70,6 +74,7 @@ export default function TodayScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [eventsByRoutineId, setEventsByRoutineId] = useState<Record<string, RoutineEvent[]>>({});
   const [appStreak, setAppStreak] = useState<AppStreakCache | undefined>(undefined);
+  const [routineStreaks, setRoutineStreaks] = useState<Record<string, RoutineStateCache>>({});
   const [displayName, setDisplayName] = useState('');
   const [overdueTasks, setOverdueTasks] = useState<Task[]>([]);
   const [tasksDueToday, setTasksDueToday] = useState<Task[]>([]);
@@ -83,6 +88,9 @@ export default function TodayScreen() {
     listRoutines(db).then((allRoutines) => setRoutines(allRoutines.filter((r) => !r.isPaused)));
     listCategories(db).then(setCategories);
     getAppStreakCache(db).then(setAppStreak);
+    listRoutineStateCaches(db).then((rows) =>
+      setRoutineStreaks(Object.fromEntries(rows.map((row) => [row.routineId, row]))),
+    );
     ensureProfile(db).then((profile) => setDisplayName(profile.displayName));
     listOverdueTasks(db, today).then(setOverdueTasks);
     listTasksForToday(db, today).then(setTasksDueToday);
@@ -270,7 +278,7 @@ export default function TodayScreen() {
                       testID={`routine-card-${routine.id}`}
                       routine={routine}
                       category={category}
-                      streak={0}
+                      streak={routineStreaks[routine.id]?.currentStreak ?? 0}
                       state={state}
                       onComplete={async () => {
                         maybeStartFirstCompletionOfDayBurst(todayDateString());

@@ -14,6 +14,8 @@ export interface CompletionControlProps {
   completed?: boolean;
   exceeded?: boolean;
   disabled?: boolean;
+  /** Category accent tinting the control (T065): pending border and done fill. Defaults to the app accent. */
+  accentColor?: string;
   longPressThresholdMs?: number;
   testID?: string;
 }
@@ -35,6 +37,7 @@ export function CompletionControl({
   completed = false,
   exceeded = false,
   disabled = false,
+  accentColor = colors.accent,
   longPressThresholdMs = DEFAULT_LONG_PRESS_THRESHOLD_MS,
   testID,
 }: CompletionControlProps) {
@@ -91,8 +94,8 @@ export function CompletionControl({
       style={[
         styles.control,
         {
-          backgroundColor: isDone ? colors.accent : colors.surfaceMuted,
-          borderColor: isDone ? 'transparent' : colors.border,
+          backgroundColor: isDone ? accentColor : colors.surfaceMuted,
+          borderColor: isDone ? 'transparent' : accentColor,
         },
         disabled && styles.disabled,
       ]}
