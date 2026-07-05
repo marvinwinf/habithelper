@@ -1,6 +1,7 @@
 import {
   generateSuggestedWeeklyTargetWeekdays,
   isOccurrenceDue,
+  scheduleFromRoutineRow,
   type DailySchedule,
   type WeekdaySchedule,
   type WeeklyTargetSchedule,
@@ -123,5 +124,43 @@ describe('generateSuggestedWeeklyTargetWeekdays', () => {
     expect(() => generateSuggestedWeeklyTargetWeekdays(0)).toThrow(RangeError);
     expect(() => generateSuggestedWeeklyTargetWeekdays(8)).toThrow(RangeError);
     expect(() => generateSuggestedWeeklyTargetWeekdays(1.5)).toThrow(RangeError);
+  });
+});
+
+describe('scheduleFromRoutineRow', () => {
+  it('maps a daily row', () => {
+    expect(
+      scheduleFromRoutineRow({ scheduleType: 'daily', scheduledWeekdays: null, weeklyTargetCount: null }),
+    ).toEqual({ type: 'daily' });
+  });
+
+  it('maps a weekdays row', () => {
+    expect(
+      scheduleFromRoutineRow({
+        scheduleType: 'weekdays',
+        scheduledWeekdays: [1, 3, 5],
+        weeklyTargetCount: null,
+      }),
+    ).toEqual({ type: 'weekdays', weekdays: [1, 3, 5] });
+  });
+
+  it('maps a weekly_target row', () => {
+    expect(
+      scheduleFromRoutineRow({
+        scheduleType: 'weekly_target',
+        scheduledWeekdays: [2, 4],
+        weeklyTargetCount: 2,
+      }),
+    ).toEqual({ type: 'weekly_target', weekdays: [2, 4], targetCount: 2 });
+  });
+
+  it('defaults null weekdays/target count to empty/zero', () => {
+    expect(
+      scheduleFromRoutineRow({
+        scheduleType: 'weekly_target',
+        scheduledWeekdays: null,
+        weeklyTargetCount: null,
+      }),
+    ).toEqual({ type: 'weekly_target', weekdays: [], targetCount: 0 });
   });
 });

@@ -1,0 +1,363 @@
+import { useState } from 'react';
+import { Link } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+
+import { Button } from './Button';
+import { colors, radius, spacing, typography } from '../theme';
+import type { ScheduleType } from '../../data/db/schema';
+import {
+  generateSuggestedWeeklyTargetWeekdays,
+  type IsoWeekday,
+} from '../../domain/routines/schedule';
+
+export interface RoutineFormCategory {
+  id: string;
+  name: string;
+}
+
+export interface RoutineFormValues {
+  name: string;
+  categoryId: string | null;
+  scheduleType: ScheduleType;
+  scheduledWeekdays: IsoWeekday[] | null;
+  weeklyTargetCount: number | null;
+  timeOfDay: string | null;
+  reason: string | null;
+  allowConsciousSkip: boolean;
+}
+
+export interface RoutineFormProps {
+  categories: readonly RoutineFormCategory[];
+  initialValues?: Partial<RoutineFormValues>;
+  submitLabel?: string;
+  onSubmit: (values: RoutineFormValues) => void;
+  testID?: string;
+}
+
+const FREQUENCY_OPTIONS: { type: ScheduleType; label: string }[] = [
+  { type: 'daily', label: 'Täglich' },
+  { type: 'weekdays', label: 'Wochentage' },
+  { type: 'weekly_target', label: 'X-mal pro Woche' },
+];
+
+const WEEKDAY_LABELS: { day: IsoWeekday; label: string }[] = [
+  { day: 1, label: 'Mo' },
+  { day: 2, label: 'Di' },
+  { day: 3, label: 'Mi' },
+  { day: 4, label: 'Do' },
+  { day: 5, label: 'Fr' },
+  { day: 6, label: 'Sa' },
+  { day: 7, label: 'So' },
+];
+
+const MIN_TARGET_COUNT = 1;
+const MAX_TARGET_COUNT = 7;
+const DEFAULT_TARGET_COUNT = 3;
+
+/** Shared create/edit form for routines, per docs/SCREEN_SPECIFICATIONS.md's Create Routine Screen. */
+export function RoutineForm({
+  categories,
+  initialValues,
+  submitLabel = 'Speichern',
+  onSubmit,
+  testID,
+}: RoutineFormProps) {
+  const [name, setName] = useState(initialValues?.name ?? '');
+  const [categoryId, setCategoryId] = useState<string | null>(initialValues?.categoryId ?? null);
+  const [scheduleType, setScheduleType] = useState<ScheduleType>(
+    initialValues?.scheduleType ?? 'daily',
+  );
+  const [scheduledWeekdays, setScheduledWeekdays] = useState<IsoWeekday[]>(
+    initialValues?.scheduledWeekdays ?? [],
+  );
+  const [weeklyTargetCount, setWeeklyTargetCount] = useState<number>(
+    initialValues?.weeklyTargetCount ?? DEFAULT_TARGET_COUNT,
+  );
+  const [timeOfDay, setTimeOfDay] = useState(initialValues?.timeOfDay ?? '');
+  const [reason, setReason] = useState(initialValues?.reason ?? '');
+  const [allowConsciousSkip, setAllowConsciousSkip] = useState(
+    initialValues?.allowConsciousSkip ?? false,
+  );
+  const [advancedExpanded, setAdvancedExpanded] = useState(false);
+
+  function handleSelectFrequency(type: ScheduleType) {
+    setScheduleType(type);
+    if (type === 'weekly_target') {
+      setScheduledWeekdays(generateSuggestedWeeklyTargetWeekdays(weeklyTargetCount));
+    }
+  }
+
+  function handleChangeTargetCount(count: number) {
+    const clamped = Math.min(MAX_TARGET_COUNT, Math.max(MIN_TARGET_COUNT, count));
+    setWeeklyTargetCount(clamped);
+    setScheduledWeekdays(generateSuggestedWeeklyTargetWeekdays(clamped));
+  }
+
+  function toggleWeekday(day: IsoWeekday) {
+    setScheduledWeekdays((prev) =>
+      prev.includes(day)
+        ? prev.filter((d) => d !== day)
+        : [...prev, day].sort((a, b) => a - b),
+    );
+  }
+
+  const trimmedName = name.trim();
+  const needsWeekdaySelection = scheduleType === 'weekdays' || scheduleType === 'weekly_target';
+  const scheduleValid = !needsWeekdaySelection || scheduledWeekdays.length > 0;
+  const canSave = trimmedName.length > 0 && scheduleValid;
+
+  function handleSubmit() {
+    const trimmedTime = timeOfDay.trim();
+    const trimmedReason = reason.trim();
+    onSubmit({
+      name: trimmedName,
+      categoryId,
+      scheduleType,
+      scheduledWeekdays: needsWeekdaySelection ? scheduledWeekdays : null,
+      weeklyTargetCount: scheduleType === 'weekly_target' ? weeklyTargetCount : null,
+      timeOfDay: trimmedTime.length > 0 ? trimmedTime : null,
+      reason: trimmedReason.length > 0 ? trimmedReason : null,
+      allowConsciousSkip,
+    });
+  }
+
+  return (
+    <ScrollView testID={testID} contentContainerStyle={styles.container}>
+      <Text style={styles.label}>Name</Text>
+      <TextInput
+        value={name}
+        onChangeText={setName}
+        placeholder="Routinenname"
+        style={styles.input}
+        testID="routine-form-name-input"
+      />
+
+      <View style={styles.categoryHeader}>
+        <Text style={styles.label}>Kategorie</Text>
+        <Link href="/category/create" style={styles.createCategoryLink} testID="routine-form-create-category-link">
+          + Neue Kategorie
+        </Link>
+      </View>
+      <View style={styles.chipRow}>
+        <Pressable
+          accessibilityRole="radio"
+          accessibilityState={{ selected: categoryId === null }}
+          testID="routine-form-category-none"
+          onPress={() => setCategoryId(null)}
+          style={[styles.chip, categoryId === null && styles.chipSelected]}
+        >
+          <Text style={styles.chipLabel}>Keine</Text>
+        </Pressable>
+        {categories.map((category) => (
+          <Pressable
+            key={category.id}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: categoryId === category.id }}
+            testID={`routine-form-category-${category.id}`}
+            onPress={() => setCategoryId(category.id)}
+            style={[styles.chip, categoryId === category.id && styles.chipSelected]}
+          >
+            <Text style={styles.chipLabel}>{category.name}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <Text style={styles.label}>Häufigkeit</Text>
+      <View style={styles.chipRow}>
+        {FREQUENCY_OPTIONS.map((option) => (
+          <Pressable
+            key={option.type}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: scheduleType === option.type }}
+            testID={`routine-form-schedule-${option.type}`}
+            onPress={() => handleSelectFrequency(option.type)}
+            style={[styles.chip, scheduleType === option.type && styles.chipSelected]}
+          >
+            <Text style={styles.chipLabel}>{option.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {scheduleType === 'weekly_target' && (
+        <View testID="routine-form-target-count-row" style={styles.targetCountRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Weniger"
+            testID="routine-form-target-count-decrease"
+            onPress={() => handleChangeTargetCount(weeklyTargetCount - 1)}
+            style={styles.stepperButton}
+          >
+            <Text style={styles.chipLabel}>−</Text>
+          </Pressable>
+          <Text style={styles.targetCountValue} testID="routine-form-target-count-value">
+            {`${weeklyTargetCount}x pro Woche`}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Mehr"
+            testID="routine-form-target-count-increase"
+            onPress={() => handleChangeTargetCount(weeklyTargetCount + 1)}
+            style={styles.stepperButton}
+          >
+            <Text style={styles.chipLabel}>+</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {needsWeekdaySelection && (
+        <View style={styles.chipRow} testID="routine-form-weekdays">
+          {WEEKDAY_LABELS.map(({ day, label }) => {
+            const selected = scheduledWeekdays.includes(day);
+            return (
+              <Pressable
+                key={day}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: selected }}
+                testID={`routine-form-weekday-${day}`}
+                onPress={() => toggleWeekday(day)}
+                style={[styles.chip, selected && styles.chipSelected]}
+              >
+                <Text style={styles.chipLabel}>{label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
+      <Text style={styles.label}>Uhrzeit</Text>
+      <TextInput
+        value={timeOfDay}
+        onChangeText={setTimeOfDay}
+        placeholder="HH:mm (optional)"
+        style={styles.input}
+        testID="routine-form-time-input"
+      />
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => setAdvancedExpanded((prev) => !prev)}
+        testID="routine-form-advanced-toggle"
+        style={styles.advancedToggle}
+      >
+        <Text style={styles.advancedToggleLabel}>
+          {advancedExpanded ? '▾' : '▸'} Weitere Einstellungen
+        </Text>
+      </Pressable>
+
+      {advancedExpanded && (
+        <View testID="routine-form-advanced-section">
+          <Text style={styles.label}>Persönlicher Grund</Text>
+          <TextInput
+            value={reason}
+            onChangeText={setReason}
+            placeholder="Optional"
+            style={styles.input}
+            testID="routine-form-reason-input"
+          />
+
+          <View style={styles.switchRow}>
+            <Text style={styles.label}>Bewusstes Auslassen erlauben</Text>
+            <Switch
+              value={allowConsciousSkip}
+              onValueChange={setAllowConsciousSkip}
+              testID="routine-form-allow-skip-switch"
+            />
+          </View>
+        </View>
+      )}
+
+      <Button
+        label={submitLabel}
+        onPress={handleSubmit}
+        disabled={!canSave}
+        testID="routine-form-save"
+      />
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    gap: spacing.sm,
+    paddingBottom: spacing.xl,
+  },
+  label: {
+    fontSize: typography.bodySmall.fontSize,
+    lineHeight: typography.bodySmall.lineHeight,
+    fontWeight: typography.bodySmall.fontWeight,
+    color: colors.textSecondary,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: typography.body.fontSize,
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  createCategoryLink: {
+    fontSize: typography.bodySmall.fontSize,
+    color: colors.accent,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.surface,
+  },
+  chipSelected: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  chipLabel: {
+    fontSize: typography.bodySmall.fontSize,
+    color: colors.textPrimary,
+  },
+  targetCountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  stepperButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  targetCountValue: {
+    fontSize: typography.body.fontSize,
+    color: colors.textPrimary,
+  },
+  advancedToggle: {
+    paddingVertical: spacing.xs,
+  },
+  advancedToggleLabel: {
+    fontSize: typography.bodySmall.fontSize,
+    color: colors.textSecondary,
+    fontWeight: typography.bodySmall.fontWeight,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.xs,
+  },
+});

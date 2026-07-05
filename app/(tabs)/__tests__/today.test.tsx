@@ -1,8 +1,145 @@
-import { render, screen } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import TodayScreen from '../today';
+import { todayDateString } from '../../../src/domain/dates';
+import { listCategories } from '../../../src/data/repositories/categoryRepository';
+import { listRoutines, softDeleteRoutine } from '../../../src/data/repositories/routineRepository';
+import { listRoutineEventsInRange } from '../../../src/data/repositories/routineEventRepository';
+import { completeRoutineOccurrence, moveRoutineOccurrence } from '../../../src/services/routineService';
 
-test('renders without throwing', async () => {
-  await render(<TodayScreen />);
-  expect(screen.getByText('Heute')).toBeTruthy();
+jest.mock('../../../src/data/db/client', () => ({ db: {} }));
+jest.mock('../../../src/data/repositories/categoryRepository', () => ({
+  listCategories: jest.fn().mockResolvedValue([]),
+}));
+jest.mock('../../../src/data/repositories/routineRepository', () => ({
+  listRoutines: jest.fn(),
+  softDeleteRoutine: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../../../src/data/repositories/routineEventRepository', () => ({
+  listRoutineEventsInRange: jest.fn().mockResolvedValue([]),
+}));
+jest.mock('../../../src/services/routineService', () => ({
+  completeRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
+  exceedRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
+  moveRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
+  skipRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
+  pauseRoutine: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('expo-router', () => ({
+  ...jest.requireActual('expo-router'),
+  useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
+}));
+
+const TODAY = todayDateString();
+
+const dailyRoutine = {
+  id: 'routine-daily',
+  name: 'Laufen',
+  categoryId: null,
+  scheduleType: 'daily' as const,
+  scheduledWeekdays: null,
+  weeklyTargetCount: null,
+  timeOfDay: null,
+  reason: null,
+  allowConsciousSkip: false,
+  isPaused: false,
+  sortOrder: 0,
+  colorVariantSeed: 0,
+  createdAt: 'x',
+  updatedAt: 'x',
+  deletedAt: null,
+};
+
+const pausedRoutine = { ...dailyRoutine, id: 'routine-paused', name: 'Meditieren', isPaused: true };
+
+describe('TodayScreen', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (listCategories as jest.Mock).mockResolvedValue([]);
+    (listRoutineEventsInRange as jest.Mock).mockResolvedValue([]);
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  });
+
+  it('shows a pending due routine and excludes a paused one', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine, pausedRoutine]);
+
+    await render(<TodayScreen />);
+
+    expect(await screen.findByText('Laufen')).toBeTruthy();
+    expect(screen.queryByText('Meditieren')).toBeNull();
+  });
+
+  it('shows an empty state when nothing is due', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([]);
+
+    await render(<TodayScreen />);
+
+    expect(await screen.findByText('Für heute nichts geplant')).toBeTruthy();
+  });
+
+  it('shows a completed routine in a subdued state and does not re-offer completion', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
+    (listRoutineEventsInRange as jest.Mock).mockResolvedValue([
+      {
+        id: 'event-1',
+        routineId: dailyRoutine.id,
+        occurrenceDate: TODAY,
+        eventType: 'completed',
+        recordedAt: TODAY,
+        movedToDate: null,
+        skipReason: null,
+        supersededByEventId: null,
+      },
+    ]);
+
+    await render(<TodayScreen />);
+
+    const control = await screen.findByTestId(`routine-card-${dailyRoutine.id}-complete`);
+    expect(control.props.accessibilityState.disabled).toBe(true);
+    expect(control.props.accessibilityState.checked).toBe(true);
+  });
+
+  it('completes a routine via its card, calling the service with today\'s date', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
+
+    await render(<TodayScreen />);
+    const control = await screen.findByTestId(`routine-card-${dailyRoutine.id}-complete`);
+
+    await fireEvent(control, 'pressIn');
+    await fireEvent(control, 'pressOut');
+
+    expect(completeRoutineOccurrence).toHaveBeenCalledWith({}, dailyRoutine.id, TODAY);
+  });
+
+  it('moves a routine to tomorrow from the overflow menu', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
+
+    await render(<TodayScreen />);
+    await fireEvent.press(await screen.findByTestId(`routine-card-${dailyRoutine.id}-menu-button`));
+    await fireEvent.press(screen.getByTestId(`routine-card-${dailyRoutine.id}-menu-move`));
+
+    expect(moveRoutineOccurrence).toHaveBeenCalledWith(
+      {},
+      dailyRoutine.id,
+      TODAY,
+      expect.any(String),
+    );
+  });
+
+  it('deletes a routine from the overflow menu only after confirmation', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
+
+    await render(<TodayScreen />);
+    await fireEvent.press(await screen.findByTestId(`routine-card-${dailyRoutine.id}-menu-button`));
+    await fireEvent.press(screen.getByTestId(`routine-card-${dailyRoutine.id}-menu-delete`));
+
+    expect(softDeleteRoutine).not.toHaveBeenCalled();
+
+    const alertCall = (Alert.alert as jest.Mock).mock.calls.at(-1);
+    const buttons = alertCall[2] as { text: string; onPress?: () => void }[];
+    await buttons.find((b) => b.text === 'Löschen')?.onPress?.();
+
+    expect(softDeleteRoutine).toHaveBeenCalledWith({}, dailyRoutine.id);
+  });
 });
