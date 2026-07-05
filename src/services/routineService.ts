@@ -182,25 +182,43 @@ function maybeWriteJokerEarnedEventTx(
   }
 }
 
+export interface CompletionResult {
+  readonly event: RoutineEvent;
+  // Whether this specific completion crossed a 66-completion level boundary
+  // (docs/ROUTINE_RULES.md's Levels section) — the signal T042's level-up
+  // milestone animation fires on, exactly once, on the crossing completion.
+  readonly leveledUp: boolean;
+}
+
 /**
  * Writes a completion event (`completed` or `exceeded`), any resulting
  * `joker_earned` event, and recomputes both the routine cache and (since
  * this is an actual completion) the app streak cache, all in one
  * transaction (docs/ARCHITECTURE.md's Event and Cache Write Atomicity).
+ * `leveledUp` compares the cache's `levelRank` immediately before and after,
+ * so it is true only for the one completion that actually crosses a
+ * 66-completion boundary.
  */
 function writeCompletionEventTx(
   db: RoutineServiceDb,
   routineId: string,
   occurrenceDate: string,
   eventType: 'completed' | 'exceeded',
-): RoutineEvent {
+): CompletionResult {
   return db.transaction((tx) => {
+    const [previousCache] = tx
+      .select()
+      .from(routineStateCache)
+      .where(eq(routineStateCache.routineId, routineId))
+      .all();
+
     const event = buildRoutineEvent({ routineId, occurrenceDate, eventType });
     tx.insert(routineEvent).values(event).run();
     maybeWriteJokerEarnedEventTx(tx, routineId, occurrenceDate);
-    recomputeRoutineCacheTx(tx, routineId);
+    const newCache = recomputeRoutineCacheTx(tx, routineId);
     recomputeAppStreakCacheOnCompletionTx(tx, occurrenceDate);
-    return event;
+
+    return { event, leveledUp: newCache.levelRank > (previousCache?.levelRank ?? 0) };
   });
 }
 
@@ -209,7 +227,7 @@ export async function completeRoutineOccurrence(
   db: RoutineServiceDb,
   routineId: string,
   occurrenceDate: string,
-): Promise<RoutineEvent> {
+): Promise<CompletionResult> {
   return writeCompletionEventTx(db, routineId, occurrenceDate, 'completed');
 }
 
@@ -218,7 +236,7 @@ export async function exceedRoutineOccurrence(
   db: RoutineServiceDb,
   routineId: string,
   occurrenceDate: string,
-): Promise<RoutineEvent> {
+): Promise<CompletionResult> {
   return writeCompletionEventTx(db, routineId, occurrenceDate, 'exceeded');
 }
 
@@ -335,6 +353,10 @@ export interface RetroactiveCompletionResult {
   readonly writtenEvents: readonly RoutineEvent[];
   readonly jokerRestored: boolean;
   readonly requiresFullRecalculation: true;
+  // Same signal as CompletionResult.leveledUp (T042) — a retroactive edit
+  // genuinely adds a `completed` event too, so it can cross a level
+  // boundary just like a direct completion.
+  readonly leveledUp: boolean;
 }
 
 /**
@@ -354,7 +376,14 @@ export async function retroactivelyCompleteOccurrence(
   const plan = planRetroactiveCompletion(occurrenceDate, priorEvents);
 
   const writtenEvents: RoutineEvent[] = [];
+  let leveledUp = false;
   db.transaction((tx) => {
+    const [previousCache] = tx
+      .select()
+      .from(routineStateCache)
+      .where(eq(routineStateCache.routineId, routineId))
+      .all();
+
     for (const eventToWrite of plan.eventsToWrite) {
       const written = buildRoutineEvent({
         routineId,
@@ -372,7 +401,8 @@ export async function retroactivelyCompleteOccurrence(
       }
     }
 
-    recomputeRoutineCacheTx(tx, routineId);
+    const newCache = recomputeRoutineCacheTx(tx, routineId);
+    leveledUp = newCache.levelRank > (previousCache?.levelRank ?? 0);
     // planRetroactiveCompletion always writes a 'completed' event for
     // occurrenceDate, so this occurrence is now (or remains) an actual
     // completion for the app streak's purposes.
@@ -383,5 +413,6 @@ export async function retroactivelyCompleteOccurrence(
     writtenEvents,
     jokerRestored: plan.jokerRestored,
     requiresFullRecalculation: plan.requiresFullRecalculation,
+    leveledUp,
   };
 }

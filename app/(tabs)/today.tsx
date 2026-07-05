@@ -151,13 +151,17 @@ export default function TodayScreen() {
                 category={category}
                 streak={0}
                 state={state}
-                onComplete={() => {
+                onComplete={async () => {
                   maybeStartFirstCompletionOfDayBurst(todayDateString());
-                  return completeRoutineOccurrence(db, routine.id, todayDateString()).then(loadData);
+                  const result = await completeRoutineOccurrence(db, routine.id, todayDateString());
+                  loadData();
+                  return result.leveledUp;
                 }}
-                onExceed={() => {
+                onExceed={async () => {
                   maybeStartFirstCompletionOfDayBurst(todayDateString());
-                  return exceedRoutineOccurrence(db, routine.id, todayDateString()).then(loadData);
+                  const result = await exceedRoutineOccurrence(db, routine.id, todayDateString());
+                  loadData();
+                  return result.leveledUp;
                 }}
                 onOpenDetail={() => router.push(`/routine/${routine.id}`)}
                 onMoveToTomorrow={() => {

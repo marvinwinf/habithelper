@@ -368,4 +368,73 @@ describe('routineService', () => {
       sqlite.close();
     });
   });
+
+  describe('leveledUp signal', () => {
+    it('fires only on the specific completion that crosses a 66-completion boundary', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      const start = new Date('2026-01-01T00:00:00Z');
+      for (let i = 0; i < 65; i++) {
+        const date = new Date(start);
+        date.setUTCDate(date.getUTCDate() + i);
+        const result = await completeRoutineOccurrence(db, created.id, date.toISOString().slice(0, 10));
+        expect(result.leveledUp).toBe(false);
+      }
+
+      const boundaryDate = new Date(start);
+      boundaryDate.setUTCDate(boundaryDate.getUTCDate() + 65);
+      const boundaryResult = await completeRoutineOccurrence(
+        db,
+        created.id,
+        boundaryDate.toISOString().slice(0, 10),
+      );
+      expect(boundaryResult.leveledUp).toBe(true);
+
+      const afterDate = new Date(start);
+      afterDate.setUTCDate(afterDate.getUTCDate() + 66);
+      const afterResult = await completeRoutineOccurrence(db, created.id, afterDate.toISOString().slice(0, 10));
+      expect(afterResult.leveledUp).toBe(false);
+
+      sqlite.close();
+    });
+
+    it('does not fire for an exceeded completion that does not cross a boundary', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      const result = await exceedRoutineOccurrence(db, created.id, '2026-07-01');
+
+      expect(result.leveledUp).toBe(false);
+
+      sqlite.close();
+    });
+
+    it('fires on a retroactive completion that crosses a boundary', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      const start = new Date('2026-01-01T00:00:00Z');
+      for (let i = 0; i < 65; i++) {
+        const date = new Date(start);
+        date.setUTCDate(date.getUTCDate() + i);
+        await completeRoutineOccurrence(db, created.id, date.toISOString().slice(0, 10));
+      }
+      // The 66th occurrence was missed, then completed retroactively.
+      const boundaryDate = new Date(start);
+      boundaryDate.setUTCDate(boundaryDate.getUTCDate() + 65);
+      const boundaryDateString = boundaryDate.toISOString().slice(0, 10);
+      await appendRoutineEvent(db, {
+        routineId: created.id,
+        occurrenceDate: boundaryDateString,
+        eventType: 'missed',
+      });
+
+      const result = await retroactivelyCompleteOccurrence(db, created.id, boundaryDateString);
+
+      expect(result.leveledUp).toBe(true);
+
+      sqlite.close();
+    });
+  });
 });

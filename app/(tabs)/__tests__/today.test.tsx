@@ -28,8 +28,8 @@ jest.mock('../../../src/data/repositories/appStreakCacheRepository', () => ({
   getAppStreakCache: jest.fn(),
 }));
 jest.mock('../../../src/services/routineService', () => ({
-  completeRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
-  exceedRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
+  completeRoutineOccurrence: jest.fn().mockResolvedValue({ event: undefined, leveledUp: false }),
+  exceedRoutineOccurrence: jest.fn().mockResolvedValue({ event: undefined, leveledUp: false }),
   moveRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
   skipRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
   pauseRoutine: jest.fn().mockResolvedValue(undefined),
@@ -213,7 +213,7 @@ describe('TodayScreen', () => {
       if (lastIncrementedDate === null || date > lastIncrementedDate) {
         lastIncrementedDate = date;
       }
-      return Promise.resolve(undefined);
+      return Promise.resolve({ event: undefined, leveledUp: false });
     });
 
     await render(<TodayScreen />);

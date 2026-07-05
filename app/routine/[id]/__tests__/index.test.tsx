@@ -8,6 +8,7 @@ import { listCategories } from '../../../../src/data/repositories/categoryReposi
 import { listRoutineEvents } from '../../../../src/data/repositories/routineEventRepository';
 import { getRoutineStateCache } from '../../../../src/data/repositories/routineStateCacheRepository';
 import { retroactivelyCompleteOccurrence } from '../../../../src/services/routineService';
+import { triggerLevelMilestoneHaptic } from '../../../../src/ui/animation/haptics';
 
 jest.mock('../../../../src/data/db/client', () => ({ db: {} }));
 jest.mock('../../../../src/data/repositories/routineRepository', () => ({
@@ -23,10 +24,18 @@ jest.mock('../../../../src/data/repositories/routineStateCacheRepository', () =>
   getRoutineStateCache: jest.fn(),
 }));
 jest.mock('../../../../src/services/routineService', () => ({
-  retroactivelyCompleteOccurrence: jest.fn().mockResolvedValue(undefined),
+  retroactivelyCompleteOccurrence: jest.fn().mockResolvedValue({
+    writtenEvents: [],
+    jokerRestored: false,
+    requiresFullRecalculation: true,
+    leveledUp: false,
+  }),
 }));
 jest.mock('../../../../src/services/reconciliationService', () => ({
   reconcileRoutine: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../../../../src/ui/animation/haptics', () => ({
+  triggerLevelMilestoneHaptic: jest.fn(),
 }));
 jest.mock('expo-router', () => ({
   ...jest.requireActual('expo-router'),
@@ -188,6 +197,27 @@ describe('RoutineDetailScreen', () => {
     await buttons.find((b) => b.text === 'Erledigt')?.onPress?.();
 
     expect(retroactivelyCompleteOccurrence).toHaveBeenCalledWith({}, 'routine-1', PREV_MONTH_15TH);
+  });
+
+  it('triggers the level-up milestone haptic when a retroactive completion crosses a level boundary', async () => {
+    (retroactivelyCompleteOccurrence as jest.Mock).mockResolvedValue({
+      writtenEvents: [],
+      jokerRestored: false,
+      requiresFullRecalculation: true,
+      leveledUp: true,
+    });
+
+    await render(<RoutineDetailScreen />);
+    await screen.findByText('Laufen');
+
+    await fireEvent.press(screen.getByTestId('routine-detail-calendar-prev'));
+    await fireEvent.press(screen.getByTestId(`calendar-day-${PREV_MONTH_15TH}-missed`));
+
+    const alertCall = (Alert.alert as jest.Mock).mock.calls.at(-1);
+    const buttons = alertCall[2] as { text: string; onPress?: () => void }[];
+    await buttons.find((b) => b.text === 'Erledigt')?.onPress?.();
+
+    expect(triggerLevelMilestoneHaptic).toHaveBeenCalledTimes(1);
   });
 
   it('does not offer retroactive completion for an already-completed past day', async () => {

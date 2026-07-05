@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { db } from '../../../src/data/db/client';
 import { listCategories, type Category } from '../../../src/data/repositories/categoryRepository';
@@ -20,11 +20,18 @@ import { getCalendarDayState, listMonthDates } from '../../../src/domain/routine
 import { scheduleFromRoutineRow } from '../../../src/domain/routines/schedule';
 import { LEVEL_SEGMENT_SIZE } from '../../../src/domain/streaks/replay';
 import { levelName } from '../../../src/domain/streaks/levelName';
+import { triggerLevelMilestoneHaptic } from '../../../src/ui/animation/haptics';
+import { useLevelUpAnimation } from '../../../src/ui/animation/useLevelUpAnimation';
 import { Card } from '../../../src/ui/components/Card';
 import { CategoryBadge } from '../../../src/ui/components/CategoryBadge';
 import { ProgressBar } from '../../../src/ui/components/ProgressBar';
 import { RoutineCalendar, type CalendarDay } from '../../../src/ui/components/RoutineCalendar';
 import { colors, spacing, typography } from '../../../src/ui/theme';
+
+// Same distinguishing treatment as RoutineCard's level-up milestone (T042):
+// scales the whole stats card, not just a single number, so it reads as
+// visually distinct from ordinary stat updates.
+const LEVEL_UP_CARD_SCALE_PEAK = 1.05;
 
 const MONTH_NAMES = [
   'Januar',
@@ -48,6 +55,7 @@ export default function RoutineDetailScreen() {
   const [events, setEvents] = useState<RoutineEvent[]>([]);
   const [cache, setCache] = useState<RoutineStateCache | undefined>(undefined);
   const [reasonExpanded, setReasonExpanded] = useState(false);
+  const levelUpAnimation = useLevelUpAnimation();
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const [year, month] = todayDateString().split('-').map(Number);
     return { year, month };
@@ -115,12 +123,21 @@ export default function RoutineDetailScreen() {
       {
         text: 'Erledigt',
         onPress: async () => {
-          await retroactivelyCompleteOccurrence(db, id, day.date);
+          const result = await retroactivelyCompleteOccurrence(db, id, day.date);
           loadData();
+          if (result.leveledUp) {
+            levelUpAnimation.start();
+            triggerLevelMilestoneHaptic();
+          }
         },
       },
     ]);
   }
+
+  const statsCardScale = levelUpAnimation.progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, LEVEL_UP_CARD_SCALE_PEAK],
+  });
 
   if (!routine) {
     return <View style={styles.screen} testID="routine-detail-loading" />;
@@ -128,37 +145,39 @@ export default function RoutineDetailScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Card style={styles.statsCard}>
-        <Text style={styles.name}>{routine.name}</Text>
-        {category && (
-          <CategoryBadge
-            label={category.name}
-            baseColor={category.baseColor}
-            colorVariantSeed={routine.colorVariantSeed}
-          />
-        )}
-        <Text style={styles.streak} testID="routine-detail-streak">
-          Streak: {cache?.currentStreak ?? 0}
-        </Text>
-        <Text style={styles.level} testID="routine-detail-level">
-          {levelName(cache?.levelRank ?? 0)}
-        </Text>
-        <ProgressBar
-          value={((cache?.totalCompletions ?? 0) % LEVEL_SEGMENT_SIZE) / LEVEL_SEGMENT_SIZE}
-          testID="routine-detail-level-progress"
-        />
-        {(cache?.currentStreak ?? 0) < LEVEL_SEGMENT_SIZE && (
-          <Text style={styles.statLine} testID="routine-detail-jokers">
-            Joker: {cache?.jokerInventory ?? 0}/2
+      <Animated.View style={{ transform: [{ scale: statsCardScale }] }}>
+        <Card style={styles.statsCard}>
+          <Text style={styles.name}>{routine.name}</Text>
+          {category && (
+            <CategoryBadge
+              label={category.name}
+              baseColor={category.baseColor}
+              colorVariantSeed={routine.colorVariantSeed}
+            />
+          )}
+          <Text style={styles.streak} testID="routine-detail-streak">
+            Streak: {cache?.currentStreak ?? 0}
           </Text>
-        )}
-        <Text style={styles.statLine} testID="routine-detail-best-streak">
-          Rekord: {cache?.bestStreak ?? 0}
-        </Text>
-        <Text style={styles.statLine} testID="routine-detail-total-completions">
-          Erledigt insgesamt: {cache?.totalCompletions ?? 0}
-        </Text>
-      </Card>
+          <Text style={styles.level} testID="routine-detail-level">
+            {levelName(cache?.levelRank ?? 0)}
+          </Text>
+          <ProgressBar
+            value={((cache?.totalCompletions ?? 0) % LEVEL_SEGMENT_SIZE) / LEVEL_SEGMENT_SIZE}
+            testID="routine-detail-level-progress"
+          />
+          {(cache?.currentStreak ?? 0) < LEVEL_SEGMENT_SIZE && (
+            <Text style={styles.statLine} testID="routine-detail-jokers">
+              Joker: {cache?.jokerInventory ?? 0}/2
+            </Text>
+          )}
+          <Text style={styles.statLine} testID="routine-detail-best-streak">
+            Rekord: {cache?.bestStreak ?? 0}
+          </Text>
+          <Text style={styles.statLine} testID="routine-detail-total-completions">
+            Erledigt insgesamt: {cache?.totalCompletions ?? 0}
+          </Text>
+        </Card>
+      </Animated.View>
 
       {routine.reason && (
         <Card style={styles.reasonCard}>
