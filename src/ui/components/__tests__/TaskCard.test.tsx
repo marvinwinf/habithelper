@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { TaskCard } from '../TaskCard';
+import { todayDateString } from '../../../domain/dates';
 
 const task = {
   id: 'task-1',
@@ -73,5 +74,30 @@ describe('TaskCard', () => {
     expect(screen.queryByTestId('task-card-menu-move')).toBeNull();
     expect(screen.getByTestId('task-card-menu-edit')).toBeTruthy();
     expect(screen.getByTestId('task-card-menu-delete')).toBeTruthy();
+  });
+
+  it('shows "Heute" as the subtitle for a task dated today', async () => {
+    await renderCard({ task: { ...task, date: todayDateString() } });
+
+    expect(screen.getByText('Heute')).toBeTruthy();
+  });
+
+  it('shows the raw date (plus time) for a task dated another day', async () => {
+    await renderCard({ task: { ...task, date: '2026-08-01', timeOfDay: '09:00' } });
+
+    expect(screen.getByText('2026-08-01 · 09:00')).toBeTruthy();
+  });
+
+  it('shows the "Für später" subtitle and a bookmark on for-later cards', async () => {
+    await renderCard({ forLater: true });
+
+    expect(screen.getByText('Für später')).toBeTruthy();
+    expect(screen.getByTestId('task-card-bookmark')).toBeTruthy();
+  });
+
+  it('shows no bookmark outside the for-later treatment', async () => {
+    await renderCard();
+
+    expect(screen.queryByTestId('task-card-bookmark')).toBeNull();
   });
 });

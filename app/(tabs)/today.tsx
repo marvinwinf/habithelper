@@ -364,6 +364,7 @@ export default function TodayScreen() {
                       task={taskItem}
                       category={category}
                       isOverdue={false}
+                      forLater
                       onToggleComplete={() => handleToggleTaskComplete(taskItem)}
                       onMoveToTomorrow={() => handleMoveTaskToTomorrow(taskItem)}
                       onEdit={() => router.push(`/task/${taskItem.id}/edit`)}
