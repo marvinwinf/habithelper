@@ -21,6 +21,9 @@ jest.mock('../../../../src/data/repositories/routineEventRepository', () => ({
 jest.mock('../../../../src/services/routineService', () => ({
   retroactivelyCompleteOccurrence: jest.fn().mockResolvedValue(undefined),
 }));
+jest.mock('../../../../src/services/reconciliationService', () => ({
+  reconcileRoutine: jest.fn().mockResolvedValue(undefined),
+}));
 jest.mock('expo-router', () => ({
   ...jest.requireActual('expo-router'),
   useLocalSearchParams: () => ({ id: 'routine-1' }),

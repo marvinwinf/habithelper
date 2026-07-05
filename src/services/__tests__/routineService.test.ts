@@ -235,6 +235,23 @@ describe('routineService', () => {
       sqlite.close();
     });
 
+    it('writes a joker_earned event automatically on the 5th completion, reflected in the cache', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      for (let i = 1; i <= 5; i++) {
+        await completeRoutineOccurrence(db, created.id, `2026-07-0${i}`);
+      }
+
+      const events = await listRoutineEvents(db, created.id);
+      expect(events.filter((e) => e.eventType === 'joker_earned')).toHaveLength(1);
+
+      const cache = await getRoutineStateCache(db, created.id);
+      expect(cache).toMatchObject({ jokerInventory: 1, jokerProgress: 0 });
+
+      sqlite.close();
+    });
+
     it('recomputes the routine cache after a conscious skip, move, pause, and reactivate — all no-ops for the numbers', async () => {
       const { db, sqlite } = await createDrizzleTestDb();
       const created = await createRoutine(db, { ...baseInput, allowConsciousSkip: true });

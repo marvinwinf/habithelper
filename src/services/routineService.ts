@@ -21,21 +21,21 @@ import { APP_STREAK_CACHE_ID, buildAppStreakCache } from '../data/repositories/a
 import { addDaysToDateString, todayDateString } from '../domain/dates';
 import { requestConsciousSkip } from '../domain/routines/completion';
 import { planRetroactiveCompletion } from '../domain/routines/retroactive';
-import { replayRoutineStreak } from '../domain/streaks/replay';
+import { JOKER_EARN_THRESHOLD, replayRoutineStreak } from '../domain/streaks/replay';
 
 // Accepts any sync-dialect SQLite drizzle database (both the real
 // expo-sqlite-backed client and a better-sqlite3-backed test database
 // satisfy this), so tests can run against a real SQLite engine per
 // docs/TEST_STRATEGY.md without needing expo-sqlite's native module, which
 // cannot run under Jest.
-type RoutineServiceSchema = {
+export type RoutineServiceSchema = {
   routine: typeof routine;
   routineEvent: typeof routineEvent;
   routineStateCache: typeof routineStateCache;
   appStreakCache: typeof appStreakCache;
 };
-type RoutineServiceDb = BaseSQLiteDatabase<'sync', unknown, RoutineServiceSchema>;
-type RoutineServiceTx = SQLiteTransaction<
+export type RoutineServiceDb = BaseSQLiteDatabase<'sync', unknown, RoutineServiceSchema>;
+export type RoutineServiceTx = SQLiteTransaction<
   'sync',
   unknown,
   RoutineServiceSchema,
@@ -49,14 +49,22 @@ export type { Routine, RoutineEvent, RoutineStateCache };
  * Recomputes a routine's streak/joker/level cache from its full event log
  * and persists it, per docs/ARCHITECTURE.md's Event and Cache Write
  * Atomicity — always called from inside the same transaction as the
- * `routine_event` write that triggered it, never on its own. `reconciled_
- * through_date` is preserved from the existing cache row; it is only ever
- * meaningfully advanced by the reconciliation service (T038), not by a
- * direct user action. The very first cache computation for a routine (no
- * existing row) seeds it to the day before that routine's earliest known
- * event, so nothing before it is ever mistaken for already reconciled.
+ * `routine_event` write(s) that triggered it, never on its own.
+ *
+ * `reconciledThroughDateOverride` lets the reconciliation service (T038)
+ * advance the watermark to the value it just computed, in the same
+ * transaction as the events it wrote; direct user actions never pass it, so
+ * `reconciled_through_date` is otherwise preserved from the existing cache
+ * row untouched. The very first cache computation for a routine (no
+ * existing row, no override) seeds it to the day before that routine's
+ * earliest known event, so nothing before it is ever mistaken for already
+ * reconciled.
  */
-function recomputeRoutineCacheTx(tx: RoutineServiceTx, routineId: string): RoutineStateCache {
+export function recomputeRoutineCacheTx(
+  tx: RoutineServiceTx,
+  routineId: string,
+  reconciledThroughDateOverride?: string,
+): RoutineStateCache {
   const events = tx.select().from(routineEvent).where(eq(routineEvent.routineId, routineId)).all();
   const state = replayRoutineStreak(events);
 
@@ -74,7 +82,9 @@ function recomputeRoutineCacheTx(tx: RoutineServiceTx, routineId: string): Routi
         )
       : todayDateString();
   const reconciledThroughDate =
-    existingCache?.reconciledThroughDate ?? addDaysToDateString(earliestEventDate, -1);
+    reconciledThroughDateOverride ??
+    existingCache?.reconciledThroughDate ??
+    addDaysToDateString(earliestEventDate, -1);
 
   const cache = buildRoutineStateCache(routineId, state, reconciledThroughDate);
   if (existingCache) {
@@ -146,10 +156,36 @@ export async function createRoutine(db: RoutineServiceDb, input: CreateRoutineIn
 }
 
 /**
- * Writes a completion event (`completed` or `exceeded`) and recomputes both
- * the routine cache and (since this is an actual completion) the app streak
- * cache, all in one transaction (docs/ARCHITECTURE.md's Event and Cache
- * Write Atomicity).
+ * Writes a joker_earned event immediately when a completion's resulting
+ * jokerProgress crosses the earn threshold, per docs/ARCHITECTURE.md
+ * ("joker_earned ... is written eagerly by the completion action itself, at
+ * the same time as the completed/exceeded event"). Checked via a throwaway
+ * replay of the event log as it stands right after the just-written
+ * completion — replay itself never grants a joker from jokerProgress alone
+ * (see replay.ts), so this is the one place that decision is made. Only
+ * ever called from a direct completion; a retroactive completion (which can
+ * insert into the middle of history) would need a forward walk similar to
+ * reconciliation to backfill any joker_earned crossing correctly, which is
+ * out of scope here and left as a known limitation.
+ */
+function maybeWriteJokerEarnedEventTx(
+  tx: RoutineServiceTx,
+  routineId: string,
+  occurrenceDate: string,
+): void {
+  const events = tx.select().from(routineEvent).where(eq(routineEvent.routineId, routineId)).all();
+  const state = replayRoutineStreak(events);
+  if (state.jokerProgress === JOKER_EARN_THRESHOLD) {
+    const jokerEarnedEvent = buildRoutineEvent({ routineId, occurrenceDate, eventType: 'joker_earned' });
+    tx.insert(routineEvent).values(jokerEarnedEvent).run();
+  }
+}
+
+/**
+ * Writes a completion event (`completed` or `exceeded`), any resulting
+ * `joker_earned` event, and recomputes both the routine cache and (since
+ * this is an actual completion) the app streak cache, all in one
+ * transaction (docs/ARCHITECTURE.md's Event and Cache Write Atomicity).
  */
 function writeCompletionEventTx(
   db: RoutineServiceDb,
@@ -160,6 +196,7 @@ function writeCompletionEventTx(
   return db.transaction((tx) => {
     const event = buildRoutineEvent({ routineId, occurrenceDate, eventType });
     tx.insert(routineEvent).values(event).run();
+    maybeWriteJokerEarnedEventTx(tx, routineId, occurrenceDate);
     recomputeRoutineCacheTx(tx, routineId);
     recomputeAppStreakCacheOnCompletionTx(tx, occurrenceDate);
     return event;

@@ -31,6 +31,12 @@ const MAX_JOKER_INVENTORY = 2;
 // (docs/ROUTINE_RULES.md's Levels section) are documented as the same 66.
 export const LEVEL_SEGMENT_SIZE = 66;
 const POST_66_TOLERATED_MISSES = 3;
+// Shared with src/services/routineService.ts: "one joker is earned after
+// every 5 successful completions" (docs/ROUTINE_RULES.md) — the completion
+// action checks jokerProgress against this threshold to decide when to
+// write a joker_earned event; replay itself never grants a joker from
+// jokerProgress alone (see applyEvent's joker_earned case below).
+export const JOKER_EARN_THRESHOLD = 5;
 
 const INITIAL_STATE: RoutineStreakState = {
   currentStreak: 0,

@@ -10,6 +10,7 @@ import {
   type RoutineEvent,
 } from '../../../src/data/repositories/routineEventRepository';
 import { retroactivelyCompleteOccurrence } from '../../../src/services/routineService';
+import { reconcileRoutine } from '../../../src/services/reconciliationService';
 import { toLocalDateString, todayDateString } from '../../../src/domain/dates';
 import { getCalendarDayState, listMonthDates } from '../../../src/domain/routines/calendar';
 import { scheduleFromRoutineRow } from '../../../src/domain/routines/schedule';
@@ -50,11 +51,16 @@ export default function RoutineDetailScreen() {
     listRoutineEvents(db, id).then(setEvents);
   }, [id]);
 
-  // TODO(T038): reconcile this routine's missed occurrences here on open,
-  // before its state is shown, once the reconciliation service exists.
+  // Re-reconciles this routine's missed occurrences before showing its
+  // state, in case the cache went stale while the app was backgrounded
+  // (T038 / docs/ARCHITECTURE.md's Missed-Occurrence Reconciliation).
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    reconcileRoutine(db, id)
+      .catch((error) => {
+        console.error('Routine reconciliation failed', error);
+      })
+      .finally(loadData);
+  }, [id, loadData]);
 
   const category = routine?.categoryId
     ? categories.find((c) => c.id === routine.categoryId)
