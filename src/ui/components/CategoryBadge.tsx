@@ -1,12 +1,16 @@
+import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../theme';
 import { getCategoryColorVariant } from '../theme/categoryVariant';
+import { categoryIconName } from '../categoryIcons';
 
 export interface CategoryBadgeProps {
   label: string;
   baseColor: string;
   colorVariantSeed: number;
+  /** The category's stored icon (category.icon); null/undefined renders the fallback icon. */
+  icon?: string | null;
   testID?: string;
 }
 
@@ -14,13 +18,19 @@ export function CategoryBadge({
   label,
   baseColor,
   colorVariantSeed,
+  icon,
   testID,
 }: CategoryBadgeProps) {
   const variant = getCategoryColorVariant(baseColor, colorVariantSeed);
 
   return (
     <View testID={testID} style={[styles.badge, { backgroundColor: variant.background }]}>
-      <View style={[styles.dot, { backgroundColor: variant.accent }]} />
+      <Ionicons
+        name={categoryIconName(icon)}
+        size={typography.caption.fontSize}
+        color={variant.accent}
+        style={styles.icon}
+      />
       <Text style={styles.label} numberOfLines={1}>
         {label}
       </Text>
@@ -37,10 +47,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     borderRadius: radius.full,
   },
-  dot: {
-    width: spacing.xs,
-    height: spacing.xs,
-    borderRadius: radius.full,
+  icon: {
     marginRight: spacing.xxs,
   },
   label: {

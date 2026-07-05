@@ -39,6 +39,7 @@ export interface RoutineCardRoutine {
 export interface RoutineCardCategory {
   name: string;
   baseColor: string;
+  icon?: string | null;
 }
 
 export interface RoutineCardProps {
@@ -137,6 +138,7 @@ export function RoutineCard({
                     label={category.name}
                     baseColor={category.baseColor}
                     colorVariantSeed={routine.colorVariantSeed}
+                    icon={category.icon}
                   />
                 )}
                 {routine.timeOfDay && <Text style={styles.time}>{routine.timeOfDay}</Text>}

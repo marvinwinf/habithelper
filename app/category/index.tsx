@@ -77,6 +77,7 @@ export default function CategoryListScreen() {
                 label={item.name}
                 baseColor={item.baseColor}
                 colorVariantSeed={PREVIEW_SEED}
+                icon={item.icon}
               />
               <View style={styles.rowActions}>
                 <Link

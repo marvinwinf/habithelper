@@ -42,6 +42,7 @@ export default function EditCategoryScreen() {
       <CategoryForm
         initialName={category.name}
         initialBaseColor={category.baseColor}
+        initialIcon={category.icon}
         onSubmit={handleSubmit}
         submitLabel="Speichern"
         testID="edit-category-form"

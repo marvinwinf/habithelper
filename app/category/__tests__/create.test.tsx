@@ -29,7 +29,10 @@ describe('CreateCategoryScreen', () => {
     await fireEvent.changeText(screen.getByTestId('category-form-name-input'), 'Sport');
     await fireEvent.press(screen.getByTestId('category-form-save'));
 
-    expect(createCategory).toHaveBeenCalledWith({}, { name: 'Sport', baseColor: expect.any(String) });
+    expect(createCategory).toHaveBeenCalledWith(
+      {},
+      { name: 'Sport', baseColor: expect.any(String), icon: null },
+    );
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 });

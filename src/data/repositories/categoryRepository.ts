@@ -15,6 +15,8 @@ export type Category = typeof category.$inferSelect;
 export interface CategoryInput {
   name: string;
   baseColor: string;
+  /** Ionicons glyph name from the curated set (src/ui/categoryIcons.ts); null renders the fallback icon. */
+  icon?: string | null;
 }
 
 class CategoryNotFoundError extends Error {
@@ -31,6 +33,7 @@ export async function createCategory(db: CategoryDb, input: CategoryInput): Prom
     id: randomUUID(),
     name: input.name,
     baseColor: input.baseColor,
+    icon: input.icon ?? null,
     createdAt: now,
     updatedAt: now,
   };

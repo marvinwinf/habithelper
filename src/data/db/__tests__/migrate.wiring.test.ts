@@ -34,10 +34,16 @@ describe('runMigrations startup wiring', () => {
     const realSql = migrations.migrations.m0000;
     const [firstStatement] = realSql.split('--> statement-breakpoint');
     expect(mockDb.execAsync).toHaveBeenCalledWith(firstStatement.trim());
+    expect(mockDb.execAsync).toHaveBeenCalledWith(migrations.migrations.m0001.trim());
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       'INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)',
       [0, expect.any(String)],
     );
-    expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(1);
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      'INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)',
+      [1, expect.any(String)],
+    );
+    // One transaction per migration (see migrationRunner.ts).
+    expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(2);
   });
 });

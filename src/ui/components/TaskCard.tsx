@@ -19,6 +19,7 @@ export interface TaskCardTask {
 export interface TaskCardCategory {
   name: string;
   baseColor: string;
+  icon?: string | null;
 }
 
 export interface TaskCardProps {
@@ -78,6 +79,7 @@ export function TaskCard({
                 label={category.name}
                 baseColor={category.baseColor}
                 colorVariantSeed={task.colorVariantSeed}
+                icon={category.icon}
               />
             )}
             {task.date && <Text style={styles.metaText}>{task.date}</Text>}

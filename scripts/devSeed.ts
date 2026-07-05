@@ -72,9 +72,14 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function insertCategory(db: SeedDb, name: string, baseColor: string): typeof schema.category.$inferSelect {
+function insertCategory(
+  db: SeedDb,
+  name: string,
+  baseColor: string,
+  icon: string | null,
+): typeof schema.category.$inferSelect {
   const timestamp = nowIso();
-  const row = { id: randomUUID(), name, baseColor, createdAt: timestamp, updatedAt: timestamp };
+  const row = { id: randomUUID(), name, baseColor, icon, createdAt: timestamp, updatedAt: timestamp };
   db.insert(schema.category).values(row).run();
   return row;
 }
@@ -225,9 +230,9 @@ async function main(): Promise<void> {
 
   const db = drizzle(sqlite, { schema });
 
-  const sport = insertCategory(db, 'Sport', '#8FBFA0');
-  const household = insertCategory(db, 'Haushalt', '#A9A0D6');
-  const work = insertCategory(db, 'Arbeit', '#F0A868');
+  const sport = insertCategory(db, 'Sport', '#8FBFA0', 'barbell');
+  const household = insertCategory(db, 'Haushalt', '#A9A0D6', 'home');
+  const work = insertCategory(db, 'Arbeit', '#F0A868', 'cafe');
 
   const today = todayDateString();
   const yesterday = addDaysToDateString(today, -1);

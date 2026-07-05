@@ -99,6 +99,7 @@ export default function RoutinesScreen() {
               label={category.name}
               baseColor={category.baseColor}
               colorVariantSeed={item.colorVariantSeed}
+              icon={category.icon}
             />
           )}
           {/* TODO(T037/T039): replace with the real streak from routine_state_cache once wired. */}

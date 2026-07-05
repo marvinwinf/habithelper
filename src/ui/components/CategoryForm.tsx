@@ -3,16 +3,21 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button } from './Button';
 import { CategoryBadge } from './CategoryBadge';
+import { IconBadge } from './IconBadge';
 import { colors, radius, spacing, typography, type CategoryColorFamily } from '../theme';
+import { getCategoryColorVariant } from '../theme/categoryVariant';
+import { CATEGORY_ICON_OPTIONS } from '../categoryIcons';
 
 export interface CategoryFormValues {
   name: string;
   baseColor: string;
+  icon: string | null;
 }
 
 export interface CategoryFormProps {
   initialName?: string;
   initialBaseColor?: string;
+  initialIcon?: string | null;
   submitLabel?: string;
   onSubmit: (values: CategoryFormValues) => void;
   testID?: string;
@@ -29,15 +34,18 @@ const PREVIEW_SEED = 0;
 export function CategoryForm({
   initialName = '',
   initialBaseColor = colors.categories[PALETTE_FAMILIES[0]].base,
+  initialIcon = null,
   submitLabel = 'Speichern',
   onSubmit,
   testID,
 }: CategoryFormProps) {
   const [name, setName] = useState(initialName);
   const [baseColor, setBaseColor] = useState(initialBaseColor);
+  const [icon, setIcon] = useState<string | null>(initialIcon);
 
   const trimmedName = name.trim();
   const canSave = trimmedName.length > 0;
+  const previewVariant = getCategoryColorVariant(baseColor, PREVIEW_SEED);
 
   return (
     <View testID={testID} style={styles.container}>
@@ -73,17 +81,43 @@ export function CategoryForm({
         })}
       </View>
 
+      <Text style={styles.label}>Symbol</Text>
+      <View style={styles.paletteRow}>
+        {CATEGORY_ICON_OPTIONS.map((option) => {
+          const selected = option === icon;
+          return (
+            <Pressable
+              key={option}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              accessibilityLabel={option}
+              testID={`category-form-icon-${option}`}
+              onPress={() => setIcon(option)}
+              style={[styles.iconOption, selected && styles.iconOptionSelected]}
+            >
+              <IconBadge
+                name={option}
+                size="sm"
+                backgroundColor={selected ? previewVariant.background : colors.surfaceMuted}
+                iconColor={selected ? previewVariant.accent : colors.textSecondary}
+              />
+            </Pressable>
+          );
+        })}
+      </View>
+
       <Text style={styles.label}>Vorschau</Text>
       <CategoryBadge
         label={trimmedName || 'Vorschau'}
         baseColor={baseColor}
         colorVariantSeed={PREVIEW_SEED}
+        icon={icon}
         testID="category-form-preview"
       />
 
       <Button
         label={submitLabel}
-        onPress={() => onSubmit({ name: trimmedName, baseColor })}
+        onPress={() => onSubmit({ name: trimmedName, baseColor, icon })}
         disabled={!canSave}
         testID="category-form-save"
       />
@@ -125,5 +159,13 @@ const styles = StyleSheet.create({
   },
   swatchSelected: {
     borderColor: colors.textPrimary,
+  },
+  iconOption: {
+    borderWidth: 2,
+    borderColor: 'transparent',
+    borderRadius: radius.md,
+  },
+  iconOptionSelected: {
+    borderColor: colors.accent,
   },
 });

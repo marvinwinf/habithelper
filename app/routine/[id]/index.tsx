@@ -153,6 +153,7 @@ export default function RoutineDetailScreen() {
               label={category.name}
               baseColor={category.baseColor}
               colorVariantSeed={routine.colorVariantSeed}
+              icon={category.icon}
             />
           )}
           <Text style={styles.streak} testID="routine-detail-streak">

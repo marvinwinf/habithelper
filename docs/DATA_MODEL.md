@@ -32,6 +32,7 @@ Note: `docs/DATA_PERSISTENCE.md` lists "settings" as its own persistent-data cat
 | `id` | TEXT PK | stable |
 | `name` | TEXT | user-editable, not unique-constrained on identity (name is not the key) |
 | `base_color` | TEXT | hex or design-token key, see Category Color Variants |
+| `icon` | TEXT NULL | Ionicons glyph name from the curated UI set (added by migration `0001_category_icon`, T063); `NULL` renders the UI-layer fallback icon |
 | `created_at` | TEXT | |
 | `updated_at` | TEXT | |
 

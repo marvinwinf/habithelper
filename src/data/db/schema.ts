@@ -41,6 +41,10 @@ export const category = sqliteTable('category', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   baseColor: text('base_color').notNull(),
+  // Ionicons glyph name, added by migration 0001 (T063). Nullable: rows
+  // created before the migration keep NULL and render the UI-layer fallback
+  // icon (src/ui/categoryIcons.ts).
+  icon: text('icon'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
