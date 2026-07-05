@@ -80,11 +80,4 @@ describe('RoutinesScreen', () => {
     expect(await screen.findByText('Noch keine aktiven Routinen')).toBeTruthy();
   });
 
-  it('offers a create-routine link', async () => {
-    (listRoutines as jest.Mock).mockResolvedValue([]);
-
-    await renderScreen();
-
-    expect(await screen.findByTestId('routines-create-link')).toBeTruthy();
-  });
 });

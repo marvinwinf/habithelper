@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { db } from '../../src/data/db/client';
@@ -120,10 +120,6 @@ export default function RoutinesScreen() {
     <View style={styles.screen}>
       <View style={styles.header}>
         <Text style={styles.title}>Routinen</Text>
-        {/* TODO(T050): replace with the floating create button once it exists. */}
-        <Link href="/routine/create" style={styles.createLink} testID="routines-create-link">
-          + Neue Routine
-        </Link>
       </View>
 
       <View style={styles.tabRow}>
@@ -148,7 +144,7 @@ export default function RoutinesScreen() {
           title={tab === 'active' ? 'Noch keine aktiven Routinen' : 'Keine pausierten Routinen'}
           message={
             tab === 'active'
-              ? 'Tippe oben auf „+ Neue Routine“, um loszulegen.'
+              ? 'Tippe unten rechts auf „+“, um loszulegen.'
               : 'Pausierte Routinen erscheinen hier.'
           }
         />
@@ -206,10 +202,6 @@ const styles = StyleSheet.create({
     lineHeight: typography.title.lineHeight,
     fontWeight: typography.title.fontWeight,
     color: colors.textPrimary,
-  },
-  createLink: {
-    fontSize: typography.body.fontSize,
-    color: colors.accent,
   },
   tabRow: {
     flexDirection: 'row',

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { db } from '../../src/data/db/client';
@@ -106,16 +106,12 @@ export default function TasksScreen() {
     <View style={styles.screen}>
       <View style={styles.header}>
         <Text style={styles.title}>Aufgaben</Text>
-        {/* TODO(T050): replace with the floating create button once it exists. */}
-        <Link href="/task/create" style={styles.createLink} testID="tasks-create-link">
-          + Neue Aufgabe
-        </Link>
       </View>
 
       {!hasAnyTask ? (
         <EmptyState
           title="Noch keine Aufgaben"
-          message="Tippe oben auf „+ Neue Aufgabe“, um loszulegen."
+          message="Tippe unten rechts auf „+“, um loszulegen."
         />
       ) : (
         <View style={styles.list}>
@@ -166,10 +162,6 @@ const styles = StyleSheet.create({
     lineHeight: typography.title.lineHeight,
     fontWeight: typography.title.fontWeight,
     color: colors.textPrimary,
-  },
-  createLink: {
-    fontSize: typography.body.fontSize,
-    color: colors.accent,
   },
   list: {
     gap: spacing.md,
