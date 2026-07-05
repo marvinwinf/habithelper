@@ -7,7 +7,11 @@ import { getRoutine } from '../../../../src/data/repositories/routineRepository'
 import { listCategories } from '../../../../src/data/repositories/categoryRepository';
 import { listRoutineEvents } from '../../../../src/data/repositories/routineEventRepository';
 import { getRoutineStateCache } from '../../../../src/data/repositories/routineStateCacheRepository';
-import { retroactivelyCompleteOccurrence } from '../../../../src/services/routineService';
+import {
+  pauseRoutine,
+  reactivateRoutine,
+  retroactivelyCompleteOccurrence,
+} from '../../../../src/services/routineService';
 import { triggerLevelMilestoneHaptic } from '../../../../src/ui/animation/haptics';
 
 jest.mock('../../../../src/data/db/client', () => ({ db: {} }));
@@ -30,6 +34,8 @@ jest.mock('../../../../src/services/routineService', () => ({
     requiresFullRecalculation: true,
     leveledUp: false,
   }),
+  pauseRoutine: jest.fn().mockResolvedValue(undefined),
+  reactivateRoutine: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('../../../../src/services/reconciliationService', () => ({
   reconcileRoutine: jest.fn().mockResolvedValue(undefined),
@@ -37,9 +43,12 @@ jest.mock('../../../../src/services/reconciliationService', () => ({
 jest.mock('../../../../src/ui/animation/haptics', () => ({
   triggerLevelMilestoneHaptic: jest.fn(),
 }));
+const mockPush = jest.fn();
+const mockBack = jest.fn();
 jest.mock('expo-router', () => ({
   ...jest.requireActual('expo-router'),
   useLocalSearchParams: () => ({ id: 'routine-1' }),
+  useRouter: () => ({ push: mockPush, back: mockBack }),
 }));
 
 const TODAY = todayDateString();
@@ -104,7 +113,51 @@ describe('RoutineDetailScreen', () => {
     await render(<RoutineDetailScreen />);
 
     expect(await screen.findByText('Laufen')).toBeTruthy();
-    expect(await screen.findByText('Streak: 3')).toBeTruthy();
+    expect(await screen.findByTestId('routine-detail-streak')).toHaveTextContent('3 Tage');
+  });
+
+  it('shows the remaining completions to the next level with the segment progress count', async () => {
+    (getRoutineStateCache as jest.Mock).mockResolvedValue(
+      buildCache({ totalCompletions: 48, levelRank: 0 }),
+    );
+
+    await render(<RoutineDetailScreen />);
+
+    expect(await screen.findByTestId('routine-detail-remaining')).toHaveTextContent(
+      'Noch 18 Abschlüsse bis Level 2',
+    );
+    expect(screen.getByTestId('routine-detail-progress-count')).toHaveTextContent('48 / 66');
+  });
+
+  it('navigates to the edit screen from the Bearbeiten action button', async () => {
+    await render(<RoutineDetailScreen />);
+    await screen.findByText('Laufen');
+
+    await fireEvent.press(screen.getByTestId('routine-detail-edit'));
+
+    expect(mockPush).toHaveBeenCalledWith('/routine/routine-1/edit');
+  });
+
+  it('pauses an active routine from the action button', async () => {
+    await render(<RoutineDetailScreen />);
+    await screen.findByText('Laufen');
+
+    await fireEvent.press(screen.getByTestId('routine-detail-pause'));
+
+    expect(pauseRoutine).toHaveBeenCalledWith({}, 'routine-1', TODAY);
+    expect(reactivateRoutine).not.toHaveBeenCalled();
+  });
+
+  it('reactivates a paused routine from the action button', async () => {
+    (getRoutine as jest.Mock).mockResolvedValue({ ...routine, isPaused: true });
+
+    await render(<RoutineDetailScreen />);
+    await screen.findByText('Reaktivieren');
+
+    await fireEvent.press(screen.getByTestId('routine-detail-pause'));
+
+    expect(reactivateRoutine).toHaveBeenCalledWith({}, 'routine-1', TODAY);
+    expect(pauseRoutine).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -140,17 +193,18 @@ describe('RoutineDetailScreen', () => {
     expect(screen.queryByTestId('routine-detail-jokers')).toBeNull();
   });
 
-  it('shows the personal streak record and total successful completions', async () => {
+  it('shows the personal streak record and total completions in the stat tiles', async () => {
     (getRoutineStateCache as jest.Mock).mockResolvedValue(
       buildCache({ bestStreak: 12, totalCompletions: 40 }),
     );
 
     await render(<RoutineDetailScreen />);
 
-    expect(await screen.findByTestId('routine-detail-best-streak')).toHaveTextContent('Rekord: 12');
+    expect(await screen.findByTestId('routine-detail-best-streak')).toHaveTextContent(/12 Tage/);
     expect(await screen.findByTestId('routine-detail-total-completions')).toHaveTextContent(
-      'Erledigt insgesamt: 40',
+      /Wiederholungen/,
     );
+    expect(screen.getByTestId('routine-detail-total-completions')).toHaveTextContent(/40/);
   });
 
   it('maps calendar cell states from the routine events', async () => {
