@@ -21,6 +21,24 @@ export interface RoutineEventInput {
 }
 
 /**
+ * Builds a full routine event row (fresh stable `id`, `recordedAt` stamped
+ * now) without writing it — for callers that persist the row inside their
+ * own transaction alongside other writes (see routineService).
+ */
+export function buildRoutineEvent(input: RoutineEventInput): RoutineEvent {
+  return {
+    id: randomUUID(),
+    routineId: input.routineId,
+    occurrenceDate: input.occurrenceDate,
+    eventType: input.eventType,
+    recordedAt: new Date().toISOString(),
+    movedToDate: input.movedToDate ?? null,
+    skipReason: input.skipReason ?? null,
+    supersededByEventId: null,
+  };
+}
+
+/**
  * Appends a new routine event with a freshly generated, stable `id`. This is
  * the only way new event data enters `routine_event` — rows are never
  * updated in place once written (docs/DATA_MODEL.md); a retroactive edit
@@ -31,16 +49,7 @@ export async function appendRoutineEvent(
   db: RoutineEventDb,
   input: RoutineEventInput,
 ): Promise<RoutineEvent> {
-  const created: RoutineEvent = {
-    id: randomUUID(),
-    routineId: input.routineId,
-    occurrenceDate: input.occurrenceDate,
-    eventType: input.eventType,
-    recordedAt: new Date().toISOString(),
-    movedToDate: input.movedToDate ?? null,
-    skipReason: input.skipReason ?? null,
-    supersededByEventId: null,
-  };
+  const created = buildRoutineEvent(input);
   await db.insert(routineEvent).values(created);
   return created;
 }

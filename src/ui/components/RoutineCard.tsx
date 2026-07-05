@@ -108,12 +108,17 @@ export function RoutineCard({
 
       <Sheet visible={menuOpen} onClose={() => setMenuOpen(false)} testID={`${testID}-menu`}>
         <View style={styles.menu}>
-          <Button
-            label="Auf morgen verschieben"
-            onPress={() => closeMenuThen(onMoveToTomorrow)}
-            testID={`${testID}-menu-move`}
-          />
-          {routine.allowConsciousSkip && (
+          {/* Move and skip act on today's occurrence, so they disappear once
+              it is resolved — writing a second outcome event for the same
+              date would leave the occurrence's state ambiguous. */}
+          {!isResolved && (
+            <Button
+              label="Auf morgen verschieben"
+              onPress={() => closeMenuThen(onMoveToTomorrow)}
+              testID={`${testID}-menu-move`}
+            />
+          )}
+          {!isResolved && routine.allowConsciousSkip && (
             <Button
               label="Bewusst auslassen"
               variant="secondary"

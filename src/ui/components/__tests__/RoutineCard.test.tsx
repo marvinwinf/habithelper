@@ -116,4 +116,18 @@ describe('RoutineCard', () => {
 
     expect(screen.getByTestId('routine-card-complete').props.accessibilityState.disabled).toBe(true);
   });
+
+  it('hides move and skip in the overflow menu once the occurrence is resolved', async () => {
+    await renderCard({
+      routine: { ...routine, allowConsciousSkip: true },
+      state: 'completed',
+    });
+
+    await fireEvent.press(screen.getByTestId('routine-card-menu-button'));
+
+    expect(screen.queryByTestId('routine-card-menu-move')).toBeNull();
+    expect(screen.queryByTestId('routine-card-menu-skip')).toBeNull();
+    expect(screen.getByTestId('routine-card-menu-edit')).toBeTruthy();
+    expect(screen.getByTestId('routine-card-menu-delete')).toBeTruthy();
+  });
 });

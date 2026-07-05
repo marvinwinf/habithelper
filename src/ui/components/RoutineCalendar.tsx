@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../theme';
 import type { CalendarDayState } from '../../domain/routines/calendar';
+import { getIsoWeekday } from '../../domain/routines/schedule';
 
 export interface CalendarDay {
   date: string;
@@ -30,12 +31,6 @@ const STATE_BACKGROUNDS: Record<CalendarDayState, string> = {
   paused: colors.categories.lavender.light,
 };
 
-function isoWeekday(date: string): number {
-  const [year, month, day] = date.split('-').map(Number);
-  const jsWeekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay(); // 0 = Sunday
-  return jsWeekday === 0 ? 7 : jsWeekday;
-}
-
 /**
  * Monthly history grid for the routine detail screen. Purely presentational:
  * the caller supplies each day's already-classified state (see
@@ -50,7 +45,7 @@ export function RoutineCalendar({
   testID,
 }: RoutineCalendarProps) {
   // Blank cells before the 1st so weekday columns line up (Monday-first).
-  const leadingBlanks = days.length > 0 ? isoWeekday(days[0].date) - 1 : 0;
+  const leadingBlanks = days.length > 0 ? getIsoWeekday(days[0].date) - 1 : 0;
 
   return (
     <View testID={testID}>

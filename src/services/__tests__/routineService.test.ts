@@ -125,6 +125,20 @@ describe('routineService', () => {
     sqlite.close();
   });
 
+  it('pausing an unknown routine throws and writes no event (transactional)', async () => {
+    const { db, sqlite } = await createDrizzleTestDb();
+    const created = await createRoutine(db, baseInput);
+
+    await expect(pauseRoutine(db, 'does-not-exist', '2026-07-01')).rejects.toThrow(
+      RoutineNotFoundError,
+    );
+
+    expect(await listRoutineEvents(db, 'does-not-exist')).toHaveLength(0);
+    expect((await getRoutine(db, created.id))?.isPaused).toBe(false);
+
+    sqlite.close();
+  });
+
   it('pauses a routine: writes a paused event and flips isPaused', async () => {
     const { db, sqlite } = await createDrizzleTestDb();
     const created = await createRoutine(db, baseInput);

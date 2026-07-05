@@ -2,9 +2,10 @@ import { Alert } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import TodayScreen from '../today';
+import { todayDateString } from '../../../src/domain/dates';
 import { listCategories } from '../../../src/data/repositories/categoryRepository';
 import { listRoutines, softDeleteRoutine } from '../../../src/data/repositories/routineRepository';
-import { listRoutineEvents } from '../../../src/data/repositories/routineEventRepository';
+import { listRoutineEventsInRange } from '../../../src/data/repositories/routineEventRepository';
 import { completeRoutineOccurrence, moveRoutineOccurrence } from '../../../src/services/routineService';
 
 jest.mock('../../../src/data/db/client', () => ({ db: {} }));
@@ -16,7 +17,7 @@ jest.mock('../../../src/data/repositories/routineRepository', () => ({
   softDeleteRoutine: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('../../../src/data/repositories/routineEventRepository', () => ({
-  listRoutineEvents: jest.fn().mockResolvedValue([]),
+  listRoutineEventsInRange: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('../../../src/services/routineService', () => ({
   completeRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
@@ -30,7 +31,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
 }));
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = todayDateString();
 
 const dailyRoutine = {
   id: 'routine-daily',
@@ -56,7 +57,7 @@ describe('TodayScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (listCategories as jest.Mock).mockResolvedValue([]);
-    (listRoutineEvents as jest.Mock).mockResolvedValue([]);
+    (listRoutineEventsInRange as jest.Mock).mockResolvedValue([]);
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   });
 
@@ -79,7 +80,7 @@ describe('TodayScreen', () => {
 
   it('shows a completed routine in a subdued state and does not re-offer completion', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
-    (listRoutineEvents as jest.Mock).mockResolvedValue([
+    (listRoutineEventsInRange as jest.Mock).mockResolvedValue([
       {
         id: 'event-1',
         routineId: dailyRoutine.id,

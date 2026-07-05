@@ -10,6 +10,7 @@ import {
   type RoutineEvent,
 } from '../../../src/data/repositories/routineEventRepository';
 import { retroactivelyCompleteOccurrence } from '../../../src/services/routineService';
+import { toLocalDateString, todayDateString } from '../../../src/domain/dates';
 import { getCalendarDayState, listMonthDates } from '../../../src/domain/routines/calendar';
 import { scheduleFromRoutineRow } from '../../../src/domain/routines/schedule';
 import { Card } from '../../../src/ui/components/Card';
@@ -32,10 +33,6 @@ const MONTH_NAMES = [
   'Dezember',
 ];
 
-function todayDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export default function RoutineDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [routine, setRoutine] = useState<Routine | undefined>(undefined);
@@ -43,7 +40,7 @@ export default function RoutineDetailScreen() {
   const [events, setEvents] = useState<RoutineEvent[]>([]);
   const [reasonExpanded, setReasonExpanded] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() => {
-    const [year, month] = todayDate().split('-').map(Number);
+    const [year, month] = todayDateString().split('-').map(Number);
     return { year, month };
   });
 
@@ -68,8 +65,11 @@ export default function RoutineDetailScreen() {
       return [];
     }
     const schedule = scheduleFromRoutineRow(routine);
-    const startDate = routine.createdAt.slice(0, 10);
-    const today = todayDate();
+    // createdAt is a UTC timestamp; the routine's first day is the LOCAL
+    // calendar day it was created on (docs/DATA_MODEL.md: "created_at date
+    // is the start"), so convert rather than slicing the UTC date part.
+    const startDate = toLocalDateString(new Date(routine.createdAt));
+    const today = todayDateString();
     return listMonthDates(visibleMonth.year, visibleMonth.month).map((date) => ({
       date,
       state: getCalendarDayState(schedule, events, startDate, date, today),
@@ -92,7 +92,7 @@ export default function RoutineDetailScreen() {
   function handleDayPress(day: CalendarDay) {
     // Retroactive completion applies to elapsed missed occurrences only,
     // per docs/ROUTINE_RULES.md's Retroactive Completion section.
-    if (day.state !== 'missed' || day.date >= todayDate()) {
+    if (day.state !== 'missed' || day.date >= todayDateString()) {
       return;
     }
     Alert.alert('Nachträglich erledigen?', `${day.date} als erledigt markieren.`, [

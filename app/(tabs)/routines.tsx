@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { db } from '../../src/data/db/client';
 import { listCategories, type Category } from '../../src/data/repositories/categoryRepository';
@@ -11,24 +11,17 @@ import {
   type Routine,
 } from '../../src/data/repositories/routineRepository';
 import { pauseRoutine, reactivateRoutine } from '../../src/services/routineService';
+import { todayDateString } from '../../src/domain/dates';
+import { confirmRoutineDeletion } from '../../src/ui/alerts';
 import { Button } from '../../src/ui/components/Button';
 import { Card } from '../../src/ui/components/Card';
 import { CategoryBadge } from '../../src/ui/components/CategoryBadge';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { ReorderableList } from '../../src/ui/components/ReorderableList';
 import { Sheet } from '../../src/ui/components/Sheet';
-import { colors, spacing, typography } from '../../src/ui/theme';
+import { colors, radius, spacing, typography } from '../../src/ui/theme';
 
 type RoutinesTab = 'active' | 'paused';
-
-// Includes the row's own bottom margin, so consecutive rows sit exactly
-// ROW_HEIGHT apart — the drag math in ReorderableList relies on that.
-const ROW_HEIGHT = 92;
-const ROW_CARD_HEIGHT = ROW_HEIGHT - spacing.sm;
-
-function todayDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export default function RoutinesScreen() {
   const router = useRouter();
@@ -78,26 +71,19 @@ export default function RoutinesScreen() {
   async function handleTogglePause(routine: Routine) {
     closeMenu();
     if (routine.isPaused) {
-      await reactivateRoutine(db, routine.id, todayDate());
+      await reactivateRoutine(db, routine.id, todayDateString());
     } else {
-      await pauseRoutine(db, routine.id, todayDate());
+      await pauseRoutine(db, routine.id, todayDateString());
     }
     loadRoutines();
   }
 
   function handleDelete(routine: Routine) {
     closeMenu();
-    Alert.alert('Routine löschen?', `„${routine.name}“ wird gelöscht.`, [
-      { text: 'Abbrechen', style: 'cancel' },
-      {
-        text: 'Löschen',
-        style: 'destructive',
-        onPress: async () => {
-          await softDeleteRoutine(db, routine.id);
-          loadRoutines();
-        },
-      },
-    ]);
+    confirmRoutineDeletion(routine.name, async () => {
+      await softDeleteRoutine(db, routine.id);
+      loadRoutines();
+    });
   }
 
   function renderRoutine(item: Routine) {
@@ -105,7 +91,9 @@ export default function RoutinesScreen() {
     return (
       <Card style={styles.row} testID={`routine-row-${item.id}`}>
         <View style={styles.rowMain}>
-          <Text style={styles.routineName}>{item.name}</Text>
+          <Text style={styles.routineName} numberOfLines={1}>
+            {item.name}
+          </Text>
           {category && (
             <CategoryBadge
               label={category.name}
@@ -161,7 +149,6 @@ export default function RoutinesScreen() {
           data={visibleRoutines}
           keyExtractor={(item) => item.id}
           renderItem={renderRoutine}
-          rowHeight={ROW_HEIGHT}
           onReorder={handleReorder}
           testID="routines-list"
         />
@@ -208,7 +195,7 @@ const styles = StyleSheet.create({
   tab: {
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
-    borderRadius: 999,
+    borderRadius: radius.full,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
@@ -221,8 +208,9 @@ const styles = StyleSheet.create({
     fontSize: typography.body.fontSize,
     color: colors.textPrimary,
   },
+  // Rows must stay uniform in height (single-line name enforced above) —
+  // ReorderableList measures their pitch and assumes it is constant.
   row: {
-    height: ROW_CARD_HEIGHT,
     marginBottom: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',

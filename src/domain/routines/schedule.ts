@@ -59,7 +59,8 @@ export interface MovedOccurrence {
   readonly toDate: string;
 }
 
-function getIsoWeekday(date: string): IsoWeekday {
+/** ISO weekday (1 = Monday ... 7 = Sunday) of a `YYYY-MM-DD` date string. */
+export function getIsoWeekday(date: string): IsoWeekday {
   const [year, month, day] = date.split('-').map(Number);
   const jsWeekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay(); // 0 = Sunday
   return (jsWeekday === 0 ? 7 : jsWeekday) as IsoWeekday;

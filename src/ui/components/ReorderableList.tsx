@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
-import { useCallback } from 'react';
-import { View } from 'react-native';
+import { useCallback, useRef } from 'react';
+import { View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 
 /**
@@ -25,9 +26,8 @@ export function moveItem<T>(items: readonly T[], fromIndex: number, toIndex: num
 export interface ReorderableListProps<T> {
   data: readonly T[];
   keyExtractor: (item: T) => string;
+  /** Rows are assumed equal-height; the drag math measures their pitch at runtime. */
   renderItem: (item: T) => ReactNode;
-  /** Fixed row height in dp, used to translate drag distance into row positions. */
-  rowHeight: number;
   onReorder: (newData: T[]) => void;
   testID?: string;
 }
@@ -36,9 +36,10 @@ interface ReorderableRowProps<T> {
   item: T;
   index: number;
   data: readonly T[];
-  rowHeight: number;
+  rowPitch: SharedValue<number>;
   renderItem: (item: T) => ReactNode;
   onReorder: (newData: T[]) => void;
+  onRowLayout: (index: number, y: number) => void;
   testID?: string;
 }
 
@@ -51,9 +52,10 @@ function ReorderableRow<T>({
   item,
   index,
   data,
-  rowHeight,
+  rowPitch,
   renderItem,
   onReorder,
+  onRowLayout,
   testID,
 }: ReorderableRowProps<T>) {
   const translateY = useSharedValue(0);
@@ -76,8 +78,11 @@ function ReorderableRow<T>({
     .onUpdate((event) => {
       translateY.value = event.translationY;
     })
-    .onEnd(() => {
-      const rowsMoved = Math.round(translateY.value / rowHeight);
+    .onEnd((event) => {
+      // rowPitch stays 0 until two rows have been laid out — a single-row
+      // list has nothing to reorder, so the drag resolves to 0 rows moved.
+      const pitch = rowPitch.value;
+      const rowsMoved = pitch > 0 ? Math.round(event.translationY / pitch) : 0;
       translateY.value = withTiming(0, { duration: DRAG_RESET_DURATION_MS });
       isDragging.value = false;
       runOnJS(handleDragEnd)(rowsMoved);
@@ -91,7 +96,11 @@ function ReorderableRow<T>({
 
   return (
     <GestureDetector gesture={pan}>
-      <Animated.View style={animatedStyle} testID={testID}>
+      <Animated.View
+        style={animatedStyle}
+        onLayout={(event: LayoutChangeEvent) => onRowLayout(index, event.nativeEvent.layout.y)}
+        testID={testID}
+      >
         {renderItem(item)}
       </Animated.View>
     </GestureDetector>
@@ -102,15 +111,30 @@ function ReorderableRow<T>({
  * A long-press-to-drag reorderable list, built directly on the
  * already-installed react-native-gesture-handler + react-native-reanimated
  * (no third-party drag-list dependency — see T032's commit for why).
+ *
+ * Row pitch (vertical distance between consecutive row starts, including
+ * any margins) is measured from the rendered layout rather than passed in,
+ * so the drag-to-index math can never drift from the rows' actual styling.
  */
 export function ReorderableList<T>({
   data,
   keyExtractor,
   renderItem,
-  rowHeight,
   onReorder,
   testID,
 }: ReorderableListProps<T>) {
+  const rowOffsetsRef = useRef(new Map<number, number>());
+  const rowPitch = useSharedValue(0);
+
+  function handleRowLayout(index: number, y: number) {
+    rowOffsetsRef.current.set(index, y);
+    const first = rowOffsetsRef.current.get(0);
+    const second = rowOffsetsRef.current.get(1);
+    if (first !== undefined && second !== undefined && second > first) {
+      rowPitch.value = second - first;
+    }
+  }
+
   return (
     <View testID={testID}>
       {data.map((item, index) => (
@@ -119,9 +143,10 @@ export function ReorderableList<T>({
           item={item}
           index={index}
           data={data}
-          rowHeight={rowHeight}
+          rowPitch={rowPitch}
           renderItem={renderItem}
           onReorder={onReorder}
+          onRowLayout={handleRowLayout}
           testID={`reorderable-row-${keyExtractor(item)}`}
         />
       ))}

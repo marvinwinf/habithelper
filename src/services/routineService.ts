@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 import { routine, routineEvent } from '../data/db/schema';
 import {
@@ -5,14 +6,13 @@ import {
   createRoutine as repoCreateRoutine,
   getRoutine,
   listRoutines,
-  updateRoutine,
   type Routine,
   type RoutineInput,
 } from '../data/repositories/routineRepository';
 import {
   appendRoutineEvent,
+  buildRoutineEvent,
   listRoutineEvents,
-  supersedeRoutineEvent,
   type RoutineEvent,
 } from '../data/repositories/routineEventRepository';
 import { requestConsciousSkip } from '../domain/routines/completion';
@@ -120,8 +120,7 @@ export async function pauseRoutine(
   routineId: string,
   date: string,
 ): Promise<void> {
-  await appendRoutineEvent(db, { routineId, occurrenceDate: date, eventType: 'paused' });
-  await updateRoutine(db, routineId, { isPaused: true });
+  setPauseState(db, routineId, date, true);
 }
 
 /** Reactivates a paused routine, resuming from its preserved state (docs/ROUTINE_RULES.md). */
@@ -130,8 +129,36 @@ export async function reactivateRoutine(
   routineId: string,
   date: string,
 ): Promise<void> {
-  await appendRoutineEvent(db, { routineId, occurrenceDate: date, eventType: 'reactivated' });
-  await updateRoutine(db, routineId, { isPaused: false });
+  setPauseState(db, routineId, date, false);
+}
+
+/**
+ * Writes the pause/reactivate event and flips the `isPaused` flag in one
+ * synchronous SQLite transaction, so a crash can never leave the event log
+ * and the flag disagreeing (the same all-sync-inside-the-transaction rule
+ * documented on categoryService.deleteCategory applies here).
+ */
+function setPauseState(
+  db: RoutineServiceDb,
+  routineId: string,
+  date: string,
+  isPaused: boolean,
+): void {
+  const event = buildRoutineEvent({
+    routineId,
+    occurrenceDate: date,
+    eventType: isPaused ? 'paused' : 'reactivated',
+  });
+  const updatedAt = new Date().toISOString();
+
+  db.transaction((tx) => {
+    const [existing] = tx.select().from(routine).where(eq(routine.id, routineId)).all();
+    if (!existing) {
+      throw new RoutineNotFoundError(routineId);
+    }
+    tx.insert(routineEvent).values(event).run();
+    tx.update(routine).set({ isPaused, updatedAt }).where(eq(routine.id, routineId)).run();
+  });
 }
 
 export interface RetroactiveCompletionResult {
@@ -143,9 +170,10 @@ export interface RetroactiveCompletionResult {
 /**
  * Retroactively completes a past occurrence on its original `occurrenceDate`
  * (docs/ROUTINE_RULES.md). Plans the supersede chain via T027's pure domain
- * function, then persists it: writes each new event, then marks every event
- * it supersedes (including a prior `joker_consumed` event, if any — restored
- * via a `joker_restored` event) rather than deleting anything.
+ * function, then persists it in one synchronous transaction: each new event
+ * plus the `superseded_by_event_id` marks on the rows it replaces land
+ * together or not at all — a partial write would leave two active events
+ * for the same occurrence, which the replay logic cannot disambiguate.
  */
 export async function retroactivelyCompleteOccurrence(
   db: RoutineServiceDb,
@@ -156,18 +184,24 @@ export async function retroactivelyCompleteOccurrence(
   const plan = planRetroactiveCompletion(occurrenceDate, priorEvents);
 
   const writtenEvents: RoutineEvent[] = [];
-  for (const eventToWrite of plan.eventsToWrite) {
-    const written = await appendRoutineEvent(db, {
-      routineId,
-      occurrenceDate: eventToWrite.occurrenceDate,
-      eventType: eventToWrite.eventType,
-    });
-    writtenEvents.push(written);
+  db.transaction((tx) => {
+    for (const eventToWrite of plan.eventsToWrite) {
+      const written = buildRoutineEvent({
+        routineId,
+        occurrenceDate: eventToWrite.occurrenceDate,
+        eventType: eventToWrite.eventType,
+      });
+      tx.insert(routineEvent).values(written).run();
+      writtenEvents.push(written);
 
-    for (const supersededId of eventToWrite.supersedesEventIds) {
-      await supersedeRoutineEvent(db, supersededId, written.id);
+      for (const supersededId of eventToWrite.supersedesEventIds) {
+        tx.update(routineEvent)
+          .set({ supersededByEventId: written.id })
+          .where(eq(routineEvent.id, supersededId))
+          .run();
+      }
     }
-  }
+  });
 
   return {
     writtenEvents,

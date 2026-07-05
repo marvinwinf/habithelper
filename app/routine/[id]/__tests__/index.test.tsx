@@ -2,6 +2,7 @@ import { Alert } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import RoutineDetailScreen from '../index';
+import { todayDateString } from '../../../../src/domain/dates';
 import { getRoutine } from '../../../../src/data/repositories/routineRepository';
 import { listCategories } from '../../../../src/data/repositories/categoryRepository';
 import { listRoutineEvents } from '../../../../src/data/repositories/routineEventRepository';
@@ -25,7 +26,7 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: 'routine-1' }),
 }));
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = todayDateString();
 
 // The 15th of the previous month: always fully elapsed, so its state is
 // deterministic regardless of which day of the current month "today" is.

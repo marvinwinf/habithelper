@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { db } from '../../src/data/db/client';
 import { listCategories, type Category } from '../../src/data/repositories/categoryRepository';
 import { listRoutines, softDeleteRoutine, type Routine } from '../../src/data/repositories/routineRepository';
-import { listRoutineEvents, type RoutineEvent } from '../../src/data/repositories/routineEventRepository';
+import {
+  listRoutineEventsInRange,
+  type RoutineEvent,
+} from '../../src/data/repositories/routineEventRepository';
 import {
   completeRoutineOccurrence,
   exceedRoutineOccurrence,
@@ -13,25 +16,21 @@ import {
   pauseRoutine,
   skipRoutineOccurrence,
 } from '../../src/services/routineService';
+import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
 import { classifyOccurrence, type OccurrenceState } from '../../src/domain/routines/completion';
 import { scheduleFromRoutineRow } from '../../src/domain/routines/schedule';
+import { confirmRoutineDeletion } from '../../src/ui/alerts';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { RoutineCard, type RoutineCardOccurrenceState } from '../../src/ui/components/RoutineCard';
 import { colors, spacing } from '../../src/ui/theme';
 
+// TODO(T040/T048/T049): header (greeting, date, app streak, daily progress)
+// and the combined routines/tasks/for-later ordering land in Phases 6/8;
+// this is the routines-only slice from T033.
+
 interface DueRoutine {
   routine: Routine;
   state: RoutineCardOccurrenceState;
-}
-
-function todayDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function tomorrowDate(): string {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  return date.toISOString().slice(0, 10);
 }
 
 function isCardState(state: OccurrenceState): state is RoutineCardOccurrenceState {
@@ -55,11 +54,16 @@ export default function TodayScreen() {
 
   // Separate from the effect above: this one re-fetches events whenever the
   // active routine list changes (including after loadData() re-runs post-
-  // action). Each routine's events resolve independently rather than via a
-  // combined Promise.all, so one slow fetch doesn't hold up the others.
+  // action). Yesterday+today is sufficient for classifying today: an
+  // occurrence can only arrive on today via a moved event dated yesterday
+  // (moves are strictly "to tomorrow", docs/ROUTINE_RULES.md), and every
+  // other relevant event carries today's occurrence_date — so the query
+  // stays bounded no matter how much history a routine accumulates.
   useEffect(() => {
+    const today = todayDateString();
+    const yesterday = addDaysToDateString(today, -1);
     routines.forEach((r) => {
-      listRoutineEvents(db, r.id).then((events) => {
+      listRoutineEventsInRange(db, r.id, yesterday, today).then((events) => {
         setEventsByRoutineId((prev) => ({ ...prev, [r.id]: events }));
       });
     });
@@ -68,7 +72,7 @@ export default function TodayScreen() {
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
   const dueRoutines = useMemo<DueRoutine[]>(() => {
-    const today = todayDate();
+    const today = todayDateString();
     return routines
       .map((routine) => {
         const schedule = scheduleFromRoutineRow(routine);
@@ -88,17 +92,10 @@ export default function TodayScreen() {
   }, [routines, eventsByRoutineId]);
 
   function handleDelete(routine: Routine) {
-    Alert.alert('Routine löschen?', `„${routine.name}“ wird gelöscht.`, [
-      { text: 'Abbrechen', style: 'cancel' },
-      {
-        text: 'Löschen',
-        style: 'destructive',
-        onPress: async () => {
-          await softDeleteRoutine(db, routine.id);
-          loadData();
-        },
-      },
-    ]);
+    confirmRoutineDeletion(routine.name, async () => {
+      await softDeleteRoutine(db, routine.id);
+      loadData();
+    });
   }
 
   return (
@@ -120,15 +117,27 @@ export default function TodayScreen() {
                 category={category}
                 streak={0}
                 state={state}
-                onComplete={() => completeRoutineOccurrence(db, routine.id, todayDate()).then(loadData)}
-                onExceed={() => exceedRoutineOccurrence(db, routine.id, todayDate()).then(loadData)}
-                onOpenDetail={() => router.push(`/routine/${routine.id}`)}
-                onMoveToTomorrow={() =>
-                  moveRoutineOccurrence(db, routine.id, todayDate(), tomorrowDate()).then(loadData)
+                onComplete={() =>
+                  completeRoutineOccurrence(db, routine.id, todayDateString()).then(loadData)
                 }
-                onSkip={() => skipRoutineOccurrence(db, routine.id, todayDate()).then(loadData)}
+                onExceed={() =>
+                  exceedRoutineOccurrence(db, routine.id, todayDateString()).then(loadData)
+                }
+                onOpenDetail={() => router.push(`/routine/${routine.id}`)}
+                onMoveToTomorrow={() => {
+                  const today = todayDateString();
+                  return moveRoutineOccurrence(
+                    db,
+                    routine.id,
+                    today,
+                    addDaysToDateString(today, 1),
+                  ).then(loadData);
+                }}
+                onSkip={() =>
+                  skipRoutineOccurrence(db, routine.id, todayDateString()).then(loadData)
+                }
                 onEdit={() => router.push(`/routine/${routine.id}/edit`)}
-                onPause={() => pauseRoutine(db, routine.id, todayDate()).then(loadData)}
+                onPause={() => pauseRoutine(db, routine.id, todayDateString()).then(loadData)}
                 onDelete={() => handleDelete(routine)}
               />
             );
