@@ -10,6 +10,7 @@ import {
 import { listCategories, type Category } from '../../../src/data/repositories/categoryRepository';
 import { db } from '../../../src/data/db/client';
 import { RoutineForm, type RoutineFormValues } from '../../../src/ui/components/RoutineForm';
+import { ScreenHeader } from '../../../src/ui/components/ScreenHeader';
 import type { IsoWeekday } from '../../../src/domain/routines/schedule';
 import { colors, spacing } from '../../../src/ui/theme';
 
@@ -50,6 +51,7 @@ export default function EditRoutineScreen() {
 
   return (
     <View style={styles.screen}>
+      <ScreenHeader title="Routine bearbeiten" testID="edit-routine-header" />
       <RoutineForm
         categories={categories}
         initialValues={{

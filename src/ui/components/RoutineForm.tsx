@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { Button } from './Button';
-import { colors, radius, spacing, typography } from '../theme';
+import { colors, iconBadgeSizes, radius, spacing, typography } from '../theme';
+import { categoryIconName } from '../categoryIcons';
 import type { ScheduleType } from '../../data/db/schema';
 import {
   generateSuggestedWeeklyTargetWeekdays,
@@ -13,6 +15,7 @@ import {
 export interface RoutineFormCategory {
   id: string;
   name: string;
+  icon?: string | null;
 }
 
 export interface RoutineFormValues {
@@ -34,10 +37,12 @@ export interface RoutineFormProps {
   testID?: string;
 }
 
-const FREQUENCY_OPTIONS: { type: ScheduleType; label: string }[] = [
-  { type: 'daily', label: 'Täglich' },
-  { type: 'weekdays', label: 'Wochentage' },
-  { type: 'weekly_target', label: 'X-mal pro Woche' },
+// Labels per the design reference mockup's three frequency option cards;
+// the weekly-target card's label reflects the current count ("3x pro Woche").
+const FREQUENCY_OPTIONS: { type: ScheduleType; label: (targetCount: number) => string }[] = [
+  { type: 'daily', label: () => 'Täglich' },
+  { type: 'weekdays', label: () => 'Wochentage' },
+  { type: 'weekly_target', label: (targetCount) => `${targetCount}x pro Woche` },
 ];
 
 const WEEKDAY_LABELS: { day: IsoWeekday; label: string }[] = [
@@ -124,20 +129,18 @@ export function RoutineForm({
   return (
     <ScrollView testID={testID} contentContainerStyle={styles.container}>
       <Text style={styles.label}>Name</Text>
-      <TextInput
-        value={name}
-        onChangeText={setName}
-        placeholder="Routinenname"
-        style={styles.input}
-        testID="routine-form-name-input"
-      />
-
-      <View style={styles.categoryHeader}>
-        <Text style={styles.label}>Kategorie</Text>
-        <Link href="/category/create" style={styles.createCategoryLink} testID="routine-form-create-category-link">
-          + Neue Kategorie
-        </Link>
+      <View style={styles.inputRow}>
+        <Ionicons name="book-outline" size={iconBadgeSizes.sm.icon} color={colors.textSecondary} />
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          placeholder="z. B. Lesen"
+          style={styles.inputRowField}
+          testID="routine-form-name-input"
+        />
       </View>
+
+      <Text style={styles.label}>Kategorie</Text>
       <View style={styles.chipRow}>
         <Pressable
           accessibilityRole="radio"
@@ -157,25 +160,47 @@ export function RoutineForm({
             onPress={() => setCategoryId(category.id)}
             style={[styles.chip, categoryId === category.id && styles.chipSelected]}
           >
+            <Ionicons
+              name={categoryIconName(category.icon)}
+              size={typography.bodySmall.fontSize}
+              color={colors.textSecondary}
+            />
             <Text style={styles.chipLabel}>{category.name}</Text>
           </Pressable>
         ))}
       </View>
+      <Link
+        href="/category/create"
+        style={styles.createCategoryButton}
+        testID="routine-form-create-category-link"
+      >
+        + Neue Kategorie erstellen
+      </Link>
 
       <Text style={styles.label}>Häufigkeit</Text>
-      <View style={styles.chipRow}>
-        {FREQUENCY_OPTIONS.map((option) => (
-          <Pressable
-            key={option.type}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: scheduleType === option.type }}
-            testID={`routine-form-schedule-${option.type}`}
-            onPress={() => handleSelectFrequency(option.type)}
-            style={[styles.chip, scheduleType === option.type && styles.chipSelected]}
-          >
-            <Text style={styles.chipLabel}>{option.label}</Text>
-          </Pressable>
-        ))}
+      <View style={styles.frequencyRow}>
+        {FREQUENCY_OPTIONS.map((option) => {
+          const selected = scheduleType === option.type;
+          return (
+            <Pressable
+              key={option.type}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              testID={`routine-form-schedule-${option.type}`}
+              onPress={() => handleSelectFrequency(option.type)}
+              style={[styles.frequencyCard, selected && styles.frequencyCardSelected]}
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={iconBadgeSizes.sm.icon}
+                color={selected ? colors.accent : colors.textSecondary}
+              />
+              <Text style={[styles.frequencyLabel, selected && styles.frequencyLabelSelected]}>
+                {option.label(weeklyTargetCount)}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {scheduleType === 'weekly_target' && (
@@ -205,33 +230,49 @@ export function RoutineForm({
       )}
 
       {needsWeekdaySelection && (
-        <View style={styles.chipRow} testID="routine-form-weekdays">
-          {WEEKDAY_LABELS.map(({ day, label }) => {
-            const selected = scheduledWeekdays.includes(day);
-            return (
-              <Pressable
-                key={day}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: selected }}
-                testID={`routine-form-weekday-${day}`}
-                onPress={() => toggleWeekday(day)}
-                style={[styles.chip, selected && styles.chipSelected]}
-              >
-                <Text style={styles.chipLabel}>{label}</Text>
-              </Pressable>
-            );
-          })}
+        <View style={styles.weekdayCard} testID="routine-form-weekdays">
+          <Text style={styles.weekdayCardTitle}>Wochentage auswählen</Text>
+          <View style={styles.weekdayRow}>
+            {WEEKDAY_LABELS.map(({ day, label }) => {
+              const selected = scheduledWeekdays.includes(day);
+              return (
+                <Pressable
+                  key={day}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: selected }}
+                  accessibilityLabel={label}
+                  testID={`routine-form-weekday-${day}`}
+                  onPress={() => toggleWeekday(day)}
+                  style={styles.weekdayToggle}
+                >
+                  <Text style={styles.weekdayToggleLabel}>{label}</Text>
+                  <View
+                    style={[styles.weekdayCircle, selected && styles.weekdayCircleSelected]}
+                  >
+                    <Ionicons
+                      name={selected ? 'checkmark' : 'remove'}
+                      size={typography.bodySmall.fontSize}
+                      color={selected ? colors.textOnAccent : colors.textSecondary}
+                    />
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
       )}
 
       <Text style={styles.label}>Uhrzeit</Text>
-      <TextInput
-        value={timeOfDay}
-        onChangeText={setTimeOfDay}
-        placeholder="HH:mm (optional)"
-        style={styles.input}
-        testID="routine-form-time-input"
-      />
+      <View style={styles.inputRow}>
+        <Ionicons name="time-outline" size={iconBadgeSizes.sm.icon} color={colors.textSecondary} />
+        <TextInput
+          value={timeOfDay}
+          onChangeText={setTimeOfDay}
+          placeholder="HH:mm (optional)"
+          style={styles.inputRowField}
+          testID="routine-form-time-input"
+        />
+      </View>
 
       <Pressable
         accessibilityRole="button"
@@ -239,13 +280,16 @@ export function RoutineForm({
         testID="routine-form-advanced-toggle"
         style={styles.advancedToggle}
       >
-        <Text style={styles.advancedToggleLabel}>
-          {advancedExpanded ? '▾' : '▸'} Weitere Einstellungen
-        </Text>
+        <Text style={styles.advancedToggleLabel}>Weitere Einstellungen</Text>
+        <Ionicons
+          name={advancedExpanded ? 'chevron-up' : 'chevron-down'}
+          size={typography.body.fontSize}
+          color={colors.textSecondary}
+        />
       </Pressable>
 
       {advancedExpanded && (
-        <View testID="routine-form-advanced-section">
+        <View testID="routine-form-advanced-section" style={styles.advancedSection}>
           <Text style={styles.label}>Persönlicher Grund</Text>
           <TextInput
             value={reason}
@@ -297,14 +341,34 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     backgroundColor: colors.surface,
   },
-  categoryHeader: {
+  // Icon-leading input per the mockup's name/time fields.
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
   },
-  createCategoryLink: {
+  inputRowField: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    fontSize: typography.body.fontSize,
+    color: colors.textPrimary,
+  },
+  // Dashed outline per the mockup's "+ Neue Kategorie erstellen" button;
+  // lavender text distinguishes it from the primary save action.
+  createCategoryButton: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.categories.lavender.base,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    textAlign: 'center',
     fontSize: typography.bodySmall.fontSize,
-    color: colors.accent,
+    color: colors.categories.lavender.dark,
   },
   chipRow: {
     flexDirection: 'row',
@@ -312,6 +376,9 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.full,
@@ -320,12 +387,40 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   chipSelected: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.categories.mint.lighter,
     borderColor: colors.accent,
   },
   chipLabel: {
     fontSize: typography.bodySmall.fontSize,
     color: colors.textPrimary,
+  },
+  // Three side-by-side option cards per the mockup's Häufigkeit section.
+  frequencyRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  frequencyCard: {
+    flex: 1,
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs,
+    backgroundColor: colors.surface,
+  },
+  frequencyCardSelected: {
+    borderColor: colors.accent,
+  },
+  frequencyLabel: {
+    fontSize: typography.caption.fontSize,
+    fontWeight: typography.caption.fontWeight,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  frequencyLabelSelected: {
+    color: colors.accent,
   },
   targetCountRow: {
     flexDirection: 'row',
@@ -346,13 +441,62 @@ const styles = StyleSheet.create({
     fontSize: typography.body.fontSize,
     color: colors.textPrimary,
   },
+  // Circular Mo–So toggles inside a sub-card, per the mockup's
+  // "Wochentage auswählen" section.
+  weekdayCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  weekdayCardTitle: {
+    fontSize: typography.bodySmall.fontSize,
+    fontWeight: typography.bodySmall.fontWeight,
+    color: colors.textPrimary,
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  weekdayToggle: {
+    alignItems: 'center',
+    gap: spacing.xxs,
+  },
+  weekdayToggleLabel: {
+    fontSize: typography.caption.fontSize,
+    color: colors.textSecondary,
+  },
+  weekdayCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weekdayCircleSelected: {
+    backgroundColor: colors.accent,
+  },
   advancedToggle: {
-    paddingVertical: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   advancedToggleLabel: {
     fontSize: typography.bodySmall.fontSize,
-    color: colors.textSecondary,
+    color: colors.textPrimary,
     fontWeight: typography.bodySmall.fontWeight,
+  },
+  advancedSection: {
+    gap: spacing.sm,
   },
   switchRow: {
     flexDirection: 'row',

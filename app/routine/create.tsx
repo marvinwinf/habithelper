@@ -6,6 +6,7 @@ import { createRoutine } from '../../src/services/routineService';
 import { listCategories, type Category } from '../../src/data/repositories/categoryRepository';
 import { db } from '../../src/data/db/client';
 import { RoutineForm, type RoutineFormValues } from '../../src/ui/components/RoutineForm';
+import { ScreenHeader } from '../../src/ui/components/ScreenHeader';
 import { colors, spacing } from '../../src/ui/theme';
 
 export default function CreateRoutineScreen() {
@@ -28,6 +29,7 @@ export default function CreateRoutineScreen() {
 
   return (
     <View style={styles.screen}>
+      <ScreenHeader title="Neue Routine" testID="create-routine-header" />
       <RoutineForm
         categories={categories}
         onSubmit={handleSubmit}
