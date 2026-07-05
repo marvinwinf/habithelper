@@ -14,3 +14,11 @@ export function confirmRoutineDeletion(
     { text: 'Löschen', style: 'destructive', onPress: onConfirm },
   ]);
 }
+
+/** Destructive-action confirmation for deleting a task, same wording/behavior contract as routine deletion. */
+export function confirmTaskDeletion(taskTitle: string, onConfirm: () => void | Promise<void>): void {
+  Alert.alert('Aufgabe löschen?', `„${taskTitle}“ wird gelöscht.`, [
+    { text: 'Abbrechen', style: 'cancel' },
+    { text: 'Löschen', style: 'destructive', onPress: onConfirm },
+  ]);
+}

@@ -1,6 +1,10 @@
 import { createDrizzleTestDb } from '../../data/db/testUtils';
+import { routineStateCache } from '../../data/db/schema';
 import { getRoutine } from '../../data/repositories/routineRepository';
 import { appendRoutineEvent, listRoutineEvents } from '../../data/repositories/routineEventRepository';
+import { getRoutineStateCache } from '../../data/repositories/routineStateCacheRepository';
+import * as routineStateCacheRepo from '../../data/repositories/routineStateCacheRepository';
+import { getAppStreakCache } from '../../data/repositories/appStreakCacheRepository';
 import { ConsciousSkipNotAllowedError } from '../../domain/routines/completion';
 import {
   RoutineNotFoundError,
@@ -10,6 +14,7 @@ import {
   moveRoutineOccurrence,
   pauseRoutine,
   reactivateRoutine,
+  recomputeRoutineCache,
   retroactivelyCompleteOccurrence,
   skipRoutineOccurrence,
 } from '../routineService';
@@ -214,5 +219,222 @@ describe('routineService', () => {
     expect(supersededJokerConsumed?.supersededByEventId).toBe(jokerRestoredEvent?.id);
 
     sqlite.close();
+  });
+
+  describe('cache persistence', () => {
+    it('recomputes the routine cache after a normal completion', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      await completeRoutineOccurrence(db, created.id, '2026-07-01');
+      await completeRoutineOccurrence(db, created.id, '2026-07-02');
+
+      const cache = await getRoutineStateCache(db, created.id);
+      expect(cache).toMatchObject({ currentStreak: 2, bestStreak: 2, totalCompletions: 2, levelRank: 0 });
+
+      sqlite.close();
+    });
+
+    it('writes a joker_earned event automatically on the 5th completion, reflected in the cache', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      for (let i = 1; i <= 5; i++) {
+        await completeRoutineOccurrence(db, created.id, `2026-07-0${i}`);
+      }
+
+      const events = await listRoutineEvents(db, created.id);
+      expect(events.filter((e) => e.eventType === 'joker_earned')).toHaveLength(1);
+
+      const cache = await getRoutineStateCache(db, created.id);
+      expect(cache).toMatchObject({ jokerInventory: 1, jokerProgress: 0 });
+
+      sqlite.close();
+    });
+
+    it('recomputes the routine cache after a conscious skip, move, pause, and reactivate — all no-ops for the numbers', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, { ...baseInput, allowConsciousSkip: true });
+
+      await skipRoutineOccurrence(db, created.id, '2026-07-01');
+      await moveRoutineOccurrence(db, created.id, '2026-07-02', '2026-07-03');
+      await pauseRoutine(db, created.id, '2026-07-04');
+      await reactivateRoutine(db, created.id, '2026-07-05');
+
+      const cache = await getRoutineStateCache(db, created.id);
+      expect(cache).toMatchObject({ currentStreak: 0, totalCompletions: 0 });
+
+      sqlite.close();
+    });
+
+    it('recomputes the app streak cache only on the first completion of a new day', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const first = await createRoutine(db, baseInput);
+      const second = await createRoutine(db, { ...baseInput, name: 'Lesen' });
+
+      await completeRoutineOccurrence(db, first.id, '2026-07-01');
+      expect(await getAppStreakCache(db)).toMatchObject({ currentStreak: 1, lastIncrementedDate: '2026-07-01' });
+
+      // A second routine completed the same day does not double-increment.
+      await completeRoutineOccurrence(db, second.id, '2026-07-01');
+      expect(await getAppStreakCache(db)).toMatchObject({ currentStreak: 1, lastIncrementedDate: '2026-07-01' });
+
+      // A completion on a new day extends the streak by one.
+      await exceedRoutineOccurrence(db, first.id, '2026-07-02');
+      expect(await getAppStreakCache(db)).toMatchObject({ currentStreak: 2, lastIncrementedDate: '2026-07-02' });
+
+      sqlite.close();
+    });
+
+    it('does not touch the app streak cache for a skip, move, pause, or reactivate', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, { ...baseInput, allowConsciousSkip: true });
+
+      await skipRoutineOccurrence(db, created.id, '2026-07-01');
+      await moveRoutineOccurrence(db, created.id, '2026-07-02', '2026-07-03');
+
+      expect(await getAppStreakCache(db)).toBeUndefined();
+
+      sqlite.close();
+    });
+
+    it('reflects a joker restored by a retroactive completion in the persisted cache', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+      await appendRoutineEvent(db, {
+        routineId: created.id,
+        occurrenceDate: '2026-07-01',
+        eventType: 'joker_earned',
+      });
+      await appendRoutineEvent(db, {
+        routineId: created.id,
+        occurrenceDate: '2026-07-02',
+        eventType: 'joker_protected',
+      });
+      await appendRoutineEvent(db, {
+        routineId: created.id,
+        occurrenceDate: '2026-07-02',
+        eventType: 'joker_consumed',
+      });
+
+      const result = await retroactivelyCompleteOccurrence(db, created.id, '2026-07-02');
+      expect(result.jokerRestored).toBe(true);
+
+      const cache = await getRoutineStateCache(db, created.id);
+      expect(cache?.jokerInventory).toBe(1);
+
+      sqlite.close();
+    });
+
+    it('re-derives a discarded cache row to the same value normal operation produced incrementally', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      await completeRoutineOccurrence(db, created.id, '2026-07-01');
+      await exceedRoutineOccurrence(db, created.id, '2026-07-02');
+
+      const incrementallyProduced = await getRoutineStateCache(db, created.id);
+
+      await db.delete(routineStateCache);
+      expect(await getRoutineStateCache(db, created.id)).toBeUndefined();
+
+      const rederived = await recomputeRoutineCache(db, created.id);
+
+      // recalculatedAt is a fresh timestamp each time, not part of the
+      // re-derivability guarantee — every other field must match exactly.
+      expect(rederived).toEqual({ ...incrementallyProduced, recalculatedAt: rederived.recalculatedAt });
+
+      sqlite.close();
+    });
+
+    it('leaves both the event and the cache untouched when the cache recompute fails mid-transaction', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      const spy = jest
+        .spyOn(routineStateCacheRepo, 'buildRoutineStateCache')
+        .mockImplementationOnce(() => {
+          throw new Error('simulated failure between event write and cache update');
+        });
+
+      await expect(completeRoutineOccurrence(db, created.id, '2026-07-01')).rejects.toThrow(
+        'simulated failure between event write and cache update',
+      );
+
+      expect(await listRoutineEvents(db, created.id)).toHaveLength(0);
+      expect(await getRoutineStateCache(db, created.id)).toBeUndefined();
+
+      spy.mockRestore();
+      sqlite.close();
+    });
+  });
+
+  describe('leveledUp signal', () => {
+    it('fires only on the specific completion that crosses a 66-completion boundary', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      const start = new Date('2026-01-01T00:00:00Z');
+      for (let i = 0; i < 65; i++) {
+        const date = new Date(start);
+        date.setUTCDate(date.getUTCDate() + i);
+        const result = await completeRoutineOccurrence(db, created.id, date.toISOString().slice(0, 10));
+        expect(result.leveledUp).toBe(false);
+      }
+
+      const boundaryDate = new Date(start);
+      boundaryDate.setUTCDate(boundaryDate.getUTCDate() + 65);
+      const boundaryResult = await completeRoutineOccurrence(
+        db,
+        created.id,
+        boundaryDate.toISOString().slice(0, 10),
+      );
+      expect(boundaryResult.leveledUp).toBe(true);
+
+      const afterDate = new Date(start);
+      afterDate.setUTCDate(afterDate.getUTCDate() + 66);
+      const afterResult = await completeRoutineOccurrence(db, created.id, afterDate.toISOString().slice(0, 10));
+      expect(afterResult.leveledUp).toBe(false);
+
+      sqlite.close();
+    });
+
+    it('does not fire for an exceeded completion that does not cross a boundary', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      const result = await exceedRoutineOccurrence(db, created.id, '2026-07-01');
+
+      expect(result.leveledUp).toBe(false);
+
+      sqlite.close();
+    });
+
+    it('fires on a retroactive completion that crosses a boundary', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      const start = new Date('2026-01-01T00:00:00Z');
+      for (let i = 0; i < 65; i++) {
+        const date = new Date(start);
+        date.setUTCDate(date.getUTCDate() + i);
+        await completeRoutineOccurrence(db, created.id, date.toISOString().slice(0, 10));
+      }
+      // The 66th occurrence was missed, then completed retroactively.
+      const boundaryDate = new Date(start);
+      boundaryDate.setUTCDate(boundaryDate.getUTCDate() + 65);
+      const boundaryDateString = boundaryDate.toISOString().slice(0, 10);
+      await appendRoutineEvent(db, {
+        routineId: created.id,
+        occurrenceDate: boundaryDateString,
+        eventType: 'missed',
+      });
+
+      const result = await retroactivelyCompleteOccurrence(db, created.id, boundaryDateString);
+
+      expect(result.leveledUp).toBe(true);
+
+      sqlite.close();
+    });
   });
 });

@@ -1,6 +1,17 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import { RoutineCard } from '../RoutineCard';
+import {
+  triggerExceededCompletionHaptic,
+  triggerLevelMilestoneHaptic,
+  triggerRoutineCompletionHaptic,
+} from '../../animation/haptics';
+
+jest.mock('../../animation/haptics', () => ({
+  triggerRoutineCompletionHaptic: jest.fn(),
+  triggerExceededCompletionHaptic: jest.fn(),
+  triggerLevelMilestoneHaptic: jest.fn(),
+}));
 
 const routine = {
   id: 'routine-1',
@@ -37,6 +48,7 @@ async function renderCard(overrides: Partial<React.ComponentProps<typeof Routine
 describe('RoutineCard', () => {
   beforeEach(() => {
     jest.useFakeTimers();
+    jest.clearAllMocks();
   });
 
   afterEach(() => {
@@ -61,6 +73,61 @@ describe('RoutineCard', () => {
 
     expect(callbacks.onExceed).toHaveBeenCalledTimes(1);
     expect(callbacks.onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires a distinct, stronger haptic for exceeded than for a normal completion', async () => {
+    await renderCard();
+    const control = screen.getByTestId('routine-card-complete');
+
+    await fireEvent(control, 'pressIn');
+    jest.advanceTimersByTime(50);
+    await fireEvent(control, 'pressOut');
+
+    expect(triggerRoutineCompletionHaptic).toHaveBeenCalledTimes(1);
+    expect(triggerExceededCompletionHaptic).not.toHaveBeenCalled();
+
+    await fireEvent(control, 'pressIn');
+    jest.advanceTimersByTime(500);
+    await fireEvent(control, 'pressOut');
+
+    expect(triggerExceededCompletionHaptic).toHaveBeenCalledTimes(1);
+    expect(triggerRoutineCompletionHaptic).toHaveBeenCalledTimes(1);
+  });
+
+  it('triggers the level-up milestone haptic only when onComplete signals a level crossing', async () => {
+    const onComplete = jest.fn().mockResolvedValue(false);
+    await renderCard({ onComplete });
+    const control = screen.getByTestId('routine-card-complete');
+
+    await fireEvent(control, 'pressIn');
+    jest.advanceTimersByTime(50);
+    await fireEvent(control, 'pressOut');
+
+    expect(triggerLevelMilestoneHaptic).not.toHaveBeenCalled();
+  });
+
+  it('triggers the level-up milestone haptic when onComplete signals a level crossing', async () => {
+    const onComplete = jest.fn().mockResolvedValue(true);
+    await renderCard({ onComplete, state: 'pending' });
+    const control = screen.getByTestId('routine-card-complete');
+
+    await fireEvent(control, 'pressIn');
+    jest.advanceTimersByTime(50);
+    await fireEvent(control, 'pressOut');
+
+    await waitFor(() => expect(triggerLevelMilestoneHaptic).toHaveBeenCalledTimes(1));
+  });
+
+  it('triggers the level-up milestone haptic when onExceed signals a level crossing', async () => {
+    const onExceed = jest.fn().mockResolvedValue(true);
+    await renderCard({ onExceed });
+    const control = screen.getByTestId('routine-card-complete');
+
+    await fireEvent(control, 'pressIn');
+    jest.advanceTimersByTime(500);
+    await fireEvent(control, 'pressOut');
+
+    await waitFor(() => expect(triggerLevelMilestoneHaptic).toHaveBeenCalledTimes(1));
   });
 
   it('tapping the card body outside the completion button navigates to detail, not completion', async () => {
