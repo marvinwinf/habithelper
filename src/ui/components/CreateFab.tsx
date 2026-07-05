@@ -56,9 +56,10 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: spacing.lg,
-    // Clears the bottom tab bar (Android's standard Material bottom
-    // navigation is ~56dp tall) with some breathing room above it.
-    bottom: 80,
+    // Clears the floating tab bar (64dp tall + its 12dp bottom margin,
+    // see app/(tabs)/_layout.tsx) with breathing room above it, so it
+    // overlaps content but never the bar's touch targets.
+    bottom: 92,
     width: 56,
     height: 56,
     borderRadius: radius.full,
