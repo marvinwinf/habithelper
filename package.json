@@ -36,6 +36,7 @@
     "jest": "^29.7.0",
     "jest-expo": "^57.0.1",
     "test-renderer": "^1.2.0",
+    "tsx": "^4.23.0",
     "typescript": "~6.0.3"
   },
   "overrides": {
@@ -49,7 +50,8 @@
     "lint": "eslint . --max-warnings 0",
     "test": "jest",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run typecheck && npm run lint && npm test"
+    "verify": "npm run typecheck && npm run lint && npm test",
+    "seed:dev": "tsx scripts/devSeed.ts"
   },
   "private": true
 }
