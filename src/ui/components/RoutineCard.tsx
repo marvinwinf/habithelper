@@ -14,6 +14,7 @@ import {
 } from '../animation/haptics';
 import { useCompletionAnimation } from '../animation/useCompletionAnimation';
 import { useLevelUpAnimation } from '../animation/useLevelUpAnimation';
+import { useMountAnimation } from '../animation/useMountAnimation';
 import { colors, pressedOpacity, spacing, typography } from '../theme';
 import { getCategoryColorVariant } from '../theme/categoryVariant';
 import { categoryIconName } from '../categoryIcons';
@@ -31,6 +32,9 @@ const EXCEEDED_SCALE_PEAK = 1.35;
 // control, so it reads as visually distinct from a normal/exceeded pulse
 // (T042) rather than just a bigger version of the same effect.
 const LEVEL_UP_CARD_SCALE_PEAK = 1.05;
+// How far the card rises into place during its mount animation — small
+// enough to read as a soft settle, not a slide-in.
+const MOUNT_RISE_DISTANCE = 8;
 
 export type RoutineCardOccurrenceState = 'pending' | 'completed' | 'exceeded' | 'skipped';
 
@@ -98,6 +102,7 @@ export function RoutineCard({
   const [lastAction, setLastAction] = useState<'complete' | 'exceed' | null>(null);
   const completionAnimation = useCompletionAnimation();
   const levelUpAnimation = useLevelUpAnimation();
+  const mountAnimation = useMountAnimation();
   const isResolved = state !== 'pending';
 
   const variant = category
@@ -143,6 +148,11 @@ export function RoutineCard({
     outputRange: [1, LEVEL_UP_CARD_SCALE_PEAK],
   });
 
+  const mountTranslateY = mountAnimation.progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [MOUNT_RISE_DISTANCE, 0],
+  });
+
   return (
     <>
       <Pressable
@@ -150,7 +160,12 @@ export function RoutineCard({
         testID={testID}
         style={({ pressed }) => pressed && styles.pressed}
       >
-        <Animated.View style={{ transform: [{ scale: cardScale }] }}>
+        <Animated.View
+          style={{
+            opacity: mountAnimation.progress,
+            transform: [{ scale: cardScale }, { translateY: mountTranslateY }],
+          }}
+        >
           <Card
             style={[
               styles.card,
