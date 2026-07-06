@@ -4,7 +4,7 @@ import { Link } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { Button } from './Button';
-import { colors, iconBadgeSizes, radius, spacing, typography } from '../theme';
+import { colors, iconBadgeSizes, pressedOpacity, radius, spacing, typography } from '../theme';
 import { categoryIconName } from '../categoryIcons';
 import type { ScheduleType } from '../../data/db/schema';
 import {
@@ -147,7 +147,11 @@ export function RoutineForm({
           accessibilityState={{ selected: categoryId === null }}
           testID="routine-form-category-none"
           onPress={() => setCategoryId(null)}
-          style={[styles.chip, categoryId === null && styles.chipSelected]}
+          style={({ pressed }) => [
+            styles.chip,
+            categoryId === null && styles.chipSelected,
+            pressed && styles.pressed,
+          ]}
         >
           <Text style={styles.chipLabel}>Keine</Text>
         </Pressable>
@@ -158,7 +162,11 @@ export function RoutineForm({
             accessibilityState={{ selected: categoryId === category.id }}
             testID={`routine-form-category-${category.id}`}
             onPress={() => setCategoryId(category.id)}
-            style={[styles.chip, categoryId === category.id && styles.chipSelected]}
+            style={({ pressed }) => [
+              styles.chip,
+              categoryId === category.id && styles.chipSelected,
+              pressed && styles.pressed,
+            ]}
           >
             <Ionicons
               name={categoryIconName(category.icon)}
@@ -188,7 +196,11 @@ export function RoutineForm({
               accessibilityState={{ selected }}
               testID={`routine-form-schedule-${option.type}`}
               onPress={() => handleSelectFrequency(option.type)}
-              style={[styles.frequencyCard, selected && styles.frequencyCardSelected]}
+              style={({ pressed }) => [
+                styles.frequencyCard,
+                selected && styles.frequencyCardSelected,
+                pressed && styles.pressed,
+              ]}
             >
               <Ionicons
                 name="calendar-outline"
@@ -210,7 +222,7 @@ export function RoutineForm({
             accessibilityLabel="Weniger"
             testID="routine-form-target-count-decrease"
             onPress={() => handleChangeTargetCount(weeklyTargetCount - 1)}
-            style={styles.stepperButton}
+            style={({ pressed }) => [styles.stepperButton, pressed && styles.pressed]}
           >
             <Text style={styles.chipLabel}>−</Text>
           </Pressable>
@@ -222,7 +234,7 @@ export function RoutineForm({
             accessibilityLabel="Mehr"
             testID="routine-form-target-count-increase"
             onPress={() => handleChangeTargetCount(weeklyTargetCount + 1)}
-            style={styles.stepperButton}
+            style={({ pressed }) => [styles.stepperButton, pressed && styles.pressed]}
           >
             <Text style={styles.chipLabel}>+</Text>
           </Pressable>
@@ -243,7 +255,7 @@ export function RoutineForm({
                   accessibilityLabel={label}
                   testID={`routine-form-weekday-${day}`}
                   onPress={() => toggleWeekday(day)}
-                  style={styles.weekdayToggle}
+                  style={({ pressed }) => [styles.weekdayToggle, pressed && styles.pressed]}
                 >
                   <Text style={styles.weekdayToggleLabel}>{label}</Text>
                   <View
@@ -278,7 +290,7 @@ export function RoutineForm({
         accessibilityRole="button"
         onPress={() => setAdvancedExpanded((prev) => !prev)}
         testID="routine-form-advanced-toggle"
-        style={styles.advancedToggle}
+        style={({ pressed }) => [styles.advancedToggle, pressed && styles.pressed]}
       >
         <Text style={styles.advancedToggleLabel}>Weitere Einstellungen</Text>
         <Ionicons
@@ -324,6 +336,9 @@ const styles = StyleSheet.create({
   container: {
     gap: spacing.sm,
     paddingBottom: spacing.xl,
+  },
+  pressed: {
+    opacity: pressedOpacity,
   },
   label: {
     fontSize: typography.bodySmall.fontSize,

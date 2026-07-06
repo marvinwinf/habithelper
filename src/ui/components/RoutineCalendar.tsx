@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, radius, spacing, typography } from '../theme';
+import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
 import type { CalendarDayState } from '../../domain/routines/calendar';
 import { getIsoWeekday } from '../../domain/routines/schedule';
 
@@ -104,7 +104,7 @@ export function RoutineCalendar({
           accessibilityRole="button"
           accessibilityLabel="Voriger Monat"
           onPress={onPrevMonth}
-          style={styles.navButton}
+          style={({ pressed }) => [styles.navButton, pressed && styles.navButtonPressed]}
           testID={testID ? `${testID}-prev` : undefined}
         >
           <Text style={styles.navLabel}>‹</Text>
@@ -114,7 +114,7 @@ export function RoutineCalendar({
           accessibilityRole="button"
           accessibilityLabel="Nächster Monat"
           onPress={onNextMonth}
-          style={styles.navButton}
+          style={({ pressed }) => [styles.navButton, pressed && styles.navButtonPressed]}
           testID={testID ? `${testID}-next` : undefined}
         >
           <Text style={styles.navLabel}>›</Text>
@@ -138,10 +138,11 @@ export function RoutineCalendar({
                 accessibilityRole="button"
                 onPress={() => onDayPress(day)}
                 testID={`calendar-day-${day.date}-${day.state}`}
-                style={[
+                style={({ pressed }) => [
                   styles.day,
                   { backgroundColor: visuals.background },
                   day.date === today && styles.dayToday,
+                  pressed && styles.dayPressed,
                 ]}
               >
                 <Text style={[styles.dayLabel, day.state === 'not_due' && styles.dayLabelDimmed]}>
@@ -197,6 +198,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  navButtonPressed: {
+    opacity: pressedOpacity,
+  },
   navLabel: {
     fontSize: typography.heading.fontSize,
     color: colors.textPrimary,
@@ -232,6 +236,9 @@ const styles = StyleSheet.create({
   dayToday: {
     borderWidth: 2,
     borderColor: colors.accent,
+  },
+  dayPressed: {
+    opacity: pressedOpacity,
   },
   dayLabel: {
     fontSize: typography.caption.fontSize,

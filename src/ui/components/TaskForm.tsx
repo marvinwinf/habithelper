@@ -3,7 +3,7 @@ import { Link } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button } from './Button';
-import { colors, radius, spacing, typography } from '../theme';
+import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
 
 export interface TaskFormCategory {
   id: string;
@@ -84,7 +84,11 @@ export function TaskForm({
           accessibilityState={{ selected: categoryId === null }}
           testID="task-form-category-none"
           onPress={() => setCategoryId(null)}
-          style={[styles.chip, categoryId === null && styles.chipSelected]}
+          style={({ pressed }) => [
+            styles.chip,
+            categoryId === null && styles.chipSelected,
+            pressed && styles.pressed,
+          ]}
         >
           <Text style={styles.chipLabel}>Keine</Text>
         </Pressable>
@@ -95,7 +99,11 @@ export function TaskForm({
             accessibilityState={{ selected: categoryId === category.id }}
             testID={`task-form-category-${category.id}`}
             onPress={() => setCategoryId(category.id)}
-            style={[styles.chip, categoryId === category.id && styles.chipSelected]}
+            style={({ pressed }) => [
+              styles.chip,
+              categoryId === category.id && styles.chipSelected,
+              pressed && styles.pressed,
+            ]}
           >
             <Text style={styles.chipLabel}>{category.name}</Text>
           </Pressable>
@@ -124,7 +132,7 @@ export function TaskForm({
         accessibilityRole="button"
         onPress={() => setDescriptionExpanded((prev) => !prev)}
         testID="task-form-description-toggle"
-        style={styles.descriptionToggle}
+        style={({ pressed }) => [styles.descriptionToggle, pressed && styles.pressed]}
       >
         <Text style={styles.descriptionToggleLabel}>
           {descriptionExpanded ? '▾' : '▸'} Beschreibung
@@ -153,6 +161,9 @@ const styles = StyleSheet.create({
   container: {
     gap: spacing.sm,
     paddingBottom: spacing.xl,
+  },
+  pressed: {
+    opacity: pressedOpacity,
   },
   label: {
     fontSize: typography.bodySmall.fontSize,

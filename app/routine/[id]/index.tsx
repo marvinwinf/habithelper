@@ -38,7 +38,7 @@ import { ProgressBar } from '../../../src/ui/components/ProgressBar';
 import { RoutineCalendar, type CalendarDay } from '../../../src/ui/components/RoutineCalendar';
 import { ScreenHeader } from '../../../src/ui/components/ScreenHeader';
 import { StatTile } from '../../../src/ui/components/StatTile';
-import { colors, radius, spacing, typography } from '../../../src/ui/theme';
+import { colors, pressedOpacity, radius, spacing, typography } from '../../../src/ui/theme';
 import { getCategoryColorVariant } from '../../../src/ui/theme/categoryVariant';
 import { categoryIconName } from '../../../src/ui/categoryIcons';
 
@@ -291,6 +291,7 @@ export default function RoutineDetailScreen() {
             accessibilityRole="button"
             onPress={() => setReasonExpanded((prev) => !prev)}
             testID="routine-detail-reason-toggle"
+            style={({ pressed }) => pressed && styles.pressed}
           >
             <Text style={styles.reasonToggle}>
               {reasonExpanded ? '▾' : '▸'} Persönlicher Grund
@@ -320,7 +321,11 @@ export default function RoutineDetailScreen() {
         <Pressable
           accessibilityRole="button"
           onPress={() => router.push(`/routine/${id}/edit`)}
-          style={[styles.actionButton, styles.editButton]}
+          style={({ pressed }) => [
+            styles.actionButton,
+            styles.editButton,
+            pressed && styles.pressed,
+          ]}
           testID="routine-detail-edit"
         >
           <Ionicons name="pencil" size={typography.body.fontSize} color={colors.accent} />
@@ -329,7 +334,11 @@ export default function RoutineDetailScreen() {
         <Pressable
           accessibilityRole="button"
           onPress={handleTogglePause}
-          style={[styles.actionButton, styles.pauseButton]}
+          style={({ pressed }) => [
+            styles.actionButton,
+            styles.pauseButton,
+            pressed && styles.pressed,
+          ]}
           testID="routine-detail-pause"
         >
           <Ionicons
@@ -354,6 +363,9 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.lg,
     gap: spacing.md,
+  },
+  pressed: {
+    opacity: pressedOpacity,
   },
   heroCard: {
     gap: spacing.sm,
