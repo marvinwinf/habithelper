@@ -14,7 +14,7 @@ import {
 } from '../animation/haptics';
 import { useCompletionAnimation } from '../animation/useCompletionAnimation';
 import { useLevelUpAnimation } from '../animation/useLevelUpAnimation';
-import { colors, spacing, typography } from '../theme';
+import { colors, pressedOpacity, spacing, typography } from '../theme';
 import { getCategoryColorVariant } from '../theme/categoryVariant';
 import { categoryIconName } from '../categoryIcons';
 import { scheduleFromRoutineRow } from '../../domain/routines/schedule';
@@ -145,7 +145,11 @@ export function RoutineCard({
 
   return (
     <>
-      <Pressable onPress={onOpenDetail} testID={testID}>
+      <Pressable
+        onPress={onOpenDetail}
+        testID={testID}
+        style={({ pressed }) => pressed && styles.pressed}
+      >
         <Animated.View style={{ transform: [{ scale: cardScale }] }}>
           <Card
             style={[
@@ -241,6 +245,9 @@ export function RoutineCard({
 }
 
 const styles = StyleSheet.create({
+  pressed: {
+    opacity: pressedOpacity,
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

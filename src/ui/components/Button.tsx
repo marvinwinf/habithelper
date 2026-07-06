@@ -5,7 +5,7 @@ import {
   type GestureResponderEvent,
 } from 'react-native';
 
-import { colors, radius, spacing, typography } from '../theme';
+import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'destructive';
 
@@ -46,13 +46,14 @@ export function Button({
       disabled={disabled}
       onPress={onPress}
       testID={testID}
-      style={[
+      style={({ pressed }) => [
         styles.base,
         {
           backgroundColor: variantStyle.background,
           borderColor: variantStyle.borderColor ?? 'transparent',
         },
         disabled && styles.disabled,
+        pressed && !disabled && styles.pressed,
       ]}
     >
       <Text style={[styles.label, { color: variantStyle.text }]}>{label}</Text>
@@ -71,6 +72,9 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.5,
+  },
+  pressed: {
+    opacity: pressedOpacity,
   },
   label: {
     fontSize: typography.body.fontSize,

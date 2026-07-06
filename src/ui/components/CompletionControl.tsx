@@ -6,7 +6,7 @@ import {
   type GestureResponderEvent,
 } from 'react-native';
 
-import { colors, radius, spacing, typography } from '../theme';
+import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
 
 export interface CompletionControlProps {
   onComplete: (event: GestureResponderEvent) => void;
@@ -91,13 +91,14 @@ export function CompletionControl({
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       testID={testID}
-      style={[
+      style={({ pressed }) => [
         styles.control,
         {
           backgroundColor: isDone ? accentColor : colors.surfaceMuted,
           borderColor: isDone ? 'transparent' : accentColor,
         },
         disabled && styles.disabled,
+        pressed && !disabled && styles.pressed,
       ]}
     >
       {isDone ? (
@@ -118,6 +119,9 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.5,
+  },
+  pressed: {
+    opacity: pressedOpacity,
   },
   checkmark: {
     color: colors.textOnAccent,

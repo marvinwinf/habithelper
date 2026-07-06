@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from './Button';
 import { Sheet } from './Sheet';
-import { colors, radius, spacing, typography } from '../theme';
+import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
 
 /**
  * Global floating create entry point (docs/SCREEN_SPECIFICATIONS.md): opens
@@ -27,7 +27,7 @@ export function CreateFab() {
         accessibilityRole="button"
         accessibilityLabel="Neu erstellen"
         onPress={() => setOpen(true)}
-        style={styles.fab}
+        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
         testID="create-fab"
       >
         <Text style={styles.fabLabel}>+</Text>
@@ -73,6 +73,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 6,
     elevation: 4,
+  },
+  fabPressed: {
+    opacity: pressedOpacity,
   },
   fabLabel: {
     fontSize: typography.title.fontSize,

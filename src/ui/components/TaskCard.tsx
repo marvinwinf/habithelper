@@ -6,7 +6,7 @@ import { Button } from './Button';
 import { Card } from './Card';
 import { IconBadge } from './IconBadge';
 import { Sheet } from './Sheet';
-import { colors, radius, spacing, typography } from '../theme';
+import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
 import { getCategoryColorVariant } from '../theme/categoryVariant';
 import { categoryIconName } from '../categoryIcons';
 import { todayDateString } from '../../domain/dates';
@@ -115,7 +115,11 @@ export function TaskCard({
           accessibilityRole="checkbox"
           accessibilityState={{ checked: task.isCompleted }}
           onPress={onToggleComplete}
-          style={[styles.toggle, task.isCompleted && styles.toggleChecked]}
+          style={({ pressed }) => [
+            styles.toggle,
+            task.isCompleted && styles.toggleChecked,
+            pressed && styles.togglePressed,
+          ]}
           testID={`${testID}-toggle`}
         >
           {task.isCompleted ? <Text style={styles.checkmark}>✓</Text> : null}
@@ -195,6 +199,9 @@ const styles = StyleSheet.create({
   toggleChecked: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
+  },
+  togglePressed: {
+    opacity: pressedOpacity,
   },
   checkmark: {
     color: colors.textOnAccent,
