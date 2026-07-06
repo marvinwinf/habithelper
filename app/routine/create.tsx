@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { createRoutine } from '../../src/services/routineService';
@@ -13,9 +13,14 @@ export default function CreateRoutineScreen() {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
 
-  useEffect(() => {
-    listCategories(db).then(setCategories);
-  }, []);
+  // Reload on focus, not just mount: the form's "+ Neue Kategorie
+  // erstellen" pushes the category-create screen over this one, and the
+  // fresh category must appear in the chips on return.
+  useFocusEffect(
+    useCallback(() => {
+      listCategories(db).then(setCategories);
+    }, []),
+  );
 
   async function handleSubmit(values: RoutineFormValues) {
     await createRoutine(db, {

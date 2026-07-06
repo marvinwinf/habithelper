@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { db } from '../../src/data/db/client';
 import { listCategories, type Category } from '../../src/data/repositories/categoryRepository';
@@ -48,9 +48,14 @@ export default function TasksScreen() {
     );
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  // Reload on every focus: this tab stays mounted while create/edit screens
+  // are pushed over it, so a mount-only effect would never show a task
+  // created via the FAB until an app restart.
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]),
+  );
 
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
@@ -114,32 +119,36 @@ export default function TasksScreen() {
           message="Tippe unten rechts auf „+“, um loszulegen."
         />
       ) : (
-        <View style={styles.list}>
-          {sections
-            .filter((section) => section.tasks.length > 0)
-            .map((section) => (
-              <View key={section.key} testID={`tasks-section-${section.key}`}>
-                <Text style={styles.sectionTitle}>{section.title}</Text>
-                {section.tasks.map((task) => renderTask(task, section.key === 'overdue'))}
-              </View>
-            ))}
+        // Without a scroll container, task lists taller than the screen were
+        // simply cut off and unreachable.
+        <ScrollView contentContainerStyle={styles.listContent}>
+          <View style={styles.list}>
+            {sections
+              .filter((section) => section.tasks.length > 0)
+              .map((section) => (
+                <View key={section.key} testID={`tasks-section-${section.key}`}>
+                  <Text style={styles.sectionTitle}>{section.title}</Text>
+                  {section.tasks.map((task) => renderTask(task, section.key === 'overdue'))}
+                </View>
+              ))}
 
-          {completed.length > 0 && (
-            <View testID="tasks-section-completed">
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setCompletedExpanded((prev) => !prev)}
-                testID="tasks-completed-toggle"
-                style={styles.sectionToggle}
-              >
-                <Text style={styles.sectionTitle}>
-                  {completedExpanded ? '▾' : '▸'} Erledigt ({completed.length})
-                </Text>
-              </Pressable>
-              {completedExpanded && completed.map((task) => renderTask(task, false))}
-            </View>
-          )}
-        </View>
+            {completed.length > 0 && (
+              <View testID="tasks-section-completed">
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setCompletedExpanded((prev) => !prev)}
+                  testID="tasks-completed-toggle"
+                  style={styles.sectionToggle}
+                >
+                  <Text style={styles.sectionTitle}>
+                    {completedExpanded ? '▾' : '▸'} Erledigt ({completed.length})
+                  </Text>
+                </Pressable>
+                {completedExpanded && completed.map((task) => renderTask(task, false))}
+              </View>
+            )}
+          </View>
+        </ScrollView>
       )}
     </View>
   );
@@ -165,6 +174,11 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: spacing.md,
+  },
+  listContent: {
+    // Clears the floating create button (see CreateFab.tsx) so the last
+    // row's controls are never covered by it.
+    paddingBottom: 160,
   },
   sectionTitle: {
     fontSize: typography.bodySmall.fontSize,

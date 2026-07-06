@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 
 import { db } from '../../src/data/db/client';
 import { listCategories, type Category } from '../../src/data/repositories/categoryRepository';
@@ -34,10 +35,15 @@ export default function RoutinesScreen() {
     listRoutines(db).then(setRoutines);
   }, []);
 
-  useEffect(() => {
-    loadRoutines();
-    listCategories(db).then(setCategories);
-  }, [loadRoutines]);
+  // Reload on every focus: this tab stays mounted while create/edit screens
+  // are pushed over it, so a mount-only effect would never show a routine
+  // created or renamed elsewhere until an app restart.
+  useFocusEffect(
+    useCallback(() => {
+      loadRoutines();
+      listCategories(db).then(setCategories);
+    }, [loadRoutines]),
+  );
 
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
@@ -150,13 +156,18 @@ export default function RoutinesScreen() {
           }
         />
       ) : (
-        <ReorderableList
-          data={visibleRoutines}
-          keyExtractor={(item) => item.id}
-          renderItem={renderRoutine}
-          onReorder={handleReorder}
-          testID="routines-list"
-        />
+        // gesture-handler's ScrollView cooperates with the rows' long-press
+        // drag gesture; without a scroll container, lists taller than the
+        // screen were simply cut off and unreachable.
+        <ScrollView contentContainerStyle={styles.listContent}>
+          <ReorderableList
+            data={visibleRoutines}
+            keyExtractor={(item) => item.id}
+            renderItem={renderRoutine}
+            onReorder={handleReorder}
+            testID="routines-list"
+          />
+        </ScrollView>
       )}
 
       <Sheet visible={menuRoutineId !== null} onClose={closeMenu} testID="routine-menu-sheet">
@@ -208,6 +219,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     marginBottom: spacing.md,
+  },
+  listContent: {
+    // Clears the floating create button (see CreateFab.tsx) so the last
+    // row's controls are never covered by it.
+    paddingBottom: 160,
   },
   tab: {
     paddingVertical: spacing.xs,

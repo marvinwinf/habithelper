@@ -13,6 +13,11 @@ jest.mock('../../../src/services/categoryService', () => ({
   ...jest.requireActual('../../../src/services/categoryService'),
   deleteCategory: jest.fn(),
 }));
+jest.mock('expo-router', () => ({
+  ...jest.requireActual('expo-router'),
+  useFocusEffect: (callback: () => void | (() => void)) =>
+    jest.requireActual('react').useEffect(callback, [callback]),
+}));
 
 const sport = { id: 'cat-1', name: 'Sport', baseColor: '#8FBFA0', createdAt: 'x', updatedAt: 'x' };
 const haushalt = { id: 'cat-2', name: 'Haushalt', baseColor: '#A9A0D6', createdAt: 'x', updatedAt: 'x' };

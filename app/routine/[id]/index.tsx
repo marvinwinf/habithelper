@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { db } from '../../../src/data/db/client';
@@ -86,13 +86,17 @@ export default function RoutineDetailScreen() {
   // Re-reconciles this routine's missed occurrences before showing its
   // state, in case the cache went stale while the app was backgrounded
   // (T038 / docs/ARCHITECTURE.md's Missed-Occurrence Reconciliation).
-  useEffect(() => {
-    reconcileRoutine(db, id)
-      .catch((error) => {
-        console.error('Routine reconciliation failed', error);
-      })
-      .finally(loadData);
-  }, [id, loadData]);
+  // Focus-based, not mount-based: the edit screen is pushed over this one,
+  // and returning from it must show the updated name/schedule.
+  useFocusEffect(
+    useCallback(() => {
+      reconcileRoutine(db, id)
+        .catch((error) => {
+          console.error('Routine reconciliation failed', error);
+        })
+        .finally(loadData);
+    }, [id, loadData]),
+  );
 
   const category = routine?.categoryId
     ? categories.find((c) => c.id === routine.categoryId)

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { createTask } from '../../src/services/taskService';
@@ -12,9 +12,13 @@ export default function CreateTaskScreen() {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
 
-  useEffect(() => {
-    listCategories(db).then(setCategories);
-  }, []);
+  // Focus-based (not mount-based) so a category created from a pushed
+  // screen appears in the form's options on return.
+  useFocusEffect(
+    useCallback(() => {
+      listCategories(db).then(setCategories);
+    }, []),
+  );
 
   async function handleSubmit(values: TaskFormValues) {
     await createTask(db, {

@@ -19,6 +19,8 @@ jest.mock('../../../src/services/routineService', () => ({
 }));
 jest.mock('expo-router', () => ({
   ...jest.requireActual('expo-router'),
+  useFocusEffect: (callback: () => void | (() => void)) =>
+    jest.requireActual('react').useEffect(callback, [callback]),
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
 }));
 

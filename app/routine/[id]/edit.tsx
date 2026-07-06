@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -20,22 +20,26 @@ export default function EditRoutineScreen() {
   const [routine, setRoutine] = useState<Routine | undefined>(undefined);
   const [categories, setCategories] = useState<Category[]>([]);
 
-  useEffect(() => {
-    let cancelled = false;
-    getRoutine(db, id).then((found) => {
-      if (!cancelled) {
-        setRoutine(found);
-      }
-    });
-    listCategories(db).then((found) => {
-      if (!cancelled) {
-        setCategories(found);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
+  // Focus-based (not mount-based) so the category-create screen pushed from
+  // the form's dashed button feeds its fresh category back into the chips.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      getRoutine(db, id).then((found) => {
+        if (!cancelled) {
+          setRoutine(found);
+        }
+      });
+      listCategories(db).then((found) => {
+        if (!cancelled) {
+          setCategories(found);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [id]),
+  );
 
   async function handleSubmit(values: RoutineFormValues) {
     // colorVariantSeed and sortOrder are intentionally excluded — the seed

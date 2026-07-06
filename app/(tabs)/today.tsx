@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { db } from '../../src/data/db/client';
@@ -99,9 +99,14 @@ export default function TodayScreen() {
     listCompletedTasks(db).then(setCompletedTasks);
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  // Reload on every focus, not just on mount: this tab stays mounted while
+  // create/edit screens are pushed over it, so a mount-only effect would
+  // never show a routine or task created via the FAB until an app restart.
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]),
+  );
 
   // Separate from the effect above: this one re-fetches events whenever the
   // active routine list changes (including after loadData() re-runs post-
@@ -388,6 +393,10 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
+    // Clears the floating create button (bottom 92 + 56 tall, see
+    // CreateFab.tsx) so the last card's completion control is never
+    // covered by it.
+    paddingBottom: 160,
   },
   header: {
     marginBottom: spacing.md,

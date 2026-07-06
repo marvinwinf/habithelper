@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { getTask, type Task } from '../../../src/data/repositories/taskRepository';
@@ -15,22 +15,26 @@ export default function EditTaskScreen() {
   const [task, setTask] = useState<Task | undefined>(undefined);
   const [categories, setCategories] = useState<Category[]>([]);
 
-  useEffect(() => {
-    let cancelled = false;
-    getTask(db, id).then((found) => {
-      if (!cancelled) {
-        setTask(found);
-      }
-    });
-    listCategories(db).then((found) => {
-      if (!cancelled) {
-        setCategories(found);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
+  // Focus-based (not mount-based) so a category created from a pushed
+  // screen appears in the form's options on return.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      getTask(db, id).then((found) => {
+        if (!cancelled) {
+          setTask(found);
+        }
+      });
+      listCategories(db).then((found) => {
+        if (!cancelled) {
+          setCategories(found);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [id]),
+  );
 
   async function handleSubmit(values: TaskFormValues) {
     // colorVariantSeed and sortOrder are intentionally excluded — the seed
