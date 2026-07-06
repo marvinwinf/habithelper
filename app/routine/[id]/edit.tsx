@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -10,6 +10,7 @@ import {
 import { listCategories, type Category } from '../../../src/data/repositories/categoryRepository';
 import { db } from '../../../src/data/db/client';
 import { RoutineForm, type RoutineFormValues } from '../../../src/ui/components/RoutineForm';
+import { ScreenHeader } from '../../../src/ui/components/ScreenHeader';
 import type { IsoWeekday } from '../../../src/domain/routines/schedule';
 import { colors, spacing } from '../../../src/ui/theme';
 
@@ -19,22 +20,26 @@ export default function EditRoutineScreen() {
   const [routine, setRoutine] = useState<Routine | undefined>(undefined);
   const [categories, setCategories] = useState<Category[]>([]);
 
-  useEffect(() => {
-    let cancelled = false;
-    getRoutine(db, id).then((found) => {
-      if (!cancelled) {
-        setRoutine(found);
-      }
-    });
-    listCategories(db).then((found) => {
-      if (!cancelled) {
-        setCategories(found);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
+  // Focus-based (not mount-based) so the category-create screen pushed from
+  // the form's dashed button feeds its fresh category back into the chips.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      getRoutine(db, id).then((found) => {
+        if (!cancelled) {
+          setRoutine(found);
+        }
+      });
+      listCategories(db).then((found) => {
+        if (!cancelled) {
+          setCategories(found);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [id]),
+  );
 
   async function handleSubmit(values: RoutineFormValues) {
     // colorVariantSeed and sortOrder are intentionally excluded — the seed
@@ -50,6 +55,7 @@ export default function EditRoutineScreen() {
 
   return (
     <View style={styles.screen}>
+      <ScreenHeader title="Routine bearbeiten" testID="edit-routine-header" />
       <RoutineForm
         categories={categories}
         initialValues={{

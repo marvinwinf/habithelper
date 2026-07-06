@@ -3,14 +3,19 @@ import { runPendingMigrations, type MigrationsData } from '../migrationRunner';
 import { createInMemoryFixture, createMigratedFixture, getTableNames } from '../testUtils';
 
 describe('runPendingMigrations', () => {
-  it('applies the real migration on first launch and records it in schema_migrations', async () => {
+  it('applies every real migration on first launch and records them in schema_migrations', async () => {
     const { sqlite } = await createMigratedFixture();
 
-    const rows = sqlite.prepare('SELECT version, applied_at FROM schema_migrations').all() as {
+    const rows = sqlite.prepare('SELECT version, applied_at FROM schema_migrations ORDER BY version').all() as {
       version: number;
       applied_at: string;
     }[];
-    expect(rows).toEqual([{ version: 0, applied_at: expect.any(String) }]);
+    expect(rows).toEqual(
+      migrations.journal.entries.map((entry) => ({
+        version: entry.idx,
+        applied_at: expect.any(String),
+      })),
+    );
     expect(() => new Date(rows[0].applied_at).toISOString()).not.toThrow();
 
     sqlite.close();
@@ -24,7 +29,7 @@ describe('runPendingMigrations', () => {
     await expect(runPendingMigrations(fixture.driver, migrations)).resolves.toBeUndefined();
 
     const rows = fixture.sqlite.prepare('SELECT version FROM schema_migrations').all();
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(migrations.journal.entries.length);
 
     fixture.sqlite.close();
   });

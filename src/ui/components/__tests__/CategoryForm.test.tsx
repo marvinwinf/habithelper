@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { CategoryForm } from '../CategoryForm';
 import { colors } from '../../theme';
 import { getCategoryColorVariant } from '../../theme/categoryVariant';
+import { CATEGORY_ICON_OPTIONS } from '../../categoryIcons';
 
 describe('CategoryForm', () => {
   it('disables save until a name is entered', async () => {
@@ -56,6 +57,35 @@ describe('CategoryForm', () => {
     await fireEvent.press(screen.getByTestId('category-form-color-apricot'));
     await fireEvent.press(screen.getByTestId('category-form-save'));
 
-    expect(onSubmit).toHaveBeenCalledWith({ name: 'Sport', baseColor: colors.categories.apricot.base });
+    expect(onSubmit).toHaveBeenCalledWith({
+      name: 'Sport',
+      baseColor: colors.categories.apricot.base,
+      icon: null,
+    });
+  });
+
+  it('offers the curated icon set and submits the selected icon', async () => {
+    const onSubmit = jest.fn();
+    await render(<CategoryForm onSubmit={onSubmit} initialName="Sport" />);
+
+    for (const option of CATEGORY_ICON_OPTIONS) {
+      expect(screen.getByTestId(`category-form-icon-${option}`)).toBeTruthy();
+    }
+
+    await fireEvent.press(screen.getByTestId('category-form-icon-book'));
+    await fireEvent.press(screen.getByTestId('category-form-save'));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ icon: 'book' }));
+  });
+
+  it('marks the initial icon as selected when editing', async () => {
+    await render(<CategoryForm onSubmit={jest.fn()} initialName="Sport" initialIcon="walk" />);
+
+    expect(
+      screen.getByTestId('category-form-icon-walk').props.accessibilityState.selected,
+    ).toBe(true);
+    expect(
+      screen.getByTestId('category-form-icon-book').props.accessibilityState.selected,
+    ).toBe(false);
   });
 });

@@ -1,10 +1,11 @@
 import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from './Button';
 import { Card } from './Card';
-import { CategoryBadge } from './CategoryBadge';
 import { CompletionControl } from './CompletionControl';
+import { IconBadge } from './IconBadge';
 import { Sheet } from './Sheet';
 import {
   triggerExceededCompletionHaptic,
@@ -14,6 +15,11 @@ import {
 import { useCompletionAnimation } from '../animation/useCompletionAnimation';
 import { useLevelUpAnimation } from '../animation/useLevelUpAnimation';
 import { colors, spacing, typography } from '../theme';
+import { getCategoryColorVariant } from '../theme/categoryVariant';
+import { categoryIconName } from '../categoryIcons';
+import { scheduleFromRoutineRow } from '../../domain/routines/schedule';
+import { scheduleLabel } from '../../domain/routines/scheduleLabel';
+import type { ScheduleType } from '../../data/db/schema';
 
 // Same short pulse for both, scaled to a visibly bigger peak for exceeded —
 // "exceeded completion receives a stronger animation" (docs/ROUTINE_RULES.md)
@@ -31,6 +37,9 @@ export type RoutineCardOccurrenceState = 'pending' | 'completed' | 'exceeded' | 
 export interface RoutineCardRoutine {
   id: string;
   name: string;
+  scheduleType: ScheduleType;
+  scheduledWeekdays: readonly number[] | null;
+  weeklyTargetCount: number | null;
   timeOfDay: string | null;
   allowConsciousSkip: boolean;
   colorVariantSeed: number;
@@ -39,12 +48,13 @@ export interface RoutineCardRoutine {
 export interface RoutineCardCategory {
   name: string;
   baseColor: string;
+  icon?: string | null;
 }
 
 export interface RoutineCardProps {
   routine: RoutineCardRoutine;
   category?: RoutineCardCategory;
-  /** Placeholder until T037/T039 wire the real routine_state_cache streak. */
+  /** The routine's real current streak from routine_state_cache (T065). */
   streak: number;
   state: RoutineCardOccurrenceState;
   // Resolving to `true` signals this completion crossed a 66-completion
@@ -64,8 +74,10 @@ export interface RoutineCardProps {
 
 /**
  * A single routine's Today-screen card, per docs/SCREEN_SPECIFICATIONS.md's
- * Routine Card: completion controls, tap-to-open-detail, and an overflow
- * menu wired to docs/ROUTINE_RULES.md's per-occurrence actions (T030).
+ * Routine Card and the design reference mockup: category-tinted background,
+ * rounded icon container, "time · schedule" subtitle, flame streak line,
+ * category-tinted completion control, and an overflow menu wired to
+ * docs/ROUTINE_RULES.md's per-occurrence actions (T030/T065).
  */
 export function RoutineCard({
   routine,
@@ -87,6 +99,13 @@ export function RoutineCard({
   const completionAnimation = useCompletionAnimation();
   const levelUpAnimation = useLevelUpAnimation();
   const isResolved = state !== 'pending';
+
+  const variant = category
+    ? getCategoryColorVariant(category.baseColor, routine.colorVariantSeed)
+    : undefined;
+  const subtitle = [routine.timeOfDay, scheduleLabel(scheduleFromRoutineRow(routine))]
+    .filter(Boolean)
+    .join(' · ');
 
   function closeMenuThen(action: () => void) {
     setMenuOpen(false);
@@ -128,21 +147,31 @@ export function RoutineCard({
     <>
       <Pressable onPress={onOpenDetail} testID={testID}>
         <Animated.View style={{ transform: [{ scale: cardScale }] }}>
-          <Card style={[styles.card, isResolved && styles.cardSubdued]}>
+          <Card
+            style={[
+              styles.card,
+              variant && { backgroundColor: variant.background, borderColor: 'transparent' },
+              isResolved && styles.cardSubdued,
+            ]}
+          >
+            <IconBadge
+              name={categoryIconName(category?.icon)}
+              backgroundColor={colors.surface}
+              iconColor={variant?.accent ?? colors.textSecondary}
+            />
             <View style={styles.main}>
               <Text style={styles.name}>{routine.name}</Text>
-              <View style={styles.metaRow}>
-                {category && (
-                  <CategoryBadge
-                    label={category.name}
-                    baseColor={category.baseColor}
-                    colorVariantSeed={routine.colorVariantSeed}
-                  />
-                )}
-                {routine.timeOfDay && <Text style={styles.time}>{routine.timeOfDay}</Text>}
+              <Text style={styles.subtitle}>{subtitle}</Text>
+              <View style={styles.streakRow}>
+                <Ionicons
+                  name="flame"
+                  size={typography.caption.fontSize}
+                  color={colors.streakFlame}
+                />
+                <Text style={styles.streak} testID={testID ? `${testID}-streak` : undefined}>
+                  Streak {streak}
+                </Text>
               </View>
-              {/* TODO(T037/T039): replace with the real streak from routine_state_cache once wired. */}
-              <Text style={styles.streak}>Streak: {streak}</Text>
             </View>
             <View style={styles.actions}>
               <Animated.View style={{ transform: [{ scale: completionScale }] }}>
@@ -150,6 +179,7 @@ export function RoutineCard({
                   completed={state === 'completed'}
                   exceeded={state === 'exceeded'}
                   disabled={isResolved}
+                  accentColor={variant?.accent}
                   onComplete={handleComplete}
                   onExceed={handleExceed}
                   testID={`${testID}-complete`}
@@ -224,22 +254,23 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing.xxs,
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
   name: {
     fontSize: typography.body.fontSize,
-    fontWeight: typography.body.fontWeight,
+    fontWeight: typography.heading.fontWeight,
     color: colors.textPrimary,
   },
-  time: {
+  subtitle: {
     fontSize: typography.caption.fontSize,
     color: colors.textSecondary,
   },
+  streakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+  },
   streak: {
     fontSize: typography.caption.fontSize,
+    fontWeight: typography.caption.fontWeight,
     color: colors.textSecondary,
   },
   actions: {

@@ -19,6 +19,8 @@ jest.mock('../../../../src/data/repositories/categoryRepository', () => ({
 const mockBack = jest.fn();
 jest.mock('expo-router', () => ({
   ...jest.requireActual('expo-router'),
+  useFocusEffect: (callback: () => void | (() => void)) =>
+    jest.requireActual('react').useEffect(callback, [callback]),
   useLocalSearchParams: () => ({ id: 'task-1' }),
   useRouter: () => ({ back: mockBack }),
 }));

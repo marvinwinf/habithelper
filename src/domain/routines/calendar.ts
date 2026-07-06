@@ -3,9 +3,7 @@ import { derivePausePeriods, isDatePaused } from './pause';
 import type { RoutineSchedule } from './schedule';
 
 // Per-day states shown in the routine detail calendar, per
-// docs/SCREEN_SPECIFICATIONS.md's Calendar states list. Joker-protected
-// styling is deferred to Phase 6 (see T034/T039 in TASKS.md), so it is not
-// yet a distinct state here.
+// docs/SCREEN_SPECIFICATIONS.md's Calendar states list.
 export type CalendarDayState =
   | 'not_due'
   | 'pending'
@@ -14,6 +12,7 @@ export type CalendarDayState =
   | 'skipped'
   | 'moved'
   | 'missed'
+  | 'joker_protected'
   | 'paused';
 
 /**
@@ -33,6 +32,20 @@ export function getCalendarDayState(
 ): CalendarDayState {
   if (date < startDate) {
     return 'not_due';
+  }
+
+  // A joker-protected day (T036's reconciliation writes joker_protected
+  // instead of missed) shows the joker treatment, unless a later
+  // retroactive completion superseded the protection (T027 restores the
+  // joker by superseding these events).
+  const jokerProtected = events.some(
+    (event) =>
+      !event.supersededByEventId &&
+      event.occurrenceDate === date &&
+      event.eventType === 'joker_protected',
+  );
+  if (jokerProtected) {
+    return 'joker_protected';
   }
 
   const state = classifyOccurrence(schedule, date, events, today);

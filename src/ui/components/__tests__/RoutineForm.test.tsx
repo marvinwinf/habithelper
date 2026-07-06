@@ -20,6 +20,27 @@ describe('RoutineForm', () => {
     expect(screen.getByTestId('routine-form-save').props.accessibilityState.disabled).toBe(false);
   });
 
+  it('marks exactly the chosen frequency card as selected', async () => {
+    const onSubmit = jest.fn();
+    await render(<RoutineForm categories={categories} onSubmit={onSubmit} />);
+
+    expect(
+      screen.getByTestId('routine-form-schedule-daily').props.accessibilityState.selected,
+    ).toBe(true);
+
+    await fireEvent.press(screen.getByTestId('routine-form-schedule-weekdays'));
+
+    expect(
+      screen.getByTestId('routine-form-schedule-weekdays').props.accessibilityState.selected,
+    ).toBe(true);
+    expect(
+      screen.getByTestId('routine-form-schedule-daily').props.accessibilityState.selected,
+    ).toBe(false);
+    expect(
+      screen.getByTestId('routine-form-schedule-weekly_target').props.accessibilityState.selected,
+    ).toBe(false);
+  });
+
   it('disables save for a weekdays schedule until at least one weekday is selected', async () => {
     const onSubmit = jest.fn();
     await render(<RoutineForm categories={categories} onSubmit={onSubmit} />);

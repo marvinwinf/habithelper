@@ -16,6 +16,9 @@ jest.mock('../../animation/haptics', () => ({
 const routine = {
   id: 'routine-1',
   name: 'Laufen',
+  scheduleType: 'daily' as const,
+  scheduledWeekdays: null,
+  weeklyTargetCount: null,
   timeOfDay: null,
   allowConsciousSkip: false,
   colorVariantSeed: 0,
@@ -182,6 +185,39 @@ describe('RoutineCard', () => {
     await renderCard({ state: 'completed' });
 
     expect(screen.getByTestId('routine-card-complete').props.accessibilityState.disabled).toBe(true);
+  });
+
+  it('renders the real streak value with its label', async () => {
+    await renderCard({ streak: 8 });
+
+    expect(screen.getByTestId('routine-card-streak')).toHaveTextContent('Streak 8');
+  });
+
+  it('renders a time · schedule subtitle for a daily routine with a time', async () => {
+    await renderCard({ routine: { ...routine, timeOfDay: '20:00' } });
+
+    expect(screen.getByText('20:00 · Jeden Tag')).toBeTruthy();
+  });
+
+  it('renders the schedule label alone when the routine has no time', async () => {
+    await renderCard({
+      routine: {
+        ...routine,
+        scheduleType: 'weekly_target' as const,
+        scheduledWeekdays: [1, 3, 5],
+        weeklyTargetCount: 3,
+      },
+    });
+
+    expect(screen.getByText('3x pro Woche')).toBeTruthy();
+  });
+
+  it('renders weekday initials for a weekday schedule', async () => {
+    await renderCard({
+      routine: { ...routine, scheduleType: 'weekdays' as const, scheduledWeekdays: [1, 3, 5] },
+    });
+
+    expect(screen.getByText('Mo, Mi, Fr')).toBeTruthy();
   });
 
   it('hides move and skip in the overflow menu once the occurrence is resolved', async () => {

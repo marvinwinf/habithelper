@@ -87,6 +87,7 @@ describe('database schema shape (docs/DATA_MODEL.md)', () => {
       id: { notnull: 1, pk: 1 },
       name: { notnull: 1, pk: 0 },
       base_color: { notnull: 1, pk: 0 },
+      icon: { notnull: 0, pk: 0 },
       created_at: { notnull: 1, pk: 0 },
       updated_at: { notnull: 1, pk: 0 },
     });

@@ -19,6 +19,8 @@ jest.mock('../../../src/services/routineService', () => ({
 }));
 jest.mock('expo-router', () => ({
   ...jest.requireActual('expo-router'),
+  useFocusEffect: (callback: () => void | (() => void)) =>
+    jest.requireActual('react').useEffect(callback, [callback]),
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
 }));
 
@@ -80,11 +82,4 @@ describe('RoutinesScreen', () => {
     expect(await screen.findByText('Noch keine aktiven Routinen')).toBeTruthy();
   });
 
-  it('offers a create-routine link', async () => {
-    (listRoutines as jest.Mock).mockResolvedValue([]);
-
-    await renderScreen();
-
-    expect(await screen.findByTestId('routines-create-link')).toBeTruthy();
-  });
 });

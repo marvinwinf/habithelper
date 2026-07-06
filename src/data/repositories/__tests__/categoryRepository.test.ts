@@ -64,6 +64,26 @@ describe('categoryRepository', () => {
     sqlite.close();
   });
 
+  it('round-trips the icon, defaulting to NULL when omitted', async () => {
+    const { db, sqlite } = await createDrizzleTestDb();
+
+    const withIcon = await createCategory(db, {
+      name: 'Sport',
+      baseColor: '#8FBFA0',
+      icon: 'barbell',
+    });
+    const withoutIcon = await createCategory(db, { name: 'Haushalt', baseColor: '#A9A0D6' });
+
+    expect((await getCategory(db, withIcon.id))?.icon).toBe('barbell');
+    expect((await getCategory(db, withoutIcon.id))?.icon).toBeNull();
+
+    const updated = await updateCategory(db, withoutIcon.id, { icon: 'home' });
+    expect(updated.icon).toBe('home');
+    expect((await getCategory(db, withoutIcon.id))?.icon).toBe('home');
+
+    sqlite.close();
+  });
+
   it('throws when updating an unknown category', async () => {
     const { db, sqlite } = await createDrizzleTestDb();
 

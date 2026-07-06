@@ -1,4 +1,4 @@
-import { colors, radius, spacing, typography } from '../index';
+import { colors, iconBadgeSizes, radius, shadows, spacing, typography } from '../index';
 
 const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 
@@ -78,6 +78,28 @@ describe('typography tokens', () => {
       expect(style.lineHeight).toBeGreaterThan(style.fontSize);
       expect(Number(style.fontWeight)).toBeGreaterThanOrEqual(100);
       expect(Number(style.fontWeight)).toBeLessThanOrEqual(900);
+    }
+  });
+});
+
+describe('shadow tokens', () => {
+  it('defines a low-contrast soft shadow usable on both platforms', () => {
+    expect(shadows.soft.shadowOpacity).toBeGreaterThan(0);
+    expect(shadows.soft.shadowOpacity).toBeLessThan(0.2);
+    expect(shadows.soft.elevation).toBeGreaterThan(0);
+    expect(shadows.soft.shadowColor).toMatch(HEX_COLOR);
+  });
+});
+
+describe('icon badge size tokens', () => {
+  it('defines an increasing container/icon/radius scale for sm, md, lg', () => {
+    const order: (keyof typeof iconBadgeSizes)[] = ['sm', 'md', 'lg'];
+    for (let i = 1; i < order.length; i++) {
+      const prev = iconBadgeSizes[order[i - 1]];
+      const next = iconBadgeSizes[order[i]];
+      expect(next.container).toBeGreaterThan(prev.container);
+      expect(next.icon).toBeGreaterThan(prev.icon);
+      expect(next.icon).toBeLessThan(next.container);
     }
   });
 });

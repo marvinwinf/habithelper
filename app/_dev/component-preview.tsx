@@ -7,9 +7,11 @@ import { Card } from '../../src/ui/components/Card';
 import { CategoryBadge } from '../../src/ui/components/CategoryBadge';
 import { CompletionControl } from '../../src/ui/components/CompletionControl';
 import { EmptyState } from '../../src/ui/components/EmptyState';
+import { IconBadge } from '../../src/ui/components/IconBadge';
 import { ProgressBar } from '../../src/ui/components/ProgressBar';
 import { Sheet } from '../../src/ui/components/Sheet';
 import { colors, spacing, typography } from '../../src/ui/theme';
+import { getCategoryColorVariant } from '../../src/ui/theme/categoryVariant';
 
 // Dev-only design system preview (TASKS.md's T019). Never linked from
 // production navigation (see the Settings screen's dev-only entry point);
@@ -55,6 +57,24 @@ export default function ComponentPreviewScreen() {
         <View style={styles.gapAbove}>
           <ProgressBar value={0.75} fillColor={colors.destructive} />
         </View>
+      </View>
+
+      <Text style={styles.sectionTitle}>IconBadge</Text>
+      <View style={[styles.row, styles.spacingBelow]}>
+        <IconBadge name="book" size="sm" />
+        <IconBadge name="book" size="md" />
+        <IconBadge name="book" size="lg" />
+        {categoryFamilies.map((family) => {
+          const variant = getCategoryColorVariant(colors.categories[family].base, 0);
+          return (
+            <IconBadge
+              key={family}
+              name="walk"
+              backgroundColor={variant.background}
+              iconColor={variant.accent}
+            />
+          );
+        })}
       </View>
 
       <Text style={styles.sectionTitle}>CategoryBadge</Text>

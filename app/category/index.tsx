@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { Link, useFocusEffect } from 'expo-router';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { db } from '../../src/data/db/client';
@@ -23,9 +23,13 @@ export default function CategoryListScreen() {
     listCategories(db).then(setCategories);
   }, []);
 
-  useEffect(() => {
-    loadCategories();
-  }, [loadCategories]);
+  // Reload on every focus: create/edit screens are pushed over this list,
+  // so a mount-only effect would keep showing the stale list on return.
+  useFocusEffect(
+    useCallback(() => {
+      loadCategories();
+    }, [loadCategories]),
+  );
 
   function handleDelete(target: Category) {
     Alert.alert('Kategorie löschen?', `„${target.name}“ wird endgültig gelöscht.`, [
@@ -77,6 +81,7 @@ export default function CategoryListScreen() {
                 label={item.name}
                 baseColor={item.baseColor}
                 colorVariantSeed={PREVIEW_SEED}
+                icon={item.icon}
               />
               <View style={styles.rowActions}>
                 <Link

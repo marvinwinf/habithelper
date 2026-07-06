@@ -37,6 +37,13 @@ export function buildRoutineStateCache(
   };
 }
 
+/** All cache rows at once — the Today screen reads streaks for every due routine in one query (T065). */
+export async function listRoutineStateCaches(
+  db: RoutineStateCacheDb,
+): Promise<RoutineStateCache[]> {
+  return db.select().from(routineStateCache);
+}
+
 /** Reads a routine's cache row, if it has ever been computed. */
 export async function getRoutineStateCache(
   db: RoutineStateCacheDb,
