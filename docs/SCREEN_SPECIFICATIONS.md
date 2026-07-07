@@ -46,6 +46,7 @@ Interactions:
 - tap card: open routine detail,
 - tap completion button: complete,
 - long press completion button: exceeded,
+- tap completion button again once completed or exceeded: undo (see `docs/ROUTINE_RULES.md`'s Undo Completion),
 - overflow menu: move to tomorrow, conscious skip, edit, pause, delete.
 
 Completed routines remain visible in a subdued completed state and move toward the end of the section.
@@ -176,6 +177,7 @@ Additional content:
 - available jokers before streak 66,
 - personal streak record,
 - total successful completions,
+- editable weekdays, for weekly-target ("X times a week") routines only,
 - monthly calendar history.
 
 Calendar states:

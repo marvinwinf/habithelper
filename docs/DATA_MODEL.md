@@ -69,13 +69,13 @@ The single append-only event log for everything that happens to a routine occurr
 | `id` | TEXT PK | stable |
 | `routine_id` | TEXT FK → routine.id | |
 | `occurrence_date` | TEXT | the calendar date (`YYYY-MM-DD`) this event applies to — for retroactive completion this is the *original* planned date, not the date the event was recorded |
-| `event_type` | TEXT | `'completed' \| 'exceeded' \| 'skipped' \| 'missed' \| 'joker_protected' \| 'paused' \| 'reactivated' \| 'moved' \| 'joker_earned' \| 'joker_consumed' \| 'joker_restored'` |
+| `event_type` | TEXT | `'completed' \| 'exceeded' \| 'skipped' \| 'missed' \| 'joker_protected' \| 'paused' \| 'reactivated' \| 'moved' \| 'joker_earned' \| 'joker_consumed' \| 'joker_restored' \| 'completion_undone'` |
 | `recorded_at` | TEXT | wall-clock timestamp the event was actually written (differs from `occurrence_date` for retroactive entries; `is_retroactive` is not stored separately since it is always `recorded_at`'s date ≠ `occurrence_date`, trivially computed from the two columns already on the row) |
 | `moved_to_date` | TEXT NULL | only for `'moved'` events |
 | `skip_reason` | TEXT NULL | only for `'skipped'` events, optional |
 | `superseded_by_event_id` | TEXT NULL FK → routine_event.id | when a retroactive edit changes the outcome of a prior occurrence, the old event is marked superseded rather than deleted — full history is never destroyed |
 
-Two distinct write paths populate this table (see `docs/ARCHITECTURE.md`'s Missed-Occurrence Reconciliation): `completed`, `exceeded`, `skipped`, `moved`, `paused`, `reactivated`, and `joker_earned` are written synchronously by direct user actions; `missed`, `joker_protected`, and `joker_consumed` are written by the reconciliation pass that runs when the app needs up-to-date state for a routine (since "missing a day" has no user action to trigger it); `joker_restored` is written by the retroactive-completion path when it supersedes a previously-`joker_consumed` occurrence.
+Two distinct write paths populate this table (see `docs/ARCHITECTURE.md`'s Missed-Occurrence Reconciliation): `completed`, `exceeded`, `skipped`, `moved`, `paused`, `reactivated`, and `joker_earned` are written synchronously by direct user actions; `missed`, `joker_protected`, and `joker_consumed` are written by the reconciliation pass that runs when the app needs up-to-date state for a routine (since "missing a day" has no user action to trigger it); `joker_restored` is written by the retroactive-completion path when it supersedes a previously-`joker_consumed` occurrence. `completion_undone` is written by the undo-completion path (`docs/ROUTINE_RULES.md`'s Undo Completion) when a misclicked `completed`/`exceeded` event — and, if present, the `joker_earned` event it produced — is superseded back to no recorded outcome.
 
 Streaks, jokers, levels are **recalculated by domain logic reading this table**, not stored as the source of truth (cached copies exist — see Derived vs Persisted). This is what makes joker restoration and full streak recalculation on retroactive edits correct by construction: replay the event log for a routine, in `occurrence_date` order, and the current state falls out — provided reconciliation has already materialized any missed/joker events up to the query date.
 
@@ -163,7 +163,7 @@ A task is a mutable single-row entity, not an event-sourced one (see rationale a
 
 ## Streak and Joker Source Data
 
-Source of truth: `routine_event` rows with types `completed`, `exceeded`, `skipped`, `missed`, `joker_protected`, `joker_earned`, `joker_consumed`, `joker_restored`, `paused`, `reactivated`, `moved`. Not all of these are written the same way — see `routine_event`'s note above on the two write paths (direct user action vs. reconciliation vs. retroactive-completion side effect).
+Source of truth: `routine_event` rows with types `completed`, `exceeded`, `skipped`, `missed`, `joker_protected`, `joker_earned`, `joker_consumed`, `joker_restored`, `paused`, `reactivated`, `moved`, `completion_undone`. Not all of these are written the same way — see `routine_event`'s note above on the two write paths (direct user action vs. reconciliation vs. retroactive-completion side effect).
 
 Domain algorithm (implemented in `src/domain/streaks`, tested per `TEST_STRATEGY.md`) replays these events in date order per routine to derive: current streak, best streak, total completions, level rank, joker inventory/progress, and the post-66 missed-occurrence tolerance window. `routine_state_cache` stores the *result* of the last replay for fast reads; it is never hand-written outside of a full or incremental replay. Replay assumes the event log is complete up to the query date — reconciliation (see `docs/ARCHITECTURE.md`) is what keeps that assumption true.
 

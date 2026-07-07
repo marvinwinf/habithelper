@@ -42,6 +42,16 @@ Normal completion and exceeded completion each count as one successful completio
 
 Exceeded completion receives a stronger animation but no additional streak or level progress.
 
+## Undo Completion
+
+A misclicked completed or exceeded occurrence can be undone back to pending by tapping its completion control again.
+
+Undoing recalculates the routine's streak, level, and joker progress as if the completion never happened — including any joker earned by that same completion, which is un-earned along with it.
+
+If the undone occurrence was the day's only actual completion, the overall app streak reverts too. If another occurrence was completed the same day, the app streak is unaffected.
+
+Undo is only offered for the current day's occurrence, not for past history — retroactive edits to past days remain a separate concern (see Retroactive Completion below).
+
 ## Retroactive Completion
 
 Past occurrences can be marked as completed later.

@@ -67,6 +67,10 @@ export interface RoutineCardProps {
   // that specific completion.
   onComplete: () => void | Promise<boolean>;
   onExceed: () => void | Promise<boolean>;
+  // Undoes a misclicked completed/exceeded occurrence back to pending,
+  // correctly reverting the routine's streak/level/joker state and (if this
+  // was the day's sole completion) the overall app streak.
+  onUndo: () => void | Promise<void>;
   onOpenDetail: () => void;
   onMoveToTomorrow: () => void;
   onSkip: () => void;
@@ -90,6 +94,7 @@ export function RoutineCard({
   state,
   onComplete,
   onExceed,
+  onUndo,
   onOpenDetail,
   onMoveToTomorrow,
   onSkip,
@@ -104,6 +109,7 @@ export function RoutineCard({
   const levelUpAnimation = useLevelUpAnimation();
   const mountAnimation = useMountAnimation();
   const isResolved = state !== 'pending';
+  const isCompletedOrExceeded = state === 'completed' || state === 'exceeded';
 
   const variant = category
     ? getCategoryColorVariant(category.baseColor, routine.colorVariantSeed)
@@ -125,6 +131,12 @@ export function RoutineCard({
   }
 
   async function handleComplete() {
+    // Tapping an already-completed/exceeded control undoes it instead of
+    // firing a redundant completion — the misclick-recovery path.
+    if (isCompletedOrExceeded) {
+      await onUndo();
+      return;
+    }
     setLastAction('complete');
     completionAnimation.start();
     triggerRoutineCompletionHaptic();
@@ -132,6 +144,10 @@ export function RoutineCard({
   }
 
   async function handleExceed() {
+    if (isCompletedOrExceeded) {
+      await onUndo();
+      return;
+    }
     setLastAction('exceed');
     completionAnimation.start();
     triggerExceededCompletionHaptic();
@@ -197,7 +213,9 @@ export function RoutineCard({
                 <CompletionControl
                   completed={state === 'completed'}
                   exceeded={state === 'exceeded'}
-                  disabled={isResolved}
+                  // Only a conscious skip stays locked — a completed/exceeded
+                  // control remains tappable so a misclick can be undone.
+                  disabled={state === 'skipped'}
                   accentColor={variant?.accent}
                   onComplete={handleComplete}
                   onExceed={handleExceed}

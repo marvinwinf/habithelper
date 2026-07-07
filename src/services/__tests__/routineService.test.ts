@@ -6,6 +6,7 @@ import { getRoutineStateCache } from '../../data/repositories/routineStateCacheR
 import * as routineStateCacheRepo from '../../data/repositories/routineStateCacheRepository';
 import { getAppStreakCache } from '../../data/repositories/appStreakCacheRepository';
 import { ConsciousSkipNotAllowedError } from '../../domain/routines/completion';
+import { NoCompletionToUndoError } from '../../domain/routines/undo';
 import {
   RoutineNotFoundError,
   completeRoutineOccurrence,
@@ -17,6 +18,7 @@ import {
   recomputeRoutineCache,
   retroactivelyCompleteOccurrence,
   skipRoutineOccurrence,
+  undoRoutineCompletion,
 } from '../routineService';
 
 jest.mock('expo-crypto', () => {
@@ -433,6 +435,145 @@ describe('routineService', () => {
       const result = await retroactivelyCompleteOccurrence(db, created.id, boundaryDateString);
 
       expect(result.leveledUp).toBe(true);
+
+      sqlite.close();
+    });
+  });
+
+  describe('undoRoutineCompletion', () => {
+    it('supersedes the completed event and reverts the routine cache', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+      await completeRoutineOccurrence(db, created.id, '2026-07-01');
+      await completeRoutineOccurrence(db, created.id, '2026-07-02');
+
+      const result = await undoRoutineCompletion(db, created.id, '2026-07-02');
+
+      expect(result.writtenEvents).toHaveLength(1);
+      expect(result.writtenEvents[0]).toMatchObject({
+        eventType: 'completion_undone',
+        occurrenceDate: '2026-07-02',
+      });
+
+      const events = await listRoutineEvents(db, created.id);
+      const supersededCompletion = events.find(
+        (e) => e.occurrenceDate === '2026-07-02' && e.eventType === 'completed',
+      );
+      expect(supersededCompletion?.supersededByEventId).toBe(result.writtenEvents[0].id);
+
+      const cache = await getRoutineStateCache(db, created.id);
+      expect(cache).toMatchObject({ currentStreak: 1, totalCompletions: 1 });
+
+      sqlite.close();
+    });
+
+    it('works the same for an exceeded completion', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+      await exceedRoutineOccurrence(db, created.id, '2026-07-01');
+
+      await undoRoutineCompletion(db, created.id, '2026-07-01');
+
+      const cache = await getRoutineStateCache(db, created.id);
+      expect(cache).toMatchObject({ currentStreak: 0, totalCompletions: 0 });
+
+      sqlite.close();
+    });
+
+    it('also supersedes the joker_earned event from the same completion, reverting the joker', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+      for (let i = 1; i <= 5; i++) {
+        await completeRoutineOccurrence(db, created.id, `2026-07-0${i}`);
+      }
+      expect(await getRoutineStateCache(db, created.id)).toMatchObject({ jokerInventory: 1 });
+
+      await undoRoutineCompletion(db, created.id, '2026-07-05');
+
+      const events = await listRoutineEvents(db, created.id);
+      const jokerEarned = events.find((e) => e.eventType === 'joker_earned');
+      expect(jokerEarned?.supersededByEventId).toBeTruthy();
+
+      const cache = await getRoutineStateCache(db, created.id);
+      expect(cache).toMatchObject({ jokerInventory: 0, jokerProgress: 4, totalCompletions: 4 });
+
+      sqlite.close();
+    });
+
+    it('throws when there is nothing active to undo', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      await expect(undoRoutineCompletion(db, created.id, '2026-07-01')).rejects.toThrow(
+        NoCompletionToUndoError,
+      );
+
+      sqlite.close();
+    });
+
+    it('reverts the app streak cache when undoing the day\'s sole completion', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+      await completeRoutineOccurrence(db, created.id, '2026-07-01');
+      await completeRoutineOccurrence(db, created.id, '2026-07-02');
+      expect(await getAppStreakCache(db)).toMatchObject({
+        currentStreak: 2,
+        lastIncrementedDate: '2026-07-02',
+      });
+
+      await undoRoutineCompletion(db, created.id, '2026-07-02');
+
+      expect(await getAppStreakCache(db)).toMatchObject({
+        currentStreak: 1,
+        lastIncrementedDate: '2026-07-01',
+      });
+
+      sqlite.close();
+    });
+
+    it('discards the app streak cache entirely when undoing the very first completion', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+      await completeRoutineOccurrence(db, created.id, '2026-07-01');
+
+      await undoRoutineCompletion(db, created.id, '2026-07-01');
+
+      expect(await getAppStreakCache(db)).toBeUndefined();
+
+      sqlite.close();
+    });
+
+    it('leaves the app streak cache untouched when another routine also completed that day', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const first = await createRoutine(db, baseInput);
+      const second = await createRoutine(db, { ...baseInput, name: 'Lesen' });
+      await completeRoutineOccurrence(db, first.id, '2026-07-01');
+      await completeRoutineOccurrence(db, second.id, '2026-07-01');
+
+      await undoRoutineCompletion(db, first.id, '2026-07-01');
+
+      expect(await getAppStreakCache(db)).toMatchObject({
+        currentStreak: 1,
+        lastIncrementedDate: '2026-07-01',
+      });
+
+      sqlite.close();
+    });
+
+    it('leaves the app streak cache untouched when undoing a day the streak has already moved past', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+      await completeRoutineOccurrence(db, created.id, '2026-07-01');
+      await completeRoutineOccurrence(db, created.id, '2026-07-02');
+
+      // 07-01 is no longer the date that most recently advanced the app
+      // streak (07-02 is) — undoing it should leave the cache alone.
+      await undoRoutineCompletion(db, created.id, '2026-07-01');
+
+      expect(await getAppStreakCache(db)).toMatchObject({
+        currentStreak: 2,
+        lastIncrementedDate: '2026-07-02',
+      });
 
       sqlite.close();
     });
