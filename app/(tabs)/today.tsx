@@ -33,6 +33,7 @@ import {
   moveRoutineOccurrence,
   pauseRoutine,
   skipRoutineOccurrence,
+  undoRoutineCompletion,
 } from '../../src/services/routineService';
 import { deleteTask, moveTask, toggleTaskCompletion } from '../../src/services/taskService';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
@@ -305,6 +306,9 @@ export default function TodayScreen() {
                         loadData();
                         return result.leveledUp;
                       }}
+                      onUndo={() =>
+                        undoRoutineCompletion(db, routine.id, todayDateString()).then(loadData)
+                      }
                       onOpenDetail={() => router.push(`/routine/${routine.id}`)}
                       onMoveToTomorrow={() => {
                         const today = todayDateString();

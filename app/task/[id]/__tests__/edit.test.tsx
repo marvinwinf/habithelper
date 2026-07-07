@@ -53,7 +53,7 @@ describe('EditTaskScreen', () => {
 
     expect(await screen.findByTestId('edit-task-form')).toBeTruthy();
     expect(screen.getByTestId('task-form-title-input').props.value).toBe('Wäsche waschen');
-    expect(screen.getByTestId('task-form-date-input').props.value).toBe('2026-07-05');
+    expect(screen.getByText('05.07.2026')).toBeTruthy();
     expect(getTask).toHaveBeenCalledWith({}, 'task-1');
   });
 

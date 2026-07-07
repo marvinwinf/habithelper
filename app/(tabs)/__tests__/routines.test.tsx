@@ -17,6 +17,9 @@ jest.mock('../../../src/services/routineService', () => ({
   pauseRoutine: jest.fn().mockResolvedValue(undefined),
   reactivateRoutine: jest.fn().mockResolvedValue(undefined),
 }));
+jest.mock('../../../src/data/repositories/routineStateCacheRepository', () => ({
+  listRoutineStateCaches: jest.fn().mockResolvedValue([]),
+}));
 jest.mock('expo-router', () => ({
   ...jest.requireActual('expo-router'),
   useFocusEffect: (callback: () => void | (() => void)) =>

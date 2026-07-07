@@ -14,7 +14,8 @@ import {
 } from '../animation/haptics';
 import { useCompletionAnimation } from '../animation/useCompletionAnimation';
 import { useLevelUpAnimation } from '../animation/useLevelUpAnimation';
-import { colors, spacing, typography } from '../theme';
+import { useMountAnimation } from '../animation/useMountAnimation';
+import { colors, pressedOpacity, spacing, typography } from '../theme';
 import { getCategoryColorVariant } from '../theme/categoryVariant';
 import { categoryIconName } from '../categoryIcons';
 import { scheduleFromRoutineRow } from '../../domain/routines/schedule';
@@ -31,6 +32,9 @@ const EXCEEDED_SCALE_PEAK = 1.35;
 // control, so it reads as visually distinct from a normal/exceeded pulse
 // (T042) rather than just a bigger version of the same effect.
 const LEVEL_UP_CARD_SCALE_PEAK = 1.05;
+// How far the card rises into place during its mount animation — small
+// enough to read as a soft settle, not a slide-in.
+const MOUNT_RISE_DISTANCE = 8;
 
 export type RoutineCardOccurrenceState = 'pending' | 'completed' | 'exceeded' | 'skipped';
 
@@ -63,6 +67,10 @@ export interface RoutineCardProps {
   // that specific completion.
   onComplete: () => void | Promise<boolean>;
   onExceed: () => void | Promise<boolean>;
+  // Undoes a misclicked completed/exceeded occurrence back to pending,
+  // correctly reverting the routine's streak/level/joker state and (if this
+  // was the day's sole completion) the overall app streak.
+  onUndo: () => void | Promise<void>;
   onOpenDetail: () => void;
   onMoveToTomorrow: () => void;
   onSkip: () => void;
@@ -86,6 +94,7 @@ export function RoutineCard({
   state,
   onComplete,
   onExceed,
+  onUndo,
   onOpenDetail,
   onMoveToTomorrow,
   onSkip,
@@ -98,7 +107,9 @@ export function RoutineCard({
   const [lastAction, setLastAction] = useState<'complete' | 'exceed' | null>(null);
   const completionAnimation = useCompletionAnimation();
   const levelUpAnimation = useLevelUpAnimation();
+  const mountAnimation = useMountAnimation();
   const isResolved = state !== 'pending';
+  const isCompletedOrExceeded = state === 'completed' || state === 'exceeded';
 
   const variant = category
     ? getCategoryColorVariant(category.baseColor, routine.colorVariantSeed)
@@ -120,6 +131,12 @@ export function RoutineCard({
   }
 
   async function handleComplete() {
+    // Tapping an already-completed/exceeded control undoes it instead of
+    // firing a redundant completion — the misclick-recovery path.
+    if (isCompletedOrExceeded) {
+      await onUndo();
+      return;
+    }
     setLastAction('complete');
     completionAnimation.start();
     triggerRoutineCompletionHaptic();
@@ -127,6 +144,10 @@ export function RoutineCard({
   }
 
   async function handleExceed() {
+    if (isCompletedOrExceeded) {
+      await onUndo();
+      return;
+    }
     setLastAction('exceed');
     completionAnimation.start();
     triggerExceededCompletionHaptic();
@@ -143,10 +164,24 @@ export function RoutineCard({
     outputRange: [1, LEVEL_UP_CARD_SCALE_PEAK],
   });
 
+  const mountTranslateY = mountAnimation.progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [MOUNT_RISE_DISTANCE, 0],
+  });
+
   return (
     <>
-      <Pressable onPress={onOpenDetail} testID={testID}>
-        <Animated.View style={{ transform: [{ scale: cardScale }] }}>
+      <Pressable
+        onPress={onOpenDetail}
+        testID={testID}
+        style={({ pressed }) => pressed && styles.pressed}
+      >
+        <Animated.View
+          style={{
+            opacity: mountAnimation.progress,
+            transform: [{ scale: cardScale }, { translateY: mountTranslateY }],
+          }}
+        >
           <Card
             style={[
               styles.card,
@@ -178,7 +213,9 @@ export function RoutineCard({
                 <CompletionControl
                   completed={state === 'completed'}
                   exceeded={state === 'exceeded'}
-                  disabled={isResolved}
+                  // Only a conscious skip stays locked — a completed/exceeded
+                  // control remains tappable so a misclick can be undone.
+                  disabled={state === 'skipped'}
                   accentColor={variant?.accent}
                   onComplete={handleComplete}
                   onExceed={handleExceed}
@@ -241,6 +278,9 @@ export function RoutineCard({
 }
 
 const styles = StyleSheet.create({
+  pressed: {
+    opacity: pressedOpacity,
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

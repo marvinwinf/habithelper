@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button } from './Button';
 import { CategoryBadge } from './CategoryBadge';
 import { IconBadge } from './IconBadge';
-import { colors, radius, spacing, typography, type CategoryColorFamily } from '../theme';
+import { colors, pressedOpacity, radius, spacing, typography, type CategoryColorFamily } from '../theme';
 import { getCategoryColorVariant } from '../theme/categoryVariant';
 import { CATEGORY_ICON_OPTIONS } from '../categoryIcons';
 
@@ -71,10 +71,11 @@ export function CategoryForm({
               accessibilityLabel={family}
               testID={`category-form-color-${family}`}
               onPress={() => setBaseColor(familyBaseColor)}
-              style={[
+              style={({ pressed }) => [
                 styles.swatch,
                 { backgroundColor: familyBaseColor },
                 selected && styles.swatchSelected,
+                pressed && styles.pressed,
               ]}
             />
           );
@@ -93,7 +94,11 @@ export function CategoryForm({
               accessibilityLabel={option}
               testID={`category-form-icon-${option}`}
               onPress={() => setIcon(option)}
-              style={[styles.iconOption, selected && styles.iconOptionSelected]}
+              style={({ pressed }) => [
+                styles.iconOption,
+                selected && styles.iconOptionSelected,
+                pressed && styles.pressed,
+              ]}
             >
               <IconBadge
                 name={option}
@@ -128,6 +133,9 @@ export function CategoryForm({
 const styles = StyleSheet.create({
   container: {
     gap: spacing.sm,
+  },
+  pressed: {
+    opacity: pressedOpacity,
   },
   label: {
     fontSize: typography.bodySmall.fontSize,

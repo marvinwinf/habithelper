@@ -28,6 +28,7 @@ async function renderCard(overrides: Partial<React.ComponentProps<typeof Routine
   const callbacks = {
     onComplete: jest.fn(),
     onExceed: jest.fn(),
+    onUndo: jest.fn(),
     onOpenDetail: jest.fn(),
     onMoveToTomorrow: jest.fn(),
     onSkip: jest.fn(),
@@ -181,10 +182,45 @@ describe('RoutineCard', () => {
     expect(callbacks.onDelete).toHaveBeenCalledTimes(1);
   });
 
-  it('disables the completion control once resolved (completed/exceeded/skipped)', async () => {
-    await renderCard({ state: 'completed' });
+  it('disables the completion control only when the occurrence was skipped', async () => {
+    await renderCard({ state: 'skipped' });
 
     expect(screen.getByTestId('routine-card-complete').props.accessibilityState.disabled).toBe(true);
+  });
+
+  it.each(['completed', 'exceeded'] as const)(
+    'keeps the completion control tappable when %s, for undo',
+    async (state) => {
+      await renderCard({ state });
+
+      expect(
+        screen.getByTestId('routine-card-complete').props.accessibilityState.disabled,
+      ).toBe(false);
+    },
+  );
+
+  it('undoes a completed occurrence on tap instead of firing onComplete again', async () => {
+    const { callbacks } = await renderCard({ state: 'completed' });
+    const control = screen.getByTestId('routine-card-complete');
+
+    await fireEvent(control, 'pressIn');
+    jest.advanceTimersByTime(50);
+    await fireEvent(control, 'pressOut');
+
+    expect(callbacks.onUndo).toHaveBeenCalledTimes(1);
+    expect(callbacks.onComplete).not.toHaveBeenCalled();
+  });
+
+  it('undoes an exceeded occurrence on a long press too, instead of firing onExceed again', async () => {
+    const { callbacks } = await renderCard({ state: 'exceeded' });
+    const control = screen.getByTestId('routine-card-complete');
+
+    await fireEvent(control, 'pressIn');
+    jest.advanceTimersByTime(500);
+    await fireEvent(control, 'pressOut');
+
+    expect(callbacks.onUndo).toHaveBeenCalledTimes(1);
+    expect(callbacks.onExceed).not.toHaveBeenCalled();
   });
 
   it('renders the real streak value with its label', async () => {

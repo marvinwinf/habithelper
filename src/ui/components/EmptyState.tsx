@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 
+import { useMountAnimation } from '../animation/useMountAnimation';
 import { colors, spacing, typography } from '../theme';
 
 export interface EmptyStateProps {
@@ -12,12 +13,14 @@ export interface EmptyStateProps {
 
 /** No mascots or illustrations per docs/DESIGN_SYSTEM.md — `icon` is caller-supplied. */
 export function EmptyState({ icon, title, message, testID }: EmptyStateProps) {
+  const mountAnimation = useMountAnimation();
+
   return (
-    <View testID={testID} style={styles.container}>
+    <Animated.View testID={testID} style={[styles.container, { opacity: mountAnimation.progress }]}>
       {icon ? <View style={styles.icon}>{icon}</View> : null}
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
-    </View>
+    </Animated.View>
   );
 }
 

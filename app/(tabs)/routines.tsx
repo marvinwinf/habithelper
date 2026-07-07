@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
@@ -11,16 +12,24 @@ import {
   updateRoutine,
   type Routine,
 } from '../../src/data/repositories/routineRepository';
+import {
+  listRoutineStateCaches,
+  type RoutineStateCache,
+} from '../../src/data/repositories/routineStateCacheRepository';
 import { pauseRoutine, reactivateRoutine } from '../../src/services/routineService';
 import { todayDateString } from '../../src/domain/dates';
+import { scheduleFromRoutineRow } from '../../src/domain/routines/schedule';
+import { scheduleLabel } from '../../src/domain/routines/scheduleLabel';
 import { confirmRoutineDeletion } from '../../src/ui/alerts';
+import { categoryIconName } from '../../src/ui/categoryIcons';
 import { Button } from '../../src/ui/components/Button';
 import { Card } from '../../src/ui/components/Card';
-import { CategoryBadge } from '../../src/ui/components/CategoryBadge';
+import { IconBadge } from '../../src/ui/components/IconBadge';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { ReorderableList } from '../../src/ui/components/ReorderableList';
 import { Sheet } from '../../src/ui/components/Sheet';
-import { colors, radius, spacing, typography } from '../../src/ui/theme';
+import { colors, pressedOpacity, radius, spacing, typography } from '../../src/ui/theme';
+import { getCategoryColorVariant } from '../../src/ui/theme/categoryVariant';
 
 type RoutinesTab = 'active' | 'paused';
 
@@ -28,6 +37,7 @@ export default function RoutinesScreen() {
   const router = useRouter();
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [routineStreaks, setRoutineStreaks] = useState<Record<string, RoutineStateCache>>({});
   const [tab, setTab] = useState<RoutinesTab>('active');
   const [menuRoutineId, setMenuRoutineId] = useState<string | null>(null);
 
@@ -42,6 +52,9 @@ export default function RoutinesScreen() {
     useCallback(() => {
       loadRoutines();
       listCategories(db).then(setCategories);
+      listRoutineStateCaches(db).then((rows) =>
+        setRoutineStreaks(Object.fromEntries(rows.map((row) => [row.routineId, row]))),
+      );
     }, [loadRoutines]),
   );
 
@@ -94,24 +107,38 @@ export default function RoutinesScreen() {
 
   function renderRoutine(item: Routine) {
     const category = item.categoryId ? categoryById.get(item.categoryId) : undefined;
+    const variant = category
+      ? getCategoryColorVariant(category.baseColor, item.colorVariantSeed)
+      : undefined;
+    const subtitle = [item.timeOfDay, scheduleLabel(scheduleFromRoutineRow(item))]
+      .filter(Boolean)
+      .join(' · ');
+    const streak = routineStreaks[item.id]?.currentStreak ?? 0;
+
     return (
-      <Card style={styles.row} testID={`routine-row-${item.id}`}>
+      <Card
+        style={[
+          styles.row,
+          variant && { backgroundColor: variant.background, borderColor: 'transparent' },
+        ]}
+        testID={`routine-row-${item.id}`}
+      >
+        <IconBadge
+          name={categoryIconName(category?.icon)}
+          backgroundColor={colors.surface}
+          iconColor={variant?.accent ?? colors.textSecondary}
+        />
         <View style={styles.rowMain}>
           <Text style={styles.routineName} numberOfLines={1}>
             {item.name}
           </Text>
-          {category && (
-            <CategoryBadge
-              label={category.name}
-              baseColor={category.baseColor}
-              colorVariantSeed={item.colorVariantSeed}
-              icon={category.icon}
-            />
-          )}
-          {/* TODO(T037/T039): replace with the real streak from routine_state_cache once wired. */}
-          <Text style={styles.streak} testID={`routine-streak-${item.id}`}>
-            Streak: 0
-          </Text>
+          {subtitle.length > 0 && <Text style={styles.subtitle}>{subtitle}</Text>}
+          <View style={styles.streakRow}>
+            <Ionicons name="flame" size={typography.caption.fontSize} color={colors.streakFlame} />
+            <Text style={styles.streak} testID={`routine-streak-${item.id}`}>
+              Streak {streak}
+            </Text>
+          </View>
         </View>
         <Button
           label="⋯"
@@ -133,14 +160,22 @@ export default function RoutinesScreen() {
         <Pressable
           onPress={() => setTab('active')}
           testID="routines-tab-active"
-          style={[styles.tab, tab === 'active' && styles.tabSelected]}
+          style={({ pressed }) => [
+            styles.tab,
+            tab === 'active' && styles.tabSelected,
+            pressed && styles.tabPressed,
+          ]}
         >
           <Text style={styles.tabLabel}>Aktiv</Text>
         </Pressable>
         <Pressable
           onPress={() => setTab('paused')}
           testID="routines-tab-paused"
-          style={[styles.tab, tab === 'paused' && styles.tabSelected]}
+          style={({ pressed }) => [
+            styles.tab,
+            tab === 'paused' && styles.tabSelected,
+            pressed && styles.tabPressed,
+          ]}
         >
           <Text style={styles.tabLabel}>Pausiert</Text>
         </Pressable>
@@ -237,6 +272,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     borderColor: colors.accent,
   },
+  tabPressed: {
+    opacity: pressedOpacity,
+  },
   tabLabel: {
     fontSize: typography.body.fontSize,
     color: colors.textPrimary,
@@ -259,8 +297,18 @@ const styles = StyleSheet.create({
     fontWeight: typography.body.fontWeight,
     color: colors.textPrimary,
   },
+  subtitle: {
+    fontSize: typography.caption.fontSize,
+    color: colors.textSecondary,
+  },
+  streakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+  },
   streak: {
     fontSize: typography.caption.fontSize,
+    fontWeight: typography.caption.fontWeight,
     color: colors.textSecondary,
   },
   menu: {

@@ -5,7 +5,11 @@ import { Alert, Animated, Pressable, ScrollView, StyleSheet, Text, View } from '
 
 import { db } from '../../../src/data/db/client';
 import { listCategories, type Category } from '../../../src/data/repositories/categoryRepository';
-import { getRoutine, type Routine } from '../../../src/data/repositories/routineRepository';
+import {
+  getRoutine,
+  updateRoutine,
+  type Routine,
+} from '../../../src/data/repositories/routineRepository';
 import {
   listRoutineEvents,
   type RoutineEvent,
@@ -22,7 +26,7 @@ import {
 import { reconcileRoutine } from '../../../src/services/reconciliationService';
 import { toLocalDateString, todayDateString } from '../../../src/domain/dates';
 import { getCalendarDayState, listMonthDates } from '../../../src/domain/routines/calendar';
-import { scheduleFromRoutineRow } from '../../../src/domain/routines/schedule';
+import { scheduleFromRoutineRow, type IsoWeekday } from '../../../src/domain/routines/schedule';
 import { LEVEL_SEGMENT_SIZE } from '../../../src/domain/streaks/replay';
 import { levelName } from '../../../src/domain/streaks/levelName';
 import {
@@ -38,7 +42,7 @@ import { ProgressBar } from '../../../src/ui/components/ProgressBar';
 import { RoutineCalendar, type CalendarDay } from '../../../src/ui/components/RoutineCalendar';
 import { ScreenHeader } from '../../../src/ui/components/ScreenHeader';
 import { StatTile } from '../../../src/ui/components/StatTile';
-import { colors, radius, spacing, typography } from '../../../src/ui/theme';
+import { colors, pressedOpacity, radius, spacing, typography } from '../../../src/ui/theme';
 import { getCategoryColorVariant } from '../../../src/ui/theme/categoryVariant';
 import { categoryIconName } from '../../../src/ui/categoryIcons';
 
@@ -46,6 +50,16 @@ import { categoryIconName } from '../../../src/ui/categoryIcons';
 // scales the whole stats card, not just a single number, so it reads as
 // visually distinct from ordinary stat updates.
 const LEVEL_UP_CARD_SCALE_PEAK = 1.05;
+
+const WEEKDAY_LABELS: { day: IsoWeekday; label: string }[] = [
+  { day: 1, label: 'Mo' },
+  { day: 2, label: 'Di' },
+  { day: 3, label: 'Mi' },
+  { day: 4, label: 'Do' },
+  { day: 5, label: 'Fr' },
+  { day: 6, label: 'Sa' },
+  { day: 7, label: 'So' },
+];
 
 const MONTH_NAMES = [
   'Januar',
@@ -183,6 +197,32 @@ export default function RoutineDetailScreen() {
     loadData();
   }
 
+  // Lets a weekly-target ("X times a week") routine's due weekdays be
+  // adjusted directly here rather than only via the full edit form, since a
+  // user's weekly plan can change at any point. Safe against the streak:
+  // replay.ts folds the already-recorded event log alone (never re-derives
+  // due-ness from the schedule), and reconciliation only ever walks forward
+  // from reconciled_through_date using whatever schedule is current at that
+  // time — so this can only change which future occurrences are due, never
+  // retroactively reinterpret already-recorded history.
+  async function handleToggleWeekday(day: IsoWeekday) {
+    if (!routine) {
+      return;
+    }
+    const current = (routine.scheduledWeekdays as IsoWeekday[] | null) ?? [];
+    const next = current.includes(day)
+      ? current.filter((scheduledDay) => scheduledDay !== day)
+      : [...current, day].sort((a, b) => a - b);
+
+    if (next.length === 0) {
+      Alert.alert('Mindestens ein Wochentag', 'Wähle mindestens einen Wochentag aus.');
+      return;
+    }
+
+    await updateRoutine(db, id, { scheduledWeekdays: next });
+    loadData();
+  }
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <ScreenHeader title={routine.name} testID="routine-detail-header" />
@@ -285,12 +325,46 @@ export default function RoutineDetailScreen() {
         />
       </View>
 
+      {routine.scheduleType === 'weekly_target' && (
+        <Card style={styles.weekdayCard} testID="routine-detail-weekdays">
+          <Text style={styles.weekdayCardTitle}>Wochentage</Text>
+          <View style={styles.weekdayRow}>
+            {WEEKDAY_LABELS.map(({ day, label }) => {
+              const selected = ((routine.scheduledWeekdays as IsoWeekday[] | null) ?? []).includes(
+                day,
+              );
+              return (
+                <Pressable
+                  key={day}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: selected }}
+                  accessibilityLabel={label}
+                  testID={`routine-detail-weekday-${day}`}
+                  onPress={() => handleToggleWeekday(day)}
+                  style={({ pressed }) => [styles.weekdayToggle, pressed && styles.pressed]}
+                >
+                  <Text style={styles.weekdayToggleLabel}>{label}</Text>
+                  <View style={[styles.weekdayCircle, selected && styles.weekdayCircleSelected]}>
+                    <Ionicons
+                      name={selected ? 'checkmark' : 'remove'}
+                      size={typography.bodySmall.fontSize}
+                      color={selected ? colors.textOnAccent : colors.textSecondary}
+                    />
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Card>
+      )}
+
       {routine.reason && (
         <Card style={styles.reasonCard}>
           <Pressable
             accessibilityRole="button"
             onPress={() => setReasonExpanded((prev) => !prev)}
             testID="routine-detail-reason-toggle"
+            style={({ pressed }) => pressed && styles.pressed}
           >
             <Text style={styles.reasonToggle}>
               {reasonExpanded ? '▾' : '▸'} Persönlicher Grund
@@ -320,7 +394,11 @@ export default function RoutineDetailScreen() {
         <Pressable
           accessibilityRole="button"
           onPress={() => router.push(`/routine/${id}/edit`)}
-          style={[styles.actionButton, styles.editButton]}
+          style={({ pressed }) => [
+            styles.actionButton,
+            styles.editButton,
+            pressed && styles.pressed,
+          ]}
           testID="routine-detail-edit"
         >
           <Ionicons name="pencil" size={typography.body.fontSize} color={colors.accent} />
@@ -329,7 +407,11 @@ export default function RoutineDetailScreen() {
         <Pressable
           accessibilityRole="button"
           onPress={handleTogglePause}
-          style={[styles.actionButton, styles.pauseButton]}
+          style={({ pressed }) => [
+            styles.actionButton,
+            styles.pauseButton,
+            pressed && styles.pressed,
+          ]}
           testID="routine-detail-pause"
         >
           <Ionicons
@@ -354,6 +436,9 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.lg,
     gap: spacing.md,
+  },
+  pressed: {
+    opacity: pressedOpacity,
   },
   heroCard: {
     gap: spacing.sm,
@@ -446,6 +531,37 @@ const styles = StyleSheet.create({
   },
   pauseLabel: {
     color: colors.streakFlame,
+  },
+  weekdayCard: {
+    gap: spacing.sm,
+  },
+  weekdayCardTitle: {
+    fontSize: typography.bodySmall.fontSize,
+    fontWeight: typography.bodySmall.fontWeight,
+    color: colors.textPrimary,
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  weekdayToggle: {
+    alignItems: 'center',
+    gap: spacing.xxs,
+  },
+  weekdayToggleLabel: {
+    fontSize: typography.caption.fontSize,
+    color: colors.textSecondary,
+  },
+  weekdayCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weekdayCircleSelected: {
+    backgroundColor: colors.accent,
   },
   reasonCard: {
     gap: spacing.xs,

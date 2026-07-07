@@ -29,7 +29,11 @@ export type RoutineEventType =
   | 'moved'
   | 'joker_earned'
   | 'joker_consumed'
-  | 'joker_restored';
+  | 'joker_restored'
+  // Supersedes a misclicked completed/exceeded event (and its joker_earned
+  // sibling, if any) — see src/domain/routines/undo.ts. event_type is a plain
+  // TEXT column with no DB-level constraint, so this needs no migration.
+  | 'completion_undone';
 
 export const profile = sqliteTable('profile', {
   id: text('id').primaryKey(),

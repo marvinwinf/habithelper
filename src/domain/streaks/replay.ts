@@ -88,12 +88,16 @@ function applyEvent(state: RoutineStreakState, event: StreakReplayEvent): Routin
     // Conscious skips and joker-protected occurrences count as neither a
     // completion nor a miss (docs/ROUTINE_RULES.md); moved/paused/reactivated
     // affect scheduling (src/domain/routines), not streak/joker/level state.
+    // completion_undone is the audit-trail marker for an undone misclick
+    // (src/domain/routines/undo.ts) — the completion it undoes is already
+    // excluded above as superseded, so this needs no numeric effect either.
     case 'joker_restored':
     case 'skipped':
     case 'joker_protected':
     case 'moved':
     case 'paused':
     case 'reactivated':
+    case 'completion_undone':
       return state;
   }
 }

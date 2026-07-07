@@ -1,9 +1,32 @@
 import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 
 import { Button } from './Button';
-import { colors, radius, spacing, typography } from '../theme';
+import { toLocalDateString } from '../../domain/dates';
+import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
+
+const DATE_DISPLAY_FORMATTER = new Intl.DateTimeFormat('de-DE', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
+
+/** Parses a `YYYY-MM-DD` string into a local Date, for handing to the native date picker. */
+function parseDateString(value: string): Date {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function openDatePicker(currentValue: string, onPicked: (value: string) => void) {
+  DateTimePickerAndroid.open({
+    value: currentValue.length > 0 ? parseDateString(currentValue) : new Date(),
+    mode: 'date',
+    onValueChange: (_event, selectedDate) => onPicked(toLocalDateString(selectedDate)),
+  });
+}
 
 export interface TaskFormCategory {
   id: string;
@@ -84,7 +107,11 @@ export function TaskForm({
           accessibilityState={{ selected: categoryId === null }}
           testID="task-form-category-none"
           onPress={() => setCategoryId(null)}
-          style={[styles.chip, categoryId === null && styles.chipSelected]}
+          style={({ pressed }) => [
+            styles.chip,
+            categoryId === null && styles.chipSelected,
+            pressed && styles.pressed,
+          ]}
         >
           <Text style={styles.chipLabel}>Keine</Text>
         </Pressable>
@@ -95,7 +122,11 @@ export function TaskForm({
             accessibilityState={{ selected: categoryId === category.id }}
             testID={`task-form-category-${category.id}`}
             onPress={() => setCategoryId(category.id)}
-            style={[styles.chip, categoryId === category.id && styles.chipSelected]}
+            style={({ pressed }) => [
+              styles.chip,
+              categoryId === category.id && styles.chipSelected,
+              pressed && styles.pressed,
+            ]}
           >
             <Text style={styles.chipLabel}>{category.name}</Text>
           </Pressable>
@@ -103,13 +134,30 @@ export function TaskForm({
       </View>
 
       <Text style={styles.label}>Datum</Text>
-      <TextInput
-        value={date}
-        onChangeText={setDate}
-        placeholder="JJJJ-MM-TT (optional)"
-        style={styles.input}
-        testID="task-form-date-input"
-      />
+      <View style={styles.dateRow}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => openDatePicker(date, setDate)}
+          testID="task-form-date-input"
+          style={({ pressed }) => [styles.input, styles.dateField, pressed && styles.pressed]}
+        >
+          <Ionicons name="calendar-outline" size={typography.body.fontSize} color={colors.textSecondary} />
+          <Text style={date.length > 0 ? styles.dateValue : styles.datePlaceholder}>
+            {date.length > 0 ? DATE_DISPLAY_FORMATTER.format(parseDateString(date)) : 'Datum wählen (optional)'}
+          </Text>
+        </Pressable>
+        {date.length > 0 && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Datum entfernen"
+            onPress={() => setDate('')}
+            testID="task-form-date-clear"
+            style={({ pressed }) => [styles.dateClear, pressed && styles.pressed]}
+          >
+            <Ionicons name="close" size={typography.body.fontSize} color={colors.textSecondary} />
+          </Pressable>
+        )}
+      </View>
 
       <Text style={styles.label}>Uhrzeit</Text>
       <TextInput
@@ -124,7 +172,7 @@ export function TaskForm({
         accessibilityRole="button"
         onPress={() => setDescriptionExpanded((prev) => !prev)}
         testID="task-form-description-toggle"
-        style={styles.descriptionToggle}
+        style={({ pressed }) => [styles.descriptionToggle, pressed && styles.pressed]}
       >
         <Text style={styles.descriptionToggleLabel}>
           {descriptionExpanded ? '▾' : '▸'} Beschreibung
@@ -154,6 +202,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingBottom: spacing.xl,
   },
+  pressed: {
+    opacity: pressedOpacity,
+  },
   label: {
     fontSize: typography.bodySmall.fontSize,
     lineHeight: typography.bodySmall.lineHeight,
@@ -173,6 +224,35 @@ const styles = StyleSheet.create({
   descriptionInput: {
     minHeight: 80,
     textAlignVertical: 'top',
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  dateField: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  dateValue: {
+    fontSize: typography.body.fontSize,
+    color: colors.textPrimary,
+  },
+  datePlaceholder: {
+    fontSize: typography.body.fontSize,
+    color: colors.textSecondary,
+  },
+  dateClear: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   categoryHeader: {
     flexDirection: 'row',

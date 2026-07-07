@@ -18,7 +18,7 @@ import { compareByDateThenTime } from '../../src/domain/tasks/ordering';
 import { confirmTaskDeletion } from '../../src/ui/alerts';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { TaskCard } from '../../src/ui/components/TaskCard';
-import { colors, spacing, typography } from '../../src/ui/theme';
+import { colors, pressedOpacity, spacing, typography } from '../../src/ui/theme';
 
 interface Section {
   key: string;
@@ -138,7 +138,7 @@ export default function TasksScreen() {
                   accessibilityRole="button"
                   onPress={() => setCompletedExpanded((prev) => !prev)}
                   testID="tasks-completed-toggle"
-                  style={styles.sectionToggle}
+                  style={({ pressed }) => [styles.sectionToggle, pressed && styles.sectionTogglePressed]}
                 >
                   <Text style={styles.sectionTitle}>
                     {completedExpanded ? '▾' : '▸'} Erledigt ({completed.length})
@@ -188,5 +188,8 @@ const styles = StyleSheet.create({
   },
   sectionToggle: {
     paddingVertical: spacing.xs,
+  },
+  sectionTogglePressed: {
+    opacity: pressedOpacity,
   },
 });

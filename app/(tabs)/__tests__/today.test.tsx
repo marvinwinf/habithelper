@@ -19,7 +19,11 @@ import {
   listUndatedTasks,
   listUpcomingTasks,
 } from '../../../src/data/repositories/taskRepository';
-import { completeRoutineOccurrence, moveRoutineOccurrence } from '../../../src/services/routineService';
+import {
+  completeRoutineOccurrence,
+  moveRoutineOccurrence,
+  undoRoutineCompletion,
+} from '../../../src/services/routineService';
 import { deleteTask, moveTask, toggleTaskCompletion } from '../../../src/services/taskService';
 import { triggerFirstCompletionOfDayHaptic } from '../../../src/ui/animation/haptics';
 
@@ -56,6 +60,7 @@ jest.mock('../../../src/services/routineService', () => ({
   moveRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
   skipRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
   pauseRoutine: jest.fn().mockResolvedValue(undefined),
+  undoRoutineCompletion: jest.fn().mockResolvedValue({ writtenEvents: [] }),
 }));
 jest.mock('../../../src/services/taskService', () => ({
   toggleTaskCompletion: jest.fn().mockResolvedValue(undefined),
@@ -239,7 +244,7 @@ describe('TodayScreen', () => {
     expect(await screen.findByText('Für heute nichts geplant')).toBeTruthy();
   });
 
-  it('shows a completed routine in a subdued state and does not re-offer completion', async () => {
+  it('shows a completed routine in a subdued, checked state, tappable only to undo', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
     (listRoutineEventsInRange as jest.Mock).mockResolvedValue([
       {
@@ -257,8 +262,14 @@ describe('TodayScreen', () => {
     await render(<TodayScreen />);
 
     const control = await screen.findByTestId(`routine-card-${dailyRoutine.id}-complete`);
-    expect(control.props.accessibilityState.disabled).toBe(true);
+    expect(control.props.accessibilityState.disabled).toBe(false);
     expect(control.props.accessibilityState.checked).toBe(true);
+
+    await fireEvent(control, 'pressIn');
+    await fireEvent(control, 'pressOut');
+
+    expect(undoRoutineCompletion).toHaveBeenCalledWith({}, dailyRoutine.id, TODAY);
+    expect(completeRoutineOccurrence).not.toHaveBeenCalled();
   });
 
   it('completes a routine via its card, calling the service with today\'s date', async () => {

@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, iconBadgeSizes, radius, shadows, spacing, typography } from '../theme';
+import { colors, iconBadgeSizes, pressedOpacity, radius, shadows, spacing, typography } from '../theme';
 
 export interface ScreenHeaderProps {
   title: string;
@@ -26,7 +26,7 @@ export function ScreenHeader({ title, right, testID }: ScreenHeaderProps) {
         accessibilityRole="button"
         accessibilityLabel="Zurück"
         onPress={() => router.back()}
-        style={styles.backButton}
+        style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
         testID={testID ? `${testID}-back` : undefined}
       >
         <Ionicons
@@ -60,6 +60,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...shadows.soft,
+  },
+  backButtonPressed: {
+    opacity: pressedOpacity,
   },
   title: {
     flex: 1,
