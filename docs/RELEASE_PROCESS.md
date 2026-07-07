@@ -31,6 +31,12 @@ After the final task of an implementation phase (per `TASKS.md`) is completed, m
 
 Tag names: `apk-phase-2`, `apk-phase-3`, … Intermediate/preview builds may use a suffix (e.g. `apk-phase-2-preview`); they are ordinary releases too, so the "latest" link picks them up.
 
+## Automatic rebuild on every merge to main
+
+Independent of the per-phase process above, every push to `main` (typically a PR merge) automatically triggers the `Android APK` workflow and publishes its result as a single rolling `apk-latest` release: the workflow deletes any previous `apk-latest` release/tag first, then republishes fresh from the new commit, so the tag always points at the latest `main`. No manual step is needed for this — it requires no tag push, no `workflow_dispatch`, and no commit-message marker.
+
+This does not replace the phase-tagged releases: `apk-phase-<n>` releases remain the deliberate, documented checkpoints per `TASKS.md`; `apk-latest` is a continuously-refreshed convenience build reflecting the current state of `main` between phases. Since the README's download link uses `releases/latest/download/habithelper.apk`, whichever of the two was published most recently is what it serves.
+
 ## Build characteristics
 
 - The APK is a release build **signed with the Android debug keystore** (Expo prebuild's default). It installs on real devices for manual testing but is not store-distributable.
