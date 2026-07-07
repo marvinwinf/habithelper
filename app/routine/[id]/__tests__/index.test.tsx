@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import RoutineDetailScreen from '../index';
 import { todayDateString } from '../../../../src/domain/dates';
-import { getRoutine } from '../../../../src/data/repositories/routineRepository';
+import { getRoutine, updateRoutine } from '../../../../src/data/repositories/routineRepository';
 import { listCategories } from '../../../../src/data/repositories/categoryRepository';
 import { listRoutineEvents } from '../../../../src/data/repositories/routineEventRepository';
 import { getRoutineStateCache } from '../../../../src/data/repositories/routineStateCacheRepository';
@@ -17,6 +17,7 @@ import { triggerLevelMilestoneHaptic } from '../../../../src/ui/animation/haptic
 jest.mock('../../../../src/data/db/client', () => ({ db: {} }));
 jest.mock('../../../../src/data/repositories/routineRepository', () => ({
   getRoutine: jest.fn(),
+  updateRoutine: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('../../../../src/data/repositories/categoryRepository', () => ({
   listCategories: jest.fn().mockResolvedValue([]),
@@ -298,5 +299,84 @@ describe('RoutineDetailScreen', () => {
 
     expect(Alert.alert).not.toHaveBeenCalled();
     expect(retroactivelyCompleteOccurrence).not.toHaveBeenCalled();
+  });
+
+  it('hides the weekday editor for a daily routine', async () => {
+    await render(<RoutineDetailScreen />);
+    await screen.findByText('Laufen');
+
+    expect(screen.queryByTestId('routine-detail-weekdays')).toBeNull();
+  });
+
+  it('shows the weekday editor with the current selection for a weekly-target routine', async () => {
+    (getRoutine as jest.Mock).mockResolvedValue({
+      ...routine,
+      scheduleType: 'weekly_target',
+      scheduledWeekdays: [1, 3, 5],
+      weeklyTargetCount: 3,
+    });
+
+    await render(<RoutineDetailScreen />);
+    await screen.findByText('Laufen');
+
+    expect(screen.getByTestId('routine-detail-weekdays')).toBeTruthy();
+    expect(screen.getByTestId('routine-detail-weekday-1').props.accessibilityState.checked).toBe(
+      true,
+    );
+    expect(screen.getByTestId('routine-detail-weekday-2').props.accessibilityState.checked).toBe(
+      false,
+    );
+  });
+
+  it('adds a weekday when tapped and persists the change', async () => {
+    (getRoutine as jest.Mock).mockResolvedValue({
+      ...routine,
+      scheduleType: 'weekly_target',
+      scheduledWeekdays: [1, 3, 5],
+      weeklyTargetCount: 3,
+    });
+
+    await render(<RoutineDetailScreen />);
+    await screen.findByText('Laufen');
+
+    await fireEvent.press(screen.getByTestId('routine-detail-weekday-2'));
+
+    expect(updateRoutine).toHaveBeenCalledWith({}, 'routine-1', { scheduledWeekdays: [1, 2, 3, 5] });
+  });
+
+  it('removes a weekday when tapped off', async () => {
+    (getRoutine as jest.Mock).mockResolvedValue({
+      ...routine,
+      scheduleType: 'weekly_target',
+      scheduledWeekdays: [1, 3, 5],
+      weeklyTargetCount: 3,
+    });
+
+    await render(<RoutineDetailScreen />);
+    await screen.findByText('Laufen');
+
+    await fireEvent.press(screen.getByTestId('routine-detail-weekday-3'));
+
+    expect(updateRoutine).toHaveBeenCalledWith({}, 'routine-1', { scheduledWeekdays: [1, 5] });
+  });
+
+  it('refuses to remove the last remaining weekday', async () => {
+    (getRoutine as jest.Mock).mockResolvedValue({
+      ...routine,
+      scheduleType: 'weekly_target',
+      scheduledWeekdays: [4],
+      weeklyTargetCount: 1,
+    });
+
+    await render(<RoutineDetailScreen />);
+    await screen.findByText('Laufen');
+
+    await fireEvent.press(screen.getByTestId('routine-detail-weekday-4'));
+
+    expect(updateRoutine).not.toHaveBeenCalled();
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Mindestens ein Wochentag',
+      'Wähle mindestens einen Wochentag aus.',
+    );
   });
 });
