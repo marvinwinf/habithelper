@@ -23,9 +23,11 @@ export interface RoutineCalendarProps {
 
 const WEEKDAY_HEADERS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
-// Every resolved state pairs a distinct icon with its color so color is
-// never the sole signal (docs/DESIGN_SYSTEM.md's Accessibility section);
-// pending and not_due days show only the day number (with not_due dimmed).
+// Every resolved state pairs a distinct icon with a shape so color is never
+// the sole signal (docs/DESIGN_SYSTEM.md's Accessibility section); pending
+// and not_due days show only the day number (with not_due dimmed). Icon
+// colors are monochrome-plus-gold — ink (textPrimary/textSecondary) or the
+// accent — never a distinct hue per state (T080).
 const STATE_VISUALS: Record<
   CalendarDayState,
   { background: string; icon: keyof typeof Ionicons.glyphMap | null; iconColor: string }
@@ -45,7 +47,7 @@ const STATE_VISUALS: Record<
   missed: {
     background: colors.surfaceMuted,
     icon: 'close',
-    iconColor: colors.missed,
+    iconColor: colors.textPrimary,
   },
   skipped: {
     background: colors.surfaceMuted,
