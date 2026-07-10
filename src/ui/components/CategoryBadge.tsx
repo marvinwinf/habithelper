@@ -2,33 +2,27 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../theme';
-import { getCategoryColorVariant } from '../theme/categoryVariant';
 import { categoryIconName } from '../categoryIcons';
 
 export interface CategoryBadgeProps {
   label: string;
-  baseColor: string;
-  colorVariantSeed: number;
   /** The category's stored icon (category.icon); null/undefined renders the fallback icon. */
   icon?: string | null;
   testID?: string;
 }
 
-export function CategoryBadge({
-  label,
-  baseColor,
-  colorVariantSeed,
-  icon,
-  testID,
-}: CategoryBadgeProps) {
-  const variant = getCategoryColorVariant(baseColor, colorVariantSeed);
-
+/**
+ * Categories are told apart by name and glyph, never by hue (Quiet Atelier,
+ * docs/DESIGN_SYSTEM.md) — this always renders in the neutral/hairline
+ * style, regardless of the category's stored base_color.
+ */
+export function CategoryBadge({ label, icon, testID }: CategoryBadgeProps) {
   return (
-    <View testID={testID} style={[styles.badge, { backgroundColor: variant.background }]}>
+    <View testID={testID} style={styles.badge}>
       <Ionicons
         name={categoryIconName(icon)}
         size={typography.caption.fontSize}
-        color={variant.accent}
+        color={colors.textSecondary}
         style={styles.icon}
       />
       <Text style={styles.label} numberOfLines={1}>
@@ -46,6 +40,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
     borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   icon: {
     marginRight: spacing.xs,

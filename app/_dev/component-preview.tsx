@@ -11,10 +11,7 @@ import { IconBadge } from '../../src/ui/components/IconBadge';
 import { ProgressBar } from '../../src/ui/components/ProgressBar';
 import { Sheet } from '../../src/ui/components/Sheet';
 import { colors, spacing, typography, type CategoryColorFamily } from '../../src/ui/theme';
-import {
-  getCategoryColorVariant,
-  legacyCategoryPalette,
-} from '../../src/ui/theme/categoryVariant';
+import { legacyCategoryPalette } from '../../src/ui/theme/categoryVariant';
 
 // Dev-only design system preview (TASKS.md's T019). Never linked from
 // production navigation (see the Settings screen's dev-only entry point);
@@ -67,28 +64,12 @@ export default function ComponentPreviewScreen() {
         <IconBadge name="book" size="sm" />
         <IconBadge name="book" size="md" />
         <IconBadge name="book" size="lg" />
-        {categoryFamilies.map((family) => {
-          const variant = getCategoryColorVariant(legacyCategoryPalette[family].base, 0);
-          return (
-            <IconBadge
-              key={family}
-              name="walk"
-              backgroundColor={variant.background}
-              iconColor={variant.accent}
-            />
-          );
-        })}
       </View>
 
       <Text style={styles.sectionTitle}>CategoryBadge</Text>
       <View style={[styles.row, styles.spacingBelow]}>
-        {categoryFamilies.map((family, index) => (
-          <CategoryBadge
-            key={family}
-            label={family}
-            baseColor={legacyCategoryPalette[family].base}
-            colorVariantSeed={index}
-          />
+        {categoryFamilies.map((family) => (
+          <CategoryBadge key={family} label={family} />
         ))}
       </View>
 

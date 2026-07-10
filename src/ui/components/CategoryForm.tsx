@@ -5,7 +5,7 @@ import { Button } from './Button';
 import { CategoryBadge } from './CategoryBadge';
 import { IconBadge } from './IconBadge';
 import { colors, pressedOpacity, radius, spacing, typography, type CategoryColorFamily } from '../theme';
-import { getCategoryColorVariant, legacyCategoryPalette } from '../theme/categoryVariant';
+import { legacyCategoryPalette } from '../theme/categoryVariant';
 import { CATEGORY_ICON_OPTIONS } from '../categoryIcons';
 
 export interface CategoryFormValues {
@@ -25,11 +25,6 @@ export interface CategoryFormProps {
 
 const PALETTE_FAMILIES = Object.keys(legacyCategoryPalette) as CategoryColorFamily[];
 
-// The preview shows how any one item in this category would look; the
-// concrete seed doesn't matter here since categories have no seed of their
-// own (only individual routines/tasks do, per docs/DATA_MODEL.md).
-const PREVIEW_SEED = 0;
-
 /** Shared name/base-color/preview form used by both the create and edit category screens. */
 export function CategoryForm({
   initialName = '',
@@ -45,7 +40,6 @@ export function CategoryForm({
 
   const trimmedName = name.trim();
   const canSave = trimmedName.length > 0;
-  const previewVariant = getCategoryColorVariant(baseColor, PREVIEW_SEED);
 
   return (
     <View testID={testID} style={styles.container}>
@@ -103,8 +97,7 @@ export function CategoryForm({
               <IconBadge
                 name={option}
                 size="sm"
-                backgroundColor={selected ? previewVariant.background : colors.surfaceMuted}
-                iconColor={selected ? previewVariant.accent : colors.textSecondary}
+                iconColor={selected ? colors.accent : colors.textSecondary}
               />
             </Pressable>
           );
@@ -114,8 +107,6 @@ export function CategoryForm({
       <Text style={styles.label}>Vorschau</Text>
       <CategoryBadge
         label={trimmedName || 'Vorschau'}
-        baseColor={baseColor}
-        colorVariantSeed={PREVIEW_SEED}
         icon={icon}
         testID="category-form-preview"
       />

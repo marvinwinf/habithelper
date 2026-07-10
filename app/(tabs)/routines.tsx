@@ -29,7 +29,6 @@ import { EmptyState } from '../../src/ui/components/EmptyState';
 import { ReorderableList } from '../../src/ui/components/ReorderableList';
 import { Sheet } from '../../src/ui/components/Sheet';
 import { colors, pressedOpacity, radius, spacing, typography } from '../../src/ui/theme';
-import { getCategoryColorVariant } from '../../src/ui/theme/categoryVariant';
 
 type RoutinesTab = 'active' | 'paused';
 
@@ -107,27 +106,14 @@ export default function RoutinesScreen() {
 
   function renderRoutine(item: Routine) {
     const category = item.categoryId ? categoryById.get(item.categoryId) : undefined;
-    const variant = category
-      ? getCategoryColorVariant(category.baseColor, item.colorVariantSeed)
-      : undefined;
     const subtitle = [item.timeOfDay, scheduleLabel(scheduleFromRoutineRow(item))]
       .filter(Boolean)
       .join(' · ');
     const streak = routineStreaks[item.id]?.currentStreak ?? 0;
 
     return (
-      <Card
-        style={[
-          styles.row,
-          variant && { backgroundColor: variant.background, borderColor: 'transparent' },
-        ]}
-        testID={`routine-row-${item.id}`}
-      >
-        <IconBadge
-          name={categoryIconName(category?.icon)}
-          backgroundColor={colors.surface}
-          iconColor={variant?.accent ?? colors.textSecondary}
-        />
+      <Card style={styles.row} testID={`routine-row-${item.id}`}>
+        <IconBadge name={categoryIconName(category?.icon)} />
         <View style={styles.rowMain}>
           <Text style={styles.routineName} numberOfLines={1}>
             {item.name}

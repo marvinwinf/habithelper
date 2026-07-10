@@ -16,7 +16,6 @@ import { useCompletionAnimation } from '../animation/useCompletionAnimation';
 import { useLevelUpAnimation } from '../animation/useLevelUpAnimation';
 import { useMountAnimation } from '../animation/useMountAnimation';
 import { colors, pressedOpacity, spacing, typography } from '../theme';
-import { getCategoryColorVariant } from '../theme/categoryVariant';
 import { categoryIconName } from '../categoryIcons';
 import { scheduleFromRoutineRow } from '../../domain/routines/schedule';
 import { scheduleLabel } from '../../domain/routines/scheduleLabel';
@@ -111,9 +110,6 @@ export function RoutineCard({
   const isResolved = state !== 'pending';
   const isCompletedOrExceeded = state === 'completed' || state === 'exceeded';
 
-  const variant = category
-    ? getCategoryColorVariant(category.baseColor, routine.colorVariantSeed)
-    : undefined;
   const subtitle = [routine.timeOfDay, scheduleLabel(scheduleFromRoutineRow(routine))]
     .filter(Boolean)
     .join(' · ');
@@ -182,18 +178,8 @@ export function RoutineCard({
             transform: [{ scale: cardScale }, { translateY: mountTranslateY }],
           }}
         >
-          <Card
-            style={[
-              styles.card,
-              variant && { backgroundColor: variant.background, borderColor: 'transparent' },
-              isResolved && styles.cardSubdued,
-            ]}
-          >
-            <IconBadge
-              name={categoryIconName(category?.icon)}
-              backgroundColor={colors.surface}
-              iconColor={variant?.accent ?? colors.textSecondary}
-            />
+          <Card style={[styles.card, isResolved && styles.cardSubdued]}>
+            <IconBadge name={categoryIconName(category?.icon)} />
             <View style={styles.main}>
               <Text style={styles.name}>{routine.name}</Text>
               <Text style={styles.subtitle}>{subtitle}</Text>
@@ -216,7 +202,6 @@ export function RoutineCard({
                   // Only a conscious skip stays locked — a completed/exceeded
                   // control remains tappable so a misclick can be undone.
                   disabled={state === 'skipped'}
-                  accentColor={variant?.accent}
                   onComplete={handleComplete}
                   onExceed={handleExceed}
                   testID={`${testID}-complete`}

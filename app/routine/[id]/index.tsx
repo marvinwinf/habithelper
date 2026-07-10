@@ -43,7 +43,6 @@ import { RoutineCalendar, type CalendarDay } from '../../../src/ui/components/Ro
 import { ScreenHeader } from '../../../src/ui/components/ScreenHeader';
 import { StatTile } from '../../../src/ui/components/StatTile';
 import { colors, pressedOpacity, radius, spacing, typography } from '../../../src/ui/theme';
-import { getCategoryColorVariant } from '../../../src/ui/theme/categoryVariant';
 import { categoryIconName } from '../../../src/ui/categoryIcons';
 
 // Same distinguishing treatment as RoutineCard's level-up milestone (T042):
@@ -176,9 +175,6 @@ export default function RoutineDetailScreen() {
     return <View style={styles.screen} testID="routine-detail-loading" />;
   }
 
-  const variant = category
-    ? getCategoryColorVariant(category.baseColor, routine.colorVariantSeed)
-    : undefined;
   const totalCompletions = cache?.totalCompletions ?? 0;
   const levelRank = cache?.levelRank ?? 0;
   // Displayed level numbers are 1-based (mockup: "Im Aufbau, Level 2");
@@ -228,28 +224,11 @@ export default function RoutineDetailScreen() {
       <ScreenHeader title={routine.name} testID="routine-detail-header" />
 
       <Animated.View style={{ transform: [{ scale: statsCardScale }] }}>
-        <Card
-          style={[
-            styles.heroCard,
-            variant && { backgroundColor: variant.background, borderColor: 'transparent' },
-          ]}
-        >
+        <Card style={styles.heroCard}>
           <View style={styles.heroTopRow}>
-            <IconBadge
-              name={categoryIconName(category?.icon)}
-              size="lg"
-              backgroundColor={colors.surface}
-              iconColor={variant?.accent ?? colors.textSecondary}
-            />
+            <IconBadge name={categoryIconName(category?.icon)} size="lg" />
             <View style={styles.heroTopMain}>
-              {category && (
-                <CategoryBadge
-                  label={category.name}
-                  baseColor={category.baseColor}
-                  colorVariantSeed={routine.colorVariantSeed}
-                  icon={category.icon}
-                />
-              )}
+              {category && <CategoryBadge label={category.name} icon={category.icon} />}
               <View style={styles.heroMetaRow}>
                 <View style={styles.heroStreakBlock}>
                   <Text style={styles.heroMetaLabel}>Streak</Text>
@@ -290,7 +269,6 @@ export default function RoutineDetailScreen() {
           </View>
           <ProgressBar
             value={completionsIntoCurrentLevel(totalCompletions) / LEVEL_SEGMENT_SIZE}
-            fillColor={variant?.accent}
             trackColor={colors.surface}
             testID="routine-detail-level-progress"
           />

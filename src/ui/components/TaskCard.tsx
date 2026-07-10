@@ -8,7 +8,6 @@ import { IconBadge } from './IconBadge';
 import { Sheet } from './Sheet';
 import { useMountAnimation } from '../animation/useMountAnimation';
 import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
-import { getCategoryColorVariant } from '../theme/categoryVariant';
 import { categoryIconName } from '../categoryIcons';
 import { todayDateString } from '../../domain/dates';
 
@@ -77,9 +76,6 @@ export function TaskCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const mountAnimation = useMountAnimation();
 
-  const variant = category
-    ? getCategoryColorVariant(category.baseColor, task.colorVariantSeed)
-    : undefined;
   const subtitle = subtitleFor(task, forLater);
 
   function closeMenuThen(action: () => void) {
@@ -101,11 +97,7 @@ export function TaskCard({
         }}
       >
         <Card style={[styles.card, task.isCompleted && styles.cardSubdued]} testID={testID}>
-          <IconBadge
-            name={categoryIconName(category?.icon)}
-            backgroundColor={variant?.background ?? colors.surfaceMuted}
-            iconColor={variant?.accent ?? colors.textSecondary}
-          />
+          <IconBadge name={categoryIconName(category?.icon)} />
           <View style={styles.main}>
             <Text style={styles.title} numberOfLines={1}>
               {task.title}
