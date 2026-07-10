@@ -206,24 +206,29 @@ const styles = StyleSheet.create({
     opacity: pressedOpacity,
   },
   label: {
-    fontSize: typography.bodySmall.fontSize,
-    lineHeight: typography.bodySmall.lineHeight,
-    fontWeight: typography.bodySmall.fontWeight,
+    fontSize: typography.label.fontSize,
+    lineHeight: typography.label.lineHeight,
+    fontWeight: typography.label.fontWeight,
+    letterSpacing: typography.label.letterSpacing,
+    textTransform: typography.label.textTransform,
     color: colors.textSecondary,
   },
+  // Underlined, not boxed — per docs/DESIGN_SYSTEM.md's Buttons and
+  // Interaction direction applied to inputs generally.
   input: {
-    borderWidth: 1,
+    borderBottomWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: typography.body.fontSize,
     color: colors.textPrimary,
-    backgroundColor: colors.surface,
   },
   descriptionInput: {
     minHeight: 80,
     textAlignVertical: 'top',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
   },
   dateRow: {
     flexDirection: 'row',
@@ -247,10 +252,6 @@ const styles = StyleSheet.create({
   dateClear: {
     width: 44,
     height: 44,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -262,6 +263,7 @@ const styles = StyleSheet.create({
   createCategoryLink: {
     fontSize: typography.bodySmall.fontSize,
     color: colors.accent,
+    textDecorationLine: 'underline',
   },
   chipRow: {
     flexDirection: 'row',
@@ -274,10 +276,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    backgroundColor: colors.surface,
   },
   chipSelected: {
-    backgroundColor: colors.accent,
     borderColor: colors.accent,
   },
   chipLabel: {

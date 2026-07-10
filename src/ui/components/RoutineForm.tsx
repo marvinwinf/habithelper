@@ -179,7 +179,7 @@ export function RoutineForm({
       </View>
       <Link
         href="/category/create"
-        style={styles.createCategoryButton}
+        style={styles.createCategoryLink}
         testID="routine-form-create-category-link"
       >
         + Neue Kategorie erstellen
@@ -264,7 +264,7 @@ export function RoutineForm({
                     <Ionicons
                       name={selected ? 'checkmark' : 'remove'}
                       size={typography.bodySmall.fontSize}
-                      color={selected ? colors.textOnAccent : colors.textSecondary}
+                      color={selected ? colors.accent : colors.textSecondary}
                     />
                   </View>
                 </Pressable>
@@ -341,31 +341,28 @@ const styles = StyleSheet.create({
     opacity: pressedOpacity,
   },
   label: {
-    fontSize: typography.bodySmall.fontSize,
-    lineHeight: typography.bodySmall.lineHeight,
-    fontWeight: typography.bodySmall.fontWeight,
+    fontSize: typography.label.fontSize,
+    lineHeight: typography.label.lineHeight,
+    fontWeight: typography.label.fontWeight,
+    letterSpacing: typography.label.letterSpacing,
+    textTransform: typography.label.textTransform,
     color: colors.textSecondary,
   },
+  // Underlined, not boxed — per docs/DESIGN_SYSTEM.md's Buttons and
+  // Interaction direction applied to inputs generally.
   input: {
-    borderWidth: 1,
+    borderBottomWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: typography.body.fontSize,
     color: colors.textPrimary,
-    backgroundColor: colors.surface,
   },
-  // Icon-leading input per the mockup's name/time fields.
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    borderWidth: 1,
+    borderBottomWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface,
   },
   inputRowField: {
     flex: 1,
@@ -373,18 +370,10 @@ const styles = StyleSheet.create({
     fontSize: typography.body.fontSize,
     color: colors.textPrimary,
   },
-  // Dashed outline for "+ Neue Kategorie erstellen", muted so it never
-  // competes with the primary save action. T078 replaces it with a plain
-  // text/icon action.
-  createCategoryButton: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm,
-    textAlign: 'center',
+  createCategoryLink: {
     fontSize: typography.bodySmall.fontSize,
-    color: colors.textSecondary,
+    color: colors.accent,
+    textDecorationLine: 'underline',
   },
   chipRow: {
     flexDirection: 'row',
@@ -400,31 +389,27 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    backgroundColor: colors.surface,
   },
   chipSelected: {
-    backgroundColor: colors.surfaceMuted,
     borderColor: colors.accent,
   },
   chipLabel: {
     fontSize: typography.bodySmall.fontSize,
     color: colors.textPrimary,
   },
-  // Three side-by-side option cards per the mockup's Häufigkeit section.
+  // Three side-by-side underlined options, replacing the colored option
+  // cards — selection reads via a gold underline + gold label, not a fill.
   frequencyRow: {
     flexDirection: 'row',
-    gap: spacing.xs,
+    gap: spacing.md,
   },
   frequencyCard: {
     flex: 1,
     alignItems: 'center',
     gap: spacing.xs,
-    borderWidth: 2,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xs,
-    backgroundColor: colors.surface,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 2,
+    borderColor: 'transparent',
   },
   frequencyCardSelected: {
     borderColor: colors.accent,
@@ -451,26 +436,24 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
   },
   targetCountValue: {
     fontSize: typography.body.fontSize,
     color: colors.textPrimary,
   },
-  // Circular Mo–So toggles inside a sub-card, per the mockup's
-  // "Wochentage auswählen" section.
   weekdayCard: {
-    borderWidth: 1,
+    borderTopWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    padding: spacing.md,
+    paddingTop: spacing.md,
     gap: spacing.sm,
   },
   weekdayCardTitle: {
-    fontSize: typography.bodySmall.fontSize,
-    fontWeight: typography.bodySmall.fontWeight,
-    color: colors.textPrimary,
+    fontSize: typography.label.fontSize,
+    lineHeight: typography.label.lineHeight,
+    fontWeight: typography.label.fontWeight,
+    letterSpacing: typography.label.letterSpacing,
+    textTransform: typography.label.textTransform,
+    color: colors.textSecondary,
   },
   weekdayRow: {
     flexDirection: 'row',
@@ -484,32 +467,35 @@ const styles = StyleSheet.create({
     fontSize: typography.caption.fontSize,
     color: colors.textSecondary,
   },
+  // Hairline outline glyph, mirroring CompletionControl — never a filled
+  // circle (docs/DESIGN_SYSTEM.md's Routine and Task Item Design).
   weekdayCircle: {
     width: 32,
     height: 32,
     borderRadius: radius.full,
-    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   weekdayCircleSelected: {
-    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   advancedToggle: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 1,
+    borderTopWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   advancedToggleLabel: {
-    fontSize: typography.bodySmall.fontSize,
+    fontSize: typography.label.fontSize,
+    lineHeight: typography.label.lineHeight,
+    fontWeight: typography.label.fontWeight,
+    letterSpacing: typography.label.letterSpacing,
+    textTransform: typography.label.textTransform,
     color: colors.textPrimary,
-    fontWeight: typography.bodySmall.fontWeight,
   },
   advancedSection: {
     gap: spacing.sm,
