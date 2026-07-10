@@ -1,11 +1,14 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
+  Animated,
   Pressable,
   StyleSheet,
   Text,
   type GestureResponderEvent,
 } from 'react-native';
 
+import { useCompletionAnimation } from '../animation/useCompletionAnimation';
+import { useReducedMotion } from '../animation/useReducedMotion';
 import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
 
 export interface CompletionControlProps {
@@ -30,6 +33,11 @@ const DEFAULT_LONG_PRESS_THRESHOLD_MS = 500;
  * — the two are mutually exclusive for a single press by construction: the
  * pending timer is what decides which callback fires, and `onPressOut`
  * always cancels it first.
+ *
+ * Visually a hairline outline glyph (never a filled circle/checkbox, per
+ * docs/DESIGN_SYSTEM.md's Routine and Task Item Design) that becomes a gold
+ * check mark on completion, with a thin gold underline drawing in beneath it
+ * — skipped in favor of an instant state change under reduced motion.
  */
 export function CompletionControl({
   onComplete,
@@ -43,6 +51,25 @@ export function CompletionControl({
 }: CompletionControlProps) {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFiredRef = useRef(false);
+  const isDone = completed || exceeded;
+  const wasDoneRef = useRef(isDone);
+  const underline = useCompletionAnimation();
+  const reducedMotion = useReducedMotion();
+
+  useEffect(() => {
+    const wasDone = wasDoneRef.current;
+    wasDoneRef.current = isDone;
+    if (isDone === wasDone) {
+      return;
+    }
+    if (!isDone) {
+      underline.progress.setValue(0);
+    } else if (reducedMotion) {
+      underline.progress.setValue(1);
+    } else {
+      underline.start();
+    }
+  }, [isDone, reducedMotion, underline]);
 
   const clearPendingTimeout = useCallback(() => {
     if (timeoutRef.current !== null) {
@@ -81,8 +108,6 @@ export function CompletionControl({
     [clearPendingTimeout, disabled, onComplete]
   );
 
-  const isDone = completed || exceeded;
-
   return (
     <Pressable
       accessibilityRole="button"
@@ -93,27 +118,37 @@ export function CompletionControl({
       testID={testID}
       style={({ pressed }) => [
         styles.control,
-        {
-          backgroundColor: isDone ? accentColor : colors.surfaceMuted,
-          borderColor: isDone ? 'transparent' : accentColor,
-        },
+        { borderColor: isDone ? 'transparent' : colors.border },
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
       ]}
     >
       {isDone ? (
-        <Text style={styles.checkmark}>{exceeded ? '✓✓' : '✓'}</Text>
+        <Text style={[styles.checkmark, { color: accentColor }]}>
+          {exceeded ? '✓✓' : '✓'}
+        </Text>
       ) : null}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.underline,
+          {
+            backgroundColor: accentColor,
+            transform: [{ scaleX: underline.progress }],
+          },
+        ]}
+      />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   control: {
-    width: spacing.xxl,
-    height: spacing.xxl,
+    width: spacing.xl,
+    height: spacing.xl,
     borderRadius: radius.full,
     borderWidth: 1,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -124,8 +159,15 @@ const styles = StyleSheet.create({
     opacity: pressedOpacity,
   },
   checkmark: {
-    color: colors.textOnAccent,
     fontSize: typography.heading.fontSize,
     fontWeight: typography.heading.fontWeight,
+  },
+  underline: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: -spacing.xs,
+    height: 2,
+    transformOrigin: 'left',
   },
 });

@@ -1,13 +1,55 @@
 // Category color variant mapping (TASKS.md's T014). Per docs/DATA_MODEL.md's
 // Category Color Variants section, `(base_color, color_variant_seed)` must
 // map deterministically to a concrete style value, and items in the same
-// category must only ever get same-family variants. Rather than deriving
-// variants algorithmically (which risks drifting into unrelated hues), this
-// selects among a small set of recipes built purely from the matching
-// family's own token stops (colors.ts) — a re-theme only has to edit those
-// tokens or recipes, never the persisted seeds.
+// category must only ever get same-family variants.
+//
+// The Quiet Atelier direction (docs/DESIGN_SYSTEM.md) retires category color
+// tinting: categories are told apart by name and glyph, never by hue. The
+// pastel families below are therefore no longer design tokens — they live
+// here, next to their only consumer, purely so persisted `base_color` values
+// keep resolving. Nothing in the color token set references them.
 
-import { colors, type CategoryColorFamily } from './colors';
+export const legacyCategoryPalette = {
+  mint: {
+    base: '#8FBFA0',
+    light: '#C9E4D2',
+    lighter: '#E7F4EC',
+    dark: '#5E9A76',
+  },
+  lavender: {
+    base: '#A9A0D6',
+    light: '#D5CFEE',
+    lighter: '#EFEBF9',
+    dark: '#7C71B8',
+  },
+  apricot: {
+    base: '#F0A868',
+    light: '#F7CFA0',
+    lighter: '#FCEBD8',
+    dark: '#D98A44',
+  },
+  skyBlue: {
+    base: '#7FB8D6',
+    light: '#BEE0EE',
+    lighter: '#E5F3F8',
+    dark: '#4F94B8',
+  },
+  softPeach: {
+    base: '#F2A69A',
+    light: '#F8CFC7',
+    lighter: '#FCEBE7',
+    dark: '#DE7E6E',
+  },
+  warmCream: {
+    base: '#D9C7A3',
+    light: '#EBDFC7',
+    lighter: '#F7F1E4',
+    dark: '#B89D6E',
+  },
+} as const;
+
+export type CategoryColorFamily = keyof typeof legacyCategoryPalette;
+export type CategoryColorStop = keyof typeof legacyCategoryPalette.mint;
 
 export interface CategoryColorVariant {
   background: string;
@@ -16,7 +58,9 @@ export interface CategoryColorVariant {
   gradientEnd: string;
 }
 
-type VariantRecipe = (family: (typeof colors.categories)[CategoryColorFamily]) => CategoryColorVariant;
+type VariantRecipe = (
+  family: (typeof legacyCategoryPalette)[CategoryColorFamily]
+) => CategoryColorVariant;
 
 const VARIANT_RECIPES: readonly VariantRecipe[] = [
   (family) => ({
@@ -47,16 +91,16 @@ const VARIANT_RECIPES: readonly VariantRecipe[] = [
 
 function findFamilyByBaseColor(baseColor: string): CategoryColorFamily | undefined {
   const normalized = baseColor.toLowerCase();
-  return (Object.keys(colors.categories) as CategoryColorFamily[]).find(
-    (family) => colors.categories[family].base.toLowerCase() === normalized
+  return (Object.keys(legacyCategoryPalette) as CategoryColorFamily[]).find(
+    (family) => legacyCategoryPalette[family].base.toLowerCase() === normalized
   );
 }
 
 /**
  * Deterministically maps a category's base color and an item's persisted
  * `color_variant_seed` to a concrete, same-family style value. Throws if
- * `baseColor` is not one of docs/DESIGN_SYSTEM.md's palette family base
- * colors, since only those are offered by the category form (T022).
+ * `baseColor` is not one of the legacy palette family base colors, since only
+ * those are offered by the category form (T022).
  */
 export function getCategoryColorVariant(
   baseColor: string,
@@ -71,5 +115,5 @@ export function getCategoryColorVariant(
     ((colorVariantSeed % VARIANT_RECIPES.length) + VARIANT_RECIPES.length) %
     VARIANT_RECIPES.length;
 
-  return VARIANT_RECIPES[recipeIndex](colors.categories[family]);
+  return VARIANT_RECIPES[recipeIndex](legacyCategoryPalette[family]);
 }

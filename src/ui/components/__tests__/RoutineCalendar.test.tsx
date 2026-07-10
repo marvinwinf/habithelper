@@ -1,8 +1,12 @@
 import { render, screen } from '@testing-library/react-native';
 
 import { RoutineCalendar, type CalendarDay } from '../RoutineCalendar';
+import { colors } from '../../theme';
 
 const noop = () => {};
+
+const flatten = (style: unknown) =>
+  Array.isArray(style) ? Object.assign({}, ...style.flat(Infinity).filter(Boolean)) : style;
 
 function renderCalendar(days: CalendarDay[], today?: string) {
   return render(
@@ -46,6 +50,21 @@ describe('RoutineCalendar', () => {
     }
   });
 
+  it('renders the exceeded day number in the on-accent stone for contrast on the gold cell (T082)', async () => {
+    await renderCalendar([
+      { date: '2026-06-01', state: 'completed' },
+      { date: '2026-06-02', state: 'exceeded' },
+    ]);
+
+    // Charcoal-on-gold measured only 3.55:1; the exceeded number switches to
+    // the on-accent stone to clear AA for small text.
+    const exceededNumber = flatten(screen.getByText('2').props.style);
+    expect(exceededNumber.color).toBe(colors.textOnAccent);
+
+    const normalNumber = flatten(screen.getByText('1').props.style);
+    expect(normalNumber.color).toBe(colors.textPrimary);
+  });
+
   it('highlights today with a ring', async () => {
     await renderCalendar(
       [
@@ -54,9 +73,6 @@ describe('RoutineCalendar', () => {
       ],
       '2026-06-02',
     );
-
-    const flatten = (style: unknown) =>
-      Array.isArray(style) ? Object.assign({}, ...style.flat(Infinity).filter(Boolean)) : style;
 
     const todayStyle = flatten(screen.getByTestId('calendar-day-2026-06-02-pending').props.style);
     const otherStyle = flatten(screen.getByTestId('calendar-day-2026-06-01-pending').props.style);

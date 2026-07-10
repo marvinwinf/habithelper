@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -46,12 +45,11 @@ import { isDueTodayOrEarlier } from '../../src/domain/tasks/section';
 import { confirmRoutineDeletion, confirmTaskDeletion } from '../../src/ui/alerts';
 import { triggerFirstCompletionOfDayHaptic } from '../../src/ui/animation/haptics';
 import { useStreakBurst } from '../../src/ui/animation/useStreakBurst';
-import { Card } from '../../src/ui/components/Card';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { ProgressBar } from '../../src/ui/components/ProgressBar';
 import { RoutineCard, type RoutineCardOccurrenceState } from '../../src/ui/components/RoutineCard';
 import { TaskCard } from '../../src/ui/components/TaskCard';
-import { colors, iconBadgeSizes, spacing, typography } from '../../src/ui/theme';
+import { colors, spacing, typography } from '../../src/ui/theme';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('de-DE', {
   weekday: 'long',
@@ -210,9 +208,13 @@ export default function TodayScreen() {
     }
   }
 
-  const streakScale = streakBurst.progress.interpolate({
+  // The first-completion-of-day flourish (T041) is a gold underline drawing
+  // in and back out beneath the streak numeral, not a scale burst — matching
+  // CompletionControl's underline draw-in (docs/DESIGN_SYSTEM.md's Motion
+  // section forbids scale/bounce).
+  const streakUnderlineScale = streakBurst.progress.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: [1, 1.3, 1],
+    outputRange: [0, 1, 0],
   });
 
   const completedRoutineCount = dueRoutines.filter(
@@ -233,23 +235,21 @@ export default function TodayScreen() {
               {formattedDate}
             </Text>
           </View>
-          {/* Subtle per docs/SCREEN_SPECIFICATIONS.md — a compact card, not a
-              dominant element; the first-completion-of-day burst (T041)
-              scales this whole card. */}
-          <Animated.View style={{ transform: [{ scale: streakScale }] }}>
-            <Card style={styles.streakCard}>
-              <Ionicons name="flame" size={iconBadgeSizes.sm.icon} color={colors.streakFlame} />
-              <View>
-                <Text style={styles.streakLabel}>Gesamt-Streak</Text>
-                <Text style={styles.streakValue} testID="today-app-streak">
-                  {appStreak?.currentStreak ?? 0}
-                </Text>
-              </View>
-            </Card>
-          </Animated.View>
+          {/* Typographic, not a card — the streak numeral itself, set in the
+              serif face, is the primary visual per docs/DESIGN_SYSTEM.md's
+              Streak and Progress Visualization section. */}
+          <View style={styles.streakBlock}>
+            <Text style={styles.streakLabel}>Gesamt-Streak</Text>
+            <Text style={styles.streakValue} testID="today-app-streak">
+              {appStreak?.currentStreak ?? 0}
+            </Text>
+            <Animated.View
+              style={[styles.streakUnderline, { transform: [{ scaleX: streakUnderlineScale }] }]}
+            />
+          </View>
         </View>
 
-        <Card style={styles.progressCard}>
+        <View style={styles.progressBlock}>
           <View style={styles.progressHeaderRow}>
             <Text style={styles.progressTitle}>Heutige Routinen</Text>
             <Text style={styles.progressCount} testID="today-routine-progress">
@@ -260,7 +260,7 @@ export default function TodayScreen() {
             value={dueRoutines.length === 0 ? 0 : completedRoutineCount / dueRoutines.length}
             testID="today-routine-progress-bar"
           />
-        </Card>
+        </View>
       </View>
 
       {dueRoutines.length === 0 && todayTasks.length === 0 && laterTasks.length === 0 ? (
@@ -414,9 +414,10 @@ const styles = StyleSheet.create({
   },
   headerGreetingBlock: {
     flex: 1,
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   greeting: {
+    fontFamily: typography.title.fontFamily,
     fontSize: typography.title.fontSize,
     lineHeight: typography.title.lineHeight,
     fontWeight: typography.title.fontWeight,
@@ -426,12 +427,8 @@ const styles = StyleSheet.create({
     fontSize: typography.body.fontSize,
     color: colors.textSecondary,
   },
-  streakCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
+  streakBlock: {
+    alignItems: 'flex-end',
   },
   streakLabel: {
     fontSize: typography.caption.fontSize,
@@ -440,14 +437,21 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   streakValue: {
-    fontSize: typography.heading.fontSize,
-    lineHeight: typography.heading.lineHeight,
-    fontWeight: typography.heading.fontWeight,
+    fontFamily: typography.streak.fontFamily,
+    fontSize: typography.streak.fontSize,
+    lineHeight: typography.streak.lineHeight,
+    fontWeight: typography.streak.fontWeight,
     color: colors.textPrimary,
   },
-  progressCard: {
+  streakUnderline: {
+    marginTop: spacing.xs,
+    width: '100%',
+    height: 2,
+    backgroundColor: colors.accent,
+    transformOrigin: 'left',
+  },
+  progressBlock: {
     gap: spacing.xs,
-    paddingVertical: spacing.sm,
   },
   progressHeaderRow: {
     flexDirection: 'row',
@@ -467,8 +471,11 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   sectionTitle: {
-    fontSize: typography.bodySmall.fontSize,
-    fontWeight: typography.bodySmall.fontWeight,
+    fontSize: typography.label.fontSize,
+    lineHeight: typography.label.lineHeight,
+    fontWeight: typography.label.fontWeight,
+    letterSpacing: typography.label.letterSpacing,
+    textTransform: typography.label.textTransform,
     color: colors.textSecondary,
     marginBottom: spacing.xs,
   },

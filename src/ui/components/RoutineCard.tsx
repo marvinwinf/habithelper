@@ -1,9 +1,7 @@
 import { useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from './Button';
-import { Card } from './Card';
 import { CompletionControl } from './CompletionControl';
 import { IconBadge } from './IconBadge';
 import { Sheet } from './Sheet';
@@ -12,29 +10,19 @@ import {
   triggerLevelMilestoneHaptic,
   triggerRoutineCompletionHaptic,
 } from '../animation/haptics';
-import { useCompletionAnimation } from '../animation/useCompletionAnimation';
 import { useLevelUpAnimation } from '../animation/useLevelUpAnimation';
 import { useMountAnimation } from '../animation/useMountAnimation';
 import { colors, pressedOpacity, spacing, typography } from '../theme';
-import { getCategoryColorVariant } from '../theme/categoryVariant';
 import { categoryIconName } from '../categoryIcons';
 import { scheduleFromRoutineRow } from '../../domain/routines/schedule';
 import { scheduleLabel } from '../../domain/routines/scheduleLabel';
 import type { ScheduleType } from '../../data/db/schema';
 
-// Same short pulse for both, scaled to a visibly bigger peak for exceeded —
-// "exceeded completion receives a stronger animation" (docs/ROUTINE_RULES.md)
-// — rather than a second animation hook, since the two only ever differ in
-// magnitude, not timing or shape.
-const NORMAL_SCALE_PEAK = 1.12;
-const EXCEEDED_SCALE_PEAK = 1.35;
-// The level-up milestone scales the whole card, not just the completion
-// control, so it reads as visually distinct from a normal/exceeded pulse
-// (T042) rather than just a bigger version of the same effect.
-const LEVEL_UP_CARD_SCALE_PEAK = 1.05;
-// How far the card rises into place during its mount animation — small
-// enough to read as a soft settle, not a slide-in.
-const MOUNT_RISE_DISTANCE = 8;
+// The level-up milestone briefly dims the whole row (an opacity dip, not a
+// scale/bounce, per docs/DESIGN_SYSTEM.md's fade-only Motion section) so it
+// reads as visually distinct from a normal/exceeded completion (T042), which
+// only shows via CompletionControl's own gold underline draw-in.
+const LEVEL_UP_FADE_OPACITY = 0.4;
 
 export type RoutineCardOccurrenceState = 'pending' | 'completed' | 'exceeded' | 'skipped';
 
@@ -81,11 +69,11 @@ export interface RoutineCardProps {
 }
 
 /**
- * A single routine's Today-screen card, per docs/SCREEN_SPECIFICATIONS.md's
- * Routine Card and the design reference mockup: category-tinted background,
- * rounded icon container, "time · schedule" subtitle, flame streak line,
- * category-tinted completion control, and an overflow menu wired to
- * docs/ROUTINE_RULES.md's per-occurrence actions (T030/T065).
+ * A single routine's Today-screen row, per docs/DESIGN_SYSTEM.md's Routine
+ * and Task Item Design: a single-surface hairline-divided row (no card, no
+ * category tint), a "time · schedule" subtitle, a serif streak numeral, and
+ * an overflow menu wired to docs/ROUTINE_RULES.md's per-occurrence actions
+ * (T030/T065).
  */
 export function RoutineCard({
   routine,
@@ -104,16 +92,12 @@ export function RoutineCard({
   testID,
 }: RoutineCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [lastAction, setLastAction] = useState<'complete' | 'exceed' | null>(null);
-  const completionAnimation = useCompletionAnimation();
   const levelUpAnimation = useLevelUpAnimation();
   const mountAnimation = useMountAnimation();
   const isResolved = state !== 'pending';
   const isCompletedOrExceeded = state === 'completed' || state === 'exceeded';
+  const isSkipped = state === 'skipped';
 
-  const variant = category
-    ? getCategoryColorVariant(category.baseColor, routine.colorVariantSeed)
-    : undefined;
   const subtitle = [routine.timeOfDay, scheduleLabel(scheduleFromRoutineRow(routine))]
     .filter(Boolean)
     .join(' · ');
@@ -137,8 +121,6 @@ export function RoutineCard({
       await onUndo();
       return;
     }
-    setLastAction('complete');
-    completionAnimation.start();
     triggerRoutineCompletionHaptic();
     maybeStartLevelUpMilestone(await onComplete());
   }
@@ -148,26 +130,17 @@ export function RoutineCard({
       await onUndo();
       return;
     }
-    setLastAction('exceed');
-    completionAnimation.start();
     triggerExceededCompletionHaptic();
     maybeStartLevelUpMilestone(await onExceed());
   }
 
-  const completionScale = completionAnimation.progress.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [1, lastAction === 'exceed' ? EXCEEDED_SCALE_PEAK : NORMAL_SCALE_PEAK, 1],
-  });
-
-  const cardScale = levelUpAnimation.progress.interpolate({
+  // Mount fades the row in (0→1); a level-up milestone briefly dips it (1→0.4
+  // and back). Multiplied so both drive the single opacity with no transform.
+  const levelUpDip = levelUpAnimation.progress.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, LEVEL_UP_CARD_SCALE_PEAK],
+    outputRange: [1, LEVEL_UP_FADE_OPACITY],
   });
-
-  const mountTranslateY = mountAnimation.progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [MOUNT_RISE_DISTANCE, 0],
-  });
+  const rowOpacity = Animated.multiply(mountAnimation.progress, levelUpDip);
 
   return (
     <>
@@ -176,52 +149,28 @@ export function RoutineCard({
         testID={testID}
         style={({ pressed }) => pressed && styles.pressed}
       >
-        <Animated.View
-          style={{
-            opacity: mountAnimation.progress,
-            transform: [{ scale: cardScale }, { translateY: mountTranslateY }],
-          }}
-        >
-          <Card
-            style={[
-              styles.card,
-              variant && { backgroundColor: variant.background, borderColor: 'transparent' },
-              isResolved && styles.cardSubdued,
-            ]}
-          >
-            <IconBadge
-              name={categoryIconName(category?.icon)}
-              backgroundColor={colors.surface}
-              iconColor={variant?.accent ?? colors.textSecondary}
-            />
+        <Animated.View style={{ opacity: rowOpacity }}>
+          <View style={styles.row}>
+            <IconBadge name={categoryIconName(category?.icon)} />
             <View style={styles.main}>
-              <Text style={styles.name}>{routine.name}</Text>
-              <Text style={styles.subtitle}>{subtitle}</Text>
-              <View style={styles.streakRow}>
-                <Ionicons
-                  name="flame"
-                  size={typography.caption.fontSize}
-                  color={colors.streakFlame}
-                />
-                <Text style={styles.streak} testID={testID ? `${testID}-streak` : undefined}>
-                  Streak {streak}
-                </Text>
+              <Text style={[styles.name, isSkipped && styles.nameSkipped]}>{routine.name}</Text>
+              {subtitle.length > 0 && <Text style={styles.subtitle}>{subtitle}</Text>}
+              <View style={styles.streakRow} testID={testID ? `${testID}-streak` : undefined}>
+                <Text style={styles.streakLabel}>Streak </Text>
+                <Text style={styles.streakValue}>{streak}</Text>
               </View>
             </View>
             <View style={styles.actions}>
-              <Animated.View style={{ transform: [{ scale: completionScale }] }}>
-                <CompletionControl
-                  completed={state === 'completed'}
-                  exceeded={state === 'exceeded'}
-                  // Only a conscious skip stays locked — a completed/exceeded
-                  // control remains tappable so a misclick can be undone.
-                  disabled={state === 'skipped'}
-                  accentColor={variant?.accent}
-                  onComplete={handleComplete}
-                  onExceed={handleExceed}
-                  testID={`${testID}-complete`}
-                />
-              </Animated.View>
+              <CompletionControl
+                completed={state === 'completed'}
+                exceeded={state === 'exceeded'}
+                // Only a conscious skip stays locked — a completed/exceeded
+                // control remains tappable so a misclick can be undone.
+                disabled={isSkipped}
+                onComplete={handleComplete}
+                onExceed={handleExceed}
+                testID={`${testID}-complete`}
+              />
               <Button
                 label="⋯"
                 variant="secondary"
@@ -229,7 +178,7 @@ export function RoutineCard({
                 testID={`${testID}-menu-button`}
               />
             </View>
-          </Card>
+          </View>
         </Animated.View>
       </Pressable>
 
@@ -281,37 +230,46 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: pressedOpacity,
   },
-  card: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.sm,
-  },
-  cardSubdued: {
-    opacity: 0.5,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   main: {
     flex: 1,
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   name: {
+    fontFamily: typography.body.fontFamily,
     fontSize: typography.body.fontSize,
     fontWeight: typography.heading.fontWeight,
     color: colors.textPrimary,
   },
+  nameSkipped: {
+    color: colors.textSecondary,
+  },
   subtitle: {
+    fontFamily: typography.caption.fontFamily,
     fontSize: typography.caption.fontSize,
     color: colors.textSecondary,
   },
   streakRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xxs,
+    alignItems: 'baseline',
   },
-  streak: {
+  streakLabel: {
+    fontFamily: typography.caption.fontFamily,
     fontSize: typography.caption.fontSize,
-    fontWeight: typography.caption.fontWeight,
     color: colors.textSecondary,
+  },
+  streakValue: {
+    fontFamily: typography.title.fontFamily,
+    fontSize: 20,
+    color: colors.textPrimary,
   },
   actions: {
     flexDirection: 'row',

@@ -1,8 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { CategoryForm } from '../CategoryForm';
-import { colors } from '../../theme';
-import { getCategoryColorVariant } from '../../theme/categoryVariant';
+import { legacyCategoryPalette } from '../../theme/categoryVariant';
 import { CATEGORY_ICON_OPTIONS } from '../../categoryIcons';
 
 describe('CategoryForm', () => {
@@ -27,41 +26,46 @@ describe('CategoryForm', () => {
     expect(screen.getByTestId('category-form-save').props.accessibilityState.disabled).toBe(true);
   });
 
-  it('offers all six palette families from the design system', async () => {
+  it('offers no color palette picker (Quiet Atelier: categories distinguished by name and glyph, not color)', async () => {
     await render(<CategoryForm onSubmit={jest.fn()} />);
 
-    for (const family of Object.keys(colors.categories)) {
-      expect(screen.getByTestId(`category-form-color-${family}`)).toBeTruthy();
+    for (const family of Object.keys(legacyCategoryPalette)) {
+      expect(screen.queryByTestId(`category-form-color-${family}`)).toBeNull();
     }
+    expect(screen.queryByText('Farbe')).toBeNull();
   });
 
-  it('updates the live preview when a different color is selected', async () => {
+  it('shows the entered name in the live preview', async () => {
     await render(<CategoryForm onSubmit={jest.fn()} initialName="Sport" />);
 
-    await fireEvent.press(screen.getByTestId('category-form-color-lavender'));
-
-    const preview = screen.getByTestId('category-form-preview');
-    const style = Array.isArray(preview.props.style)
-      ? Object.assign({}, ...preview.props.style.filter(Boolean))
-      : preview.props.style;
-
-    const expectedVariant = getCategoryColorVariant(colors.categories.lavender.base, 0);
-    expect(style.backgroundColor).toBe(expectedVariant.background);
+    expect(screen.getByTestId('category-form-preview')).toBeTruthy();
+    expect(screen.getByText('Sport')).toBeTruthy();
   });
 
-  it('calls onSubmit with the trimmed name and selected base color', async () => {
+  it('calls onSubmit with the trimmed name and a stable base color', async () => {
     const onSubmit = jest.fn();
     await render(<CategoryForm onSubmit={onSubmit} />);
 
     await fireEvent.changeText(screen.getByTestId('category-form-name-input'), '  Sport  ');
-    await fireEvent.press(screen.getByTestId('category-form-color-apricot'));
     await fireEvent.press(screen.getByTestId('category-form-save'));
 
     expect(onSubmit).toHaveBeenCalledWith({
       name: 'Sport',
-      baseColor: colors.categories.apricot.base,
+      baseColor: expect.any(String),
       icon: null,
     });
+  });
+
+  it('preserves an existing category base color unchanged, since it is no longer user-editable', async () => {
+    const onSubmit = jest.fn();
+    const existingBaseColor = legacyCategoryPalette.apricot.base;
+    await render(
+      <CategoryForm onSubmit={onSubmit} initialName="Sport" initialBaseColor={existingBaseColor} />
+    );
+
+    await fireEvent.press(screen.getByTestId('category-form-save'));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ baseColor: existingBaseColor }));
   });
 
   it('offers the curated icon set and submits the selected icon', async () => {

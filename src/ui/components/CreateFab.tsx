@@ -56,23 +56,16 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: spacing.lg,
-    // Clears the floating tab bar (64dp tall + its 12dp bottom margin,
-    // see app/(tabs)/_layout.tsx) with breathing room above it, so it
-    // overlaps content but never the bar's touch targets.
-    bottom: 92,
+    // Clears the flat tab bar (64dp tall, flush to the screen bottom, see
+    // app/(tabs)/_layout.tsx) with breathing room above it, so it overlaps
+    // content but never the bar's touch targets.
+    bottom: 80,
     width: 56,
     height: 56,
     borderRadius: radius.full,
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    // Soft, same-family elevation rather than a hard drop shadow, per
-    // docs/DESIGN_SYSTEM.md's "subtle same-family gradients" direction.
-    shadowColor: colors.textPrimary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
   },
   fabPressed: {
     opacity: pressedOpacity,

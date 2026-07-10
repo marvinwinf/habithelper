@@ -1,73 +1,59 @@
-import { colors, iconBadgeSizes, radius, shadows, spacing, typography } from '../index';
+import {
+  colors,
+  colorsDark,
+  fontFamilies,
+  iconBadgeSizes,
+  radius,
+  spacing,
+  typography,
+} from '../index';
 
 const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 
 describe('color tokens', () => {
-  it('defines every flat color as a valid hex string', () => {
-    const flatKeys: (keyof typeof colors)[] = [
-      'background',
-      'surface',
-      'surfaceMuted',
-      'border',
-      'textPrimary',
-      'textSecondary',
-      'textOnAccent',
-      'accent',
-      'destructive',
-      'success',
-    ];
-
-    for (const key of flatKeys) {
-      expect(colors[key]).toMatch(HEX_COLOR);
-    }
+  it('defines the Quiet Atelier light palette as valid hex strings', () => {
+    expect(colors).toEqual({
+      background: '#FAFAF9',
+      surface: '#FFFFFF',
+      surfaceMuted: '#F2F0EC',
+      border: '#E7E4DD',
+      textPrimary: '#1C1917',
+      textSecondary: '#78716C',
+      textOnAccent: '#FAFAF9',
+      accent: '#A16207',
+      missed: '#8F5A49',
+      destructive: '#8F5A49',
+    });
   });
 
-  it('defines each category family with a full, same-family set of tonal stops', () => {
-    const expectedFamilies = [
-      'mint',
-      'lavender',
-      'apricot',
-      'skyBlue',
-      'softPeach',
-      'warmCream',
-    ] as const;
-    const expectedStops = ['base', 'light', 'lighter', 'dark'] as const;
-
-    expect(Object.keys(colors.categories).sort()).toEqual(
-      [...expectedFamilies].sort()
-    );
-
-    for (const family of expectedFamilies) {
-      const stops = colors.categories[family];
-      expect(Object.keys(stops).sort()).toEqual([...expectedStops].sort());
-      for (const stop of expectedStops) {
-        expect(stops[stop]).toMatch(HEX_COLOR);
-      }
+  it('defines a matching dark palette for future use', () => {
+    expect(Object.keys(colorsDark).sort()).toEqual(Object.keys(colors).sort());
+    for (const value of Object.values(colorsDark)) {
+      expect(value).toMatch(HEX_COLOR);
     }
+    expect(colorsDark.accent).toBe('#C08A2E');
+  });
+
+  it('carries no pastel category families and no green success color', () => {
+    expect(colors).not.toHaveProperty('categories');
+    expect(colors).not.toHaveProperty('success');
+    expect(colors).not.toHaveProperty('streakFlame');
+  });
+
+  it('uses one rose for both the missed state and destructive actions', () => {
+    expect(colors.missed).toBe(colors.destructive);
   });
 });
 
 describe('spacing tokens', () => {
-  it('defines a monotonically increasing scale of positive numbers', () => {
-    const values = Object.values(spacing);
-    expect(values.every((value) => typeof value === 'number' && value > 0)).toBe(
-      true
-    );
-    const sorted = [...values].sort((a, b) => a - b);
-    expect(values).toEqual(sorted);
+  it('defines the 8/12/20/32/48 scale', () => {
+    expect(spacing).toEqual({ xs: 8, sm: 12, md: 20, lg: 32, xl: 48 });
   });
 });
 
 describe('radius tokens', () => {
-  it('defines a monotonically increasing scale of positive numbers', () => {
-    const { full, ...scale } = radius;
-    const values = Object.values(scale);
-    expect(values.every((value) => typeof value === 'number' && value > 0)).toBe(
-      true
-    );
-    const sorted = [...values].sort((a, b) => a - b);
-    expect(values).toEqual(sorted);
-    expect(full).toBeGreaterThan(Math.max(...values));
+  it('defines the near-square 2/4 scale plus a rare pill', () => {
+    expect(radius).toEqual({ sm: 2, md: 4, full: 999 });
   });
 });
 
@@ -78,21 +64,31 @@ describe('typography tokens', () => {
       expect(style.lineHeight).toBeGreaterThan(style.fontSize);
       expect(Number(style.fontWeight)).toBeGreaterThanOrEqual(100);
       expect(Number(style.fontWeight)).toBeLessThanOrEqual(900);
+      expect(style.fontFamily).toBeTruthy();
     }
   });
-});
 
-describe('shadow tokens', () => {
-  it('defines a low-contrast soft shadow usable on both platforms', () => {
-    expect(shadows.soft.shadowOpacity).toBeGreaterThan(0);
-    expect(shadows.soft.shadowOpacity).toBeLessThan(0.2);
-    expect(shadows.soft.elevation).toBeGreaterThan(0);
-    expect(shadows.soft.shadowColor).toMatch(HEX_COLOR);
+  it('reserves the serif face for titles, display text, and streak numerals', () => {
+    const serifTokens = ['display', 'title', 'streak'] as const;
+    for (const token of serifTokens) {
+      expect(typography[token].fontFamily).toBe(fontFamilies.serif);
+    }
+
+    const sansTokens = ['heading', 'body', 'bodySmall', 'caption', 'label'] as const;
+    for (const token of sansTokens) {
+      expect(typography[token].fontFamily).toBe(fontFamilies.sans);
+    }
+  });
+
+  it('gives the label style small-caps-style tracking rather than extra size', () => {
+    expect(typography.label.textTransform).toBe('uppercase');
+    expect(typography.label.letterSpacing).toBeGreaterThan(0);
+    expect(typography.label.fontSize).toBe(typography.caption.fontSize);
   });
 });
 
 describe('icon badge size tokens', () => {
-  it('defines an increasing container/icon/radius scale for sm, md, lg', () => {
+  it('defines an increasing container/icon scale for sm, md, lg', () => {
     const order: (keyof typeof iconBadgeSizes)[] = ['sm', 'md', 'lg'];
     for (let i = 1; i < order.length; i++) {
       const prev = iconBadgeSizes[order[i - 1]];
@@ -100,6 +96,12 @@ describe('icon badge size tokens', () => {
       expect(next.container).toBeGreaterThan(prev.container);
       expect(next.icon).toBeGreaterThan(prev.icon);
       expect(next.icon).toBeLessThan(next.container);
+    }
+  });
+
+  it('keeps icon containers near-square', () => {
+    for (const size of Object.values(iconBadgeSizes)) {
+      expect(size.radius).toBe(radius.md);
     }
   });
 });

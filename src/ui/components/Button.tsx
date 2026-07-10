@@ -17,17 +17,30 @@ export interface ButtonProps {
   testID?: string;
 }
 
+// Per docs/DESIGN_SYSTEM.md's Buttons and Interaction section: solid
+// charcoal-on-stone primary, an underlined (not filled/ghost) secondary, and
+// a rose outline for destructive — gold is reserved for meaning-carrying
+// elements (primary action feedback, streak, completion), never a button fill.
 const VARIANT_STYLES: Record<
   ButtonVariant,
-  { background: string; text: string; borderColor?: string }
+  { background: string; text: string; borderColor: string; underline?: boolean }
 > = {
-  primary: { background: colors.accent, text: colors.textOnAccent },
-  secondary: {
-    background: colors.surfaceMuted,
-    text: colors.textPrimary,
-    borderColor: colors.border,
+  primary: {
+    background: colors.textPrimary,
+    text: colors.textOnAccent,
+    borderColor: 'transparent',
   },
-  destructive: { background: colors.destructive, text: colors.textOnAccent },
+  secondary: {
+    background: 'transparent',
+    text: colors.textPrimary,
+    borderColor: 'transparent',
+    underline: true,
+  },
+  destructive: {
+    background: 'transparent',
+    text: colors.destructive,
+    borderColor: colors.destructive,
+  },
 };
 
 export function Button({
@@ -50,13 +63,21 @@ export function Button({
         styles.base,
         {
           backgroundColor: variantStyle.background,
-          borderColor: variantStyle.borderColor ?? 'transparent',
+          borderColor: variantStyle.borderColor,
         },
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
       ]}
     >
-      <Text style={[styles.label, { color: variantStyle.text }]}>{label}</Text>
+      <Text
+        style={[
+          styles.label,
+          { color: variantStyle.text },
+          variantStyle.underline && styles.labelUnderline,
+        ]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -67,6 +88,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
+    // Keeps every button a >=44dp touch target regardless of its short
+    // small-caps label (docs/DESIGN_SYSTEM.md's Accessibility section, T082);
+    // padding alone left the caption-sized label at ~40dp.
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -77,8 +102,13 @@ const styles = StyleSheet.create({
     opacity: pressedOpacity,
   },
   label: {
-    fontSize: typography.body.fontSize,
-    lineHeight: typography.body.lineHeight,
-    fontWeight: typography.body.fontWeight,
+    fontSize: typography.label.fontSize,
+    lineHeight: typography.label.lineHeight,
+    fontWeight: typography.label.fontWeight,
+    letterSpacing: typography.label.letterSpacing,
+    textTransform: typography.label.textTransform,
+  },
+  labelUnderline: {
+    textDecorationLine: 'underline',
   },
 });

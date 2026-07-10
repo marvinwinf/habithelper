@@ -41,15 +41,14 @@ import { IconBadge } from '../../../src/ui/components/IconBadge';
 import { ProgressBar } from '../../../src/ui/components/ProgressBar';
 import { RoutineCalendar, type CalendarDay } from '../../../src/ui/components/RoutineCalendar';
 import { ScreenHeader } from '../../../src/ui/components/ScreenHeader';
-import { StatTile } from '../../../src/ui/components/StatTile';
 import { colors, pressedOpacity, radius, spacing, typography } from '../../../src/ui/theme';
-import { getCategoryColorVariant } from '../../../src/ui/theme/categoryVariant';
 import { categoryIconName } from '../../../src/ui/categoryIcons';
 
 // Same distinguishing treatment as RoutineCard's level-up milestone (T042):
-// scales the whole stats card, not just a single number, so it reads as
-// visually distinct from ordinary stat updates.
-const LEVEL_UP_CARD_SCALE_PEAK = 1.05;
+// a brief fade dip across the whole hero, not just a single number, so it
+// reads as visually distinct from ordinary stat updates — a fade, not a
+// scale burst, per docs/DESIGN_SYSTEM.md's Motion section.
+const LEVEL_UP_FADE_OPACITY = 0.4;
 
 const WEEKDAY_LABELS: { day: IsoWeekday; label: string }[] = [
   { day: 1, label: 'Mo' },
@@ -167,18 +166,15 @@ export default function RoutineDetailScreen() {
     ]);
   }
 
-  const statsCardScale = levelUpAnimation.progress.interpolate({
+  const heroOpacity = levelUpAnimation.progress.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, LEVEL_UP_CARD_SCALE_PEAK],
+    outputRange: [1, LEVEL_UP_FADE_OPACITY],
   });
 
   if (!routine) {
     return <View style={styles.screen} testID="routine-detail-loading" />;
   }
 
-  const variant = category
-    ? getCategoryColorVariant(category.baseColor, routine.colorVariantSeed)
-    : undefined;
   const totalCompletions = cache?.totalCompletions ?? 0;
   const levelRank = cache?.levelRank ?? 0;
   // Displayed level numbers are 1-based (mockup: "Im Aufbau, Level 2");
@@ -227,102 +223,56 @@ export default function RoutineDetailScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <ScreenHeader title={routine.name} testID="routine-detail-header" />
 
-      <Animated.View style={{ transform: [{ scale: statsCardScale }] }}>
-        <Card
-          style={[
-            styles.heroCard,
-            variant && { backgroundColor: variant.background, borderColor: 'transparent' },
-          ]}
-        >
-          <View style={styles.heroTopRow}>
-            <IconBadge
-              name={categoryIconName(category?.icon)}
-              size="lg"
-              backgroundColor={colors.surface}
-              iconColor={variant?.accent ?? colors.textSecondary}
-            />
-            <View style={styles.heroTopMain}>
-              {category && (
-                <CategoryBadge
-                  label={category.name}
-                  baseColor={category.baseColor}
-                  colorVariantSeed={routine.colorVariantSeed}
-                  icon={category.icon}
-                />
-              )}
-              <View style={styles.heroMetaRow}>
-                <View style={styles.heroStreakBlock}>
-                  <Text style={styles.heroMetaLabel}>Streak</Text>
-                  <View style={styles.heroStreakRow}>
-                    <Ionicons
-                      name="flame"
-                      size={typography.body.fontSize}
-                      color={colors.streakFlame}
-                    />
-                    <Text style={styles.heroMetaValue} testID="routine-detail-streak">
-                      {cache?.currentStreak ?? 0} Tage
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.heroLevelBlock}>
-                  <View style={styles.levelBadge}>
-                    <Text style={styles.levelBadgeNumber}>{levelNumber}</Text>
-                  </View>
-                  <View>
-                    <Text style={styles.heroMetaValue} testID="routine-detail-level">
-                      {levelName(levelRank)}
-                    </Text>
-                    <Text style={styles.heroMetaLabel}>Level {levelNumber}</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
+      <Animated.View style={[styles.heroCard, { opacity: heroOpacity }]}>
+        <View style={styles.heroTopRow}>
+          <IconBadge name={categoryIconName(category?.icon)} size="lg" />
+          <View style={styles.heroTopMain}>
+            {category && <CategoryBadge label={category.name} icon={category.icon} />}
+            <Text style={styles.heroStreakValue} testID="routine-detail-streak">
+              {cache?.currentStreak ?? 0} Tage
+            </Text>
+            <Text style={styles.heroMetaLabel}>Streak</Text>
           </View>
+        </View>
 
-          <View style={styles.heroProgressRow}>
-            <Text style={styles.heroMetaLabel} testID="routine-detail-remaining">
-              Noch {remainingCompletionsToNextLevel(totalCompletions)} Abschlüsse bis Level{' '}
-              {levelNumber + 1}
-            </Text>
-            <Text style={styles.heroMetaLabel} testID="routine-detail-progress-count">
-              {completionsIntoCurrentLevel(totalCompletions)} / {LEVEL_SEGMENT_SIZE}
-            </Text>
-          </View>
-          <ProgressBar
-            value={completionsIntoCurrentLevel(totalCompletions) / LEVEL_SEGMENT_SIZE}
-            fillColor={variant?.accent}
-            trackColor={colors.surface}
-            testID="routine-detail-level-progress"
-          />
-          {(cache?.currentStreak ?? 0) < LEVEL_SEGMENT_SIZE && (
-            <Text style={styles.heroMetaLabel} testID="routine-detail-jokers">
-              Joker: {cache?.jokerInventory ?? 0}/2
-            </Text>
-          )}
-        </Card>
+        <Text style={styles.heroMetaValue} testID="routine-detail-level">
+          {levelName(levelRank)}
+        </Text>
+        <Text style={styles.heroMetaLabel}>Level {levelNumber}</Text>
+
+        <View style={styles.heroProgressRow}>
+          <Text style={styles.heroMetaLabel} testID="routine-detail-remaining">
+            Noch {remainingCompletionsToNextLevel(totalCompletions)} Abschlüsse bis Level{' '}
+            {levelNumber + 1}
+          </Text>
+          <Text style={styles.heroMetaLabel} testID="routine-detail-progress-count">
+            {completionsIntoCurrentLevel(totalCompletions)} / {LEVEL_SEGMENT_SIZE}
+          </Text>
+        </View>
+        <ProgressBar
+          value={completionsIntoCurrentLevel(totalCompletions) / LEVEL_SEGMENT_SIZE}
+          testID="routine-detail-level-progress"
+        />
+        {(cache?.currentStreak ?? 0) < LEVEL_SEGMENT_SIZE && (
+          <Text style={styles.heroMetaLabel} testID="routine-detail-jokers">
+            Joker: {cache?.jokerInventory ?? 0}/2
+          </Text>
+        )}
       </Animated.View>
 
-      <View style={styles.tileRow}>
-        <StatTile
-          icon="flame"
-          iconColor={colors.streakFlame}
-          label="Streak"
-          value={`${cache?.currentStreak ?? 0} Tage`}
-        />
-        <StatTile
-          icon="trophy"
-          iconColor={colors.streakFlame}
-          label="Rekord"
-          value={`${cache?.bestStreak ?? 0} Tage`}
-          testID="routine-detail-best-streak"
-        />
-        <StatTile
-          icon="repeat"
-          iconColor={colors.accent}
-          label="Wiederholungen"
-          value={`${totalCompletions}`}
-          testID="routine-detail-total-completions"
-        />
+      <View style={styles.statRow}>
+        <View style={styles.statBlock}>
+          <Text style={styles.statLabel}>Streak</Text>
+          <Text style={styles.statValue}>{`${cache?.currentStreak ?? 0} Tage`}</Text>
+        </View>
+        <View style={styles.statBlock} testID="routine-detail-best-streak">
+          <Text style={styles.statLabel}>Rekord</Text>
+          <Text style={styles.statValue}>{`${cache?.bestStreak ?? 0} Tage`}</Text>
+        </View>
+        <View style={styles.statBlock} testID="routine-detail-total-completions">
+          <Text style={styles.statLabel}>Wiederholungen</Text>
+          <Text style={styles.statValue}>{`${totalCompletions}`}</Text>
+        </View>
       </View>
 
       {routine.scheduleType === 'weekly_target' && (
@@ -348,7 +298,7 @@ export default function RoutineDetailScreen() {
                     <Ionicons
                       name={selected ? 'checkmark' : 'remove'}
                       size={typography.bodySmall.fontSize}
-                      color={selected ? colors.textOnAccent : colors.textSecondary}
+                      color={selected ? colors.accent : colors.textSecondary}
                     />
                   </View>
                 </Pressable>
@@ -394,31 +344,17 @@ export default function RoutineDetailScreen() {
         <Pressable
           accessibilityRole="button"
           onPress={() => router.push(`/routine/${id}/edit`)}
-          style={({ pressed }) => [
-            styles.actionButton,
-            styles.editButton,
-            pressed && styles.pressed,
-          ]}
+          style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
           testID="routine-detail-edit"
         >
-          <Ionicons name="pencil" size={typography.body.fontSize} color={colors.accent} />
           <Text style={[styles.actionLabel, styles.editLabel]}>Bearbeiten</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
           onPress={handleTogglePause}
-          style={({ pressed }) => [
-            styles.actionButton,
-            styles.pauseButton,
-            pressed && styles.pressed,
-          ]}
+          style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
           testID="routine-detail-pause"
         >
-          <Ionicons
-            name={routine.isPaused ? 'play' : 'pause'}
-            size={typography.body.fontSize}
-            color={colors.streakFlame}
-          />
           <Text style={[styles.actionLabel, styles.pauseLabel]}>
             {routine.isPaused ? 'Reaktivieren' : 'Pausieren'}
           </Text>
@@ -441,7 +377,10 @@ const styles = StyleSheet.create({
     opacity: pressedOpacity,
   },
   heroCard: {
-    gap: spacing.sm,
+    gap: spacing.xs,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -451,36 +390,9 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing.xs,
   },
-  heroMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  heroStreakBlock: {
-    gap: spacing.xxs,
-  },
-  heroStreakRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xxs,
-  },
-  heroLevelBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  levelBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  levelBadgeNumber: {
-    fontSize: typography.heading.fontSize,
-    fontWeight: typography.heading.fontWeight,
+  heroStreakValue: {
+    fontFamily: typography.streak.fontFamily,
+    fontSize: 36,
     color: colors.textPrimary,
   },
   heroMetaLabel: {
@@ -497,40 +409,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  tileRow: {
+  statRow: {
     flexDirection: 'row',
+  },
+  statBlock: {
+    flex: 1,
+    alignItems: 'center',
     gap: spacing.xs,
+  },
+  statLabel: {
+    fontSize: typography.caption.fontSize,
+    color: colors.textSecondary,
+  },
+  statValue: {
+    fontSize: typography.bodySmall.fontSize,
+    fontWeight: typography.heading.fontWeight,
+    color: colors.textPrimary,
   },
   actionRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.lg,
+    justifyContent: 'center',
   },
   actionButton: {
-    flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderRadius: radius.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
-  },
-  editButton: {
-    borderColor: colors.accent,
-  },
-  pauseButton: {
-    borderColor: colors.streakFlame,
   },
   actionLabel: {
-    fontSize: typography.body.fontSize,
-    fontWeight: typography.bodySmall.fontWeight,
+    fontSize: typography.label.fontSize,
+    lineHeight: typography.label.lineHeight,
+    fontWeight: typography.label.fontWeight,
+    letterSpacing: typography.label.letterSpacing,
+    textTransform: typography.label.textTransform,
+    textDecorationLine: 'underline',
   },
   editLabel: {
-    color: colors.accent,
+    color: colors.textPrimary,
   },
   pauseLabel: {
-    color: colors.streakFlame,
+    color: colors.textPrimary,
   },
   weekdayCard: {
     gap: spacing.sm,
@@ -546,22 +464,25 @@ const styles = StyleSheet.create({
   },
   weekdayToggle: {
     alignItems: 'center',
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   weekdayToggleLabel: {
     fontSize: typography.caption.fontSize,
     color: colors.textSecondary,
   },
+  // Hairline outline glyph, mirroring CompletionControl — never a filled
+  // circle (docs/DESIGN_SYSTEM.md's Routine and Task Item Design).
   weekdayCircle: {
     width: 32,
     height: 32,
     borderRadius: radius.full,
-    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   weekdayCircleSelected: {
-    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   reasonCard: {
     gap: spacing.xs,

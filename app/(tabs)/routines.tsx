@@ -28,8 +28,7 @@ import { IconBadge } from '../../src/ui/components/IconBadge';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { ReorderableList } from '../../src/ui/components/ReorderableList';
 import { Sheet } from '../../src/ui/components/Sheet';
-import { colors, pressedOpacity, radius, spacing, typography } from '../../src/ui/theme';
-import { getCategoryColorVariant } from '../../src/ui/theme/categoryVariant';
+import { colors, pressedOpacity, spacing, typography } from '../../src/ui/theme';
 
 type RoutinesTab = 'active' | 'paused';
 
@@ -107,34 +106,21 @@ export default function RoutinesScreen() {
 
   function renderRoutine(item: Routine) {
     const category = item.categoryId ? categoryById.get(item.categoryId) : undefined;
-    const variant = category
-      ? getCategoryColorVariant(category.baseColor, item.colorVariantSeed)
-      : undefined;
     const subtitle = [item.timeOfDay, scheduleLabel(scheduleFromRoutineRow(item))]
       .filter(Boolean)
       .join(' · ');
     const streak = routineStreaks[item.id]?.currentStreak ?? 0;
 
     return (
-      <Card
-        style={[
-          styles.row,
-          variant && { backgroundColor: variant.background, borderColor: 'transparent' },
-        ]}
-        testID={`routine-row-${item.id}`}
-      >
-        <IconBadge
-          name={categoryIconName(category?.icon)}
-          backgroundColor={colors.surface}
-          iconColor={variant?.accent ?? colors.textSecondary}
-        />
+      <Card style={styles.row} testID={`routine-row-${item.id}`}>
+        <IconBadge name={categoryIconName(category?.icon)} />
         <View style={styles.rowMain}>
           <Text style={styles.routineName} numberOfLines={1}>
             {item.name}
           </Text>
           {subtitle.length > 0 && <Text style={styles.subtitle}>{subtitle}</Text>}
           <View style={styles.streakRow}>
-            <Ionicons name="flame" size={typography.caption.fontSize} color={colors.streakFlame} />
+            <Ionicons name="flame" size={typography.caption.fontSize} color={colors.accent} />
             <Text style={styles.streak} testID={`routine-streak-${item.id}`}>
               Streak {streak}
             </Text>
@@ -166,7 +152,7 @@ export default function RoutinesScreen() {
             pressed && styles.tabPressed,
           ]}
         >
-          <Text style={styles.tabLabel}>Aktiv</Text>
+          <Text style={[styles.tabLabel, tab === 'active' && styles.tabLabelSelected]}>Aktiv</Text>
         </Pressable>
         <Pressable
           onPress={() => setTab('paused')}
@@ -177,7 +163,9 @@ export default function RoutinesScreen() {
             pressed && styles.tabPressed,
           ]}
         >
-          <Text style={styles.tabLabel}>Pausiert</Text>
+          <Text style={[styles.tabLabel, tab === 'paused' && styles.tabLabelSelected]}>
+            Pausiert
+          </Text>
         </Pressable>
       </View>
 
@@ -260,23 +248,29 @@ const styles = StyleSheet.create({
     // row's controls are never covered by it.
     paddingBottom: 160,
   },
+  // Gold-underline segmented control, matching the bottom nav (T077) — no
+  // filled pill highlight, per docs/DESIGN_SYSTEM.md's Navigation section.
   tab: {
     paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.xs,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
   tabSelected: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
+    borderBottomColor: colors.accent,
   },
   tabPressed: {
     opacity: pressedOpacity,
   },
   tabLabel: {
-    fontSize: typography.body.fontSize,
+    fontSize: typography.label.fontSize,
+    lineHeight: typography.label.lineHeight,
+    fontWeight: typography.label.fontWeight,
+    letterSpacing: typography.label.letterSpacing,
+    textTransform: typography.label.textTransform,
+    color: colors.textSecondary,
+  },
+  tabLabelSelected: {
     color: colors.textPrimary,
   },
   // Rows must stay uniform in height (single-line name enforced above) —
@@ -290,7 +284,7 @@ const styles = StyleSheet.create({
   },
   rowMain: {
     flex: 1,
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   routineName: {
     fontSize: typography.body.fontSize,
@@ -304,7 +298,7 @@ const styles = StyleSheet.create({
   streakRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   streak: {
     fontSize: typography.caption.fontSize,

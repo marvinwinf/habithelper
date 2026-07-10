@@ -34,6 +34,12 @@ describe('TaskCard', () => {
     expect(callbacks.onToggleComplete).toHaveBeenCalledTimes(1);
   });
 
+  it('extends the compact toggle to a >=44dp touch target via hitSlop (T082)', async () => {
+    await renderCard();
+    // 28dp glyph + 8dp hitSlop on each side = 44dp effective target.
+    expect(screen.getByTestId('task-card-toggle').props.hitSlop).toBeGreaterThanOrEqual(8);
+  });
+
   it('reflects completed state in the checkbox and dims the card', async () => {
     await renderCard({ task: { ...task, isCompleted: true } });
 

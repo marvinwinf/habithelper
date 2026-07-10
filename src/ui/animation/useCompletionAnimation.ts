@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Animated } from 'react-native';
 
-export const COMPLETION_ANIMATION_DURATION_MS = 220;
+export const COMPLETION_ANIMATION_DURATION_MS = 250;
 
 export interface CompletionAnimation {
   progress: Animated.Value;
@@ -9,7 +9,10 @@ export interface CompletionAnimation {
   start: (onDone?: () => void) => void;
 }
 
-/** Short scale/fade pulse for a normal routine completion. */
+/**
+ * Drives the gold underline draw-in on completion (docs/DESIGN_SYSTEM.md's
+ * signature interaction): a plain 0→1 ease fade, no scale/bounce/spring.
+ */
 export function useCompletionAnimation(): CompletionAnimation {
   const [progress] = useState(() => new Animated.Value(0));
 

@@ -20,24 +20,38 @@ describe('Button', () => {
   });
 
   it.each<[ButtonVariant, string]>([
-    ['primary', colors.accent],
-    ['secondary', colors.surfaceMuted],
-    ['destructive', colors.destructive],
-  ])('renders the %s variant with its own distinct background', async (variant, expectedBackground) => {
+    ['primary', colors.textPrimary],
+    ['secondary', 'transparent'],
+    ['destructive', 'transparent'],
+  ])('renders the %s variant with its own background', async (variant, expectedBackground) => {
     await render(<Button label="Aktion" variant={variant} testID="button" />);
     const style = flatten(screen.getByTestId('button').props.style);
 
     expect(style.backgroundColor).toBe(expectedBackground);
   });
 
-  it('gives each variant a visually distinct background from the others', async () => {
-    const backgrounds: unknown[] = [];
+  it('never uses the gold accent as a button fill (reserved for meaning-carrying elements)', async () => {
     for (const variant of ['primary', 'secondary', 'destructive'] as const) {
       await render(<Button label="Aktion" variant={variant} testID={variant} />);
-      backgrounds.push(flatten(screen.getByTestId(variant).props.style).backgroundColor);
+      expect(flatten(screen.getByTestId(variant).props.style).backgroundColor).not.toBe(
+        colors.accent
+      );
     }
+  });
 
-    expect(new Set(backgrounds).size).toBe(backgrounds.length);
+  it('renders secondary as underlined text and destructive as a rose outline', async () => {
+    await render(<Button label="Speichern" variant="secondary" testID="secondary" />);
+    const secondaryLabel = screen.getByText('Speichern');
+    expect(flatten(secondaryLabel.props.style).textDecorationLine).toBe('underline');
+
+    await render(<Button label="Löschen" variant="destructive" testID="destructive" />);
+    const destructiveStyle = flatten(screen.getByTestId('destructive').props.style);
+    expect(destructiveStyle.borderColor).toBe(colors.destructive);
+  });
+
+  it('keeps a >=44dp touch target for its compact small-caps label (T082)', async () => {
+    await render(<Button label="OK" testID="button" />);
+    expect(flatten(screen.getByTestId('button').props.style).minHeight).toBeGreaterThanOrEqual(44);
   });
 
   it('reduces opacity and disables interaction when disabled', async () => {

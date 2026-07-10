@@ -11,11 +11,6 @@ import { CategoryBadge } from '../../src/ui/components/CategoryBadge';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { colors, spacing, typography } from '../../src/ui/theme';
 
-// Categories have no color_variant_seed of their own (only routines/tasks
-// do, per docs/DATA_MODEL.md); this list just needs *a* representative
-// preview per row.
-const PREVIEW_SEED = 0;
-
 export default function CategoryListScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
 
@@ -77,12 +72,7 @@ export default function CategoryListScreen() {
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
             <Card style={styles.row} testID={`category-row-${item.id}`}>
-              <CategoryBadge
-                label={item.name}
-                baseColor={item.baseColor}
-                colorVariantSeed={PREVIEW_SEED}
-                icon={item.icon}
-              />
+              <CategoryBadge label={item.name} icon={item.icon} />
               <View style={styles.rowActions}>
                 <Link
                   href={`/category/${item.id}/edit`}

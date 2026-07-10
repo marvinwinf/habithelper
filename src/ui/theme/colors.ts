@@ -1,65 +1,59 @@
-// Color tokens per docs/DESIGN_SYSTEM.md's Soft Momentum direction: warm
-// off-white background, light theme only, pastel category palette families.
-// Each category family carries a small set of same-family tonal stops so
-// T014's variant mapping has concrete values to select between.
+// Color tokens per docs/DESIGN_SYSTEM.md's Quiet Atelier direction: a warm
+// stone-white background, charcoal ink, a single antique-gold accent used
+// only to carry meaning (primary action, active nav state, completion,
+// streak), and a muted rose for the "missed" state. There is deliberately no
+// green "success" color and no pastel category palette — categories are
+// distinguished by name and glyph, never by tint.
+
+// Rose does double duty: the "missed" occurrence state and destructive
+// actions. The direction forbids an alarm red, and both readings want the
+// same muted rose, so they share one constant rather than drifting apart.
+//
+// The earlier rose (#9F6B5C) measured only 4.25:1 on `background` — fine for
+// glyphs and large text, but under the 4.5:1 that normal-size body text needs,
+// and destructive/overdue labels render rose at caption size. T082 darkens it
+// to clear AA for small text on every light surface (background 5.40:1,
+// surface 5.64:1, surfaceMuted 4.95:1) while staying a muted clay-rose, never
+// an alarm red. See docs/ACCESSIBILITY.md for the full pairing table.
+const rose = '#8F5A49';
 
 export const colors = {
-  background: '#FAF6F0',
+  background: '#FAFAF9',
   surface: '#FFFFFF',
-  surfaceMuted: '#F3ECE2',
-  border: '#E8DFD1',
+  // Reserved for inset fills that are not list surfaces (disabled controls,
+  // calendar day cells). List content sits on `surface` separated by hairline
+  // `border` dividers, never on a tinted card.
+  surfaceMuted: '#F2F0EC',
+  border: '#E7E4DD',
 
-  textPrimary: '#2B2620',
-  textSecondary: '#6B6459',
-  textOnAccent: '#FFFFFF',
+  textPrimary: '#1C1917',
+  textSecondary: '#78716C',
+  textOnAccent: '#FAFAF9',
 
-  accent: '#7C9885',
-  destructive: '#C1544A',
-  success: '#5B8C6B',
-  // Streak flame accent per the design reference mockup — warm orange,
-  // deliberately outside the pastel category families so the streak reads
-  // as its own signal, not as a category color.
-  streakFlame: '#E8853D',
-
-  categories: {
-    mint: {
-      base: '#8FBFA0',
-      light: '#C9E4D2',
-      lighter: '#E7F4EC',
-      dark: '#5E9A76',
-    },
-    lavender: {
-      base: '#A9A0D6',
-      light: '#D5CFEE',
-      lighter: '#EFEBF9',
-      dark: '#7C71B8',
-    },
-    apricot: {
-      base: '#F0A868',
-      light: '#F7CFA0',
-      lighter: '#FCEBD8',
-      dark: '#D98A44',
-    },
-    skyBlue: {
-      base: '#7FB8D6',
-      light: '#BEE0EE',
-      lighter: '#E5F3F8',
-      dark: '#4F94B8',
-    },
-    softPeach: {
-      base: '#F2A69A',
-      light: '#F8CFC7',
-      lighter: '#FCEBE7',
-      dark: '#DE7E6E',
-    },
-    warmCream: {
-      base: '#D9C7A3',
-      light: '#EBDFC7',
-      lighter: '#F7F1E4',
-      dark: '#B89D6E',
-    },
-  },
+  accent: '#A16207',
+  missed: rose,
+  destructive: rose,
 } as const;
 
-export type CategoryColorFamily = keyof typeof colors.categories;
-export type CategoryColorStop = keyof typeof colors.categories.mint;
+// Defined now so the token pairings can be contrast-checked as a set; dark
+// mode is not shipped in the MVP and nothing consumes these yet. Both the gold
+// and the rose are lightened relative to their light-theme values to keep
+// 4.5:1 against the dark surfaces (rose: background 5.77:1, surface 5.23:1).
+const roseDark = '#BC8878';
+
+export const colorsDark = {
+  background: '#1C1917',
+  surface: '#242220',
+  surfaceMuted: '#2A2724',
+  border: '#3A3532',
+
+  textPrimary: '#F5F3F0',
+  textSecondary: '#A8A29E',
+  textOnAccent: '#1C1917',
+
+  accent: '#C08A2E',
+  missed: roseDark,
+  destructive: roseDark,
+} as const;
+
+export type ColorToken = keyof typeof colors;

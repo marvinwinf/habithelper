@@ -1,12 +1,12 @@
-// Corner radius scale per docs/DESIGN_SYSTEM.md's "large corner radii,
-// rounded cards and controls" direction.
+// Corner radius scale per docs/DESIGN_SYSTEM.md's Quiet Atelier direction:
+// near-square, considered geometry. Only the rare surface that needs any
+// softening gets `sm`/`md`; `full` is reserved for the occasional pill (a
+// single tag), not for cards or buttons.
 
 export const radius = {
-  sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  full: 9999,
+  sm: 2,
+  md: 4,
+  full: 999,
 } as const;
 
 export type RadiusToken = keyof typeof radius;

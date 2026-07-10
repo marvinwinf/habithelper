@@ -1,16 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import type { ColorValue } from 'react-native';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { CreateFab } from '../../src/ui/components/CreateFab';
-import { colors, radius, shadows, spacing } from '../../src/ui/theme';
+import { colors, spacing, typography } from '../../src/ui/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
-function tabIcon(focused: IconName, unfocused: IconName) {
-  function TabIcon({ focused: isFocused, color, size }: { focused: boolean; color: ColorValue; size: number }) {
-    return <Ionicons name={isFocused ? focused : unfocused} color={color} size={size} />;
+// Labels render inside the custom tabBarIcon (not the default
+// tabBarShowLabel slot) so a gold underline can sit directly beneath the
+// icon+label group, per docs/DESIGN_SYSTEM.md's Navigation section.
+function tabIcon(focused: IconName, unfocused: IconName, label: string) {
+  function TabIcon({ focused: isFocused, color }: { focused: boolean; color: ColorValue }) {
+    return (
+      <View style={styles.tabItem}>
+        <Ionicons name={isFocused ? focused : unfocused} color={color} size={22} />
+        <Text style={[styles.tabLabel, { color }]}>{label}</Text>
+        <View style={[styles.tabIndicator, isFocused && styles.tabIndicatorActive]} />
+      </View>
+    );
   }
   return TabIcon;
 }
@@ -20,32 +29,40 @@ export default function TabLayout() {
     <View style={styles.container}>
       <Tabs
         screenOptions={{
+          tabBarShowLabel: false,
           tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.textSecondary,
-          // Floating rounded tab bar per the design reference mockup: kept
-          // in normal layout flow (not absolutely positioned) so screen
-          // content can never hide behind it; the margins let the warm
-          // background show around it, which is what reads as "floating".
+          // Kept in normal layout flow (not absolutely positioned) so screen
+          // content can never hide behind it. A flat, hairline-topped bar —
+          // no floating margin, rounded corners, or shadow — with a gold
+          // underline marking the active tab (T077).
           tabBarStyle: styles.tabBar,
-          tabBarItemStyle: styles.tabBarItem,
-          tabBarActiveBackgroundColor: colors.categories.mint.lighter,
         }}
       >
         <Tabs.Screen
           name="today"
-          options={{ title: 'Heute', tabBarIcon: tabIcon('sunny', 'sunny-outline') }}
+          options={{ title: 'Heute', tabBarIcon: tabIcon('sunny', 'sunny-outline', 'Heute') }}
         />
         <Tabs.Screen
           name="routines"
-          options={{ title: 'Routinen', tabBarIcon: tabIcon('repeat', 'repeat-outline') }}
+          options={{
+            title: 'Routinen',
+            tabBarIcon: tabIcon('repeat', 'repeat-outline', 'Routinen'),
+          }}
         />
         <Tabs.Screen
           name="tasks"
-          options={{ title: 'Aufgaben', tabBarIcon: tabIcon('checkbox', 'checkbox-outline') }}
+          options={{
+            title: 'Aufgaben',
+            tabBarIcon: tabIcon('checkbox', 'checkbox-outline', 'Aufgaben'),
+          }}
         />
         <Tabs.Screen
           name="settings"
-          options={{ title: 'Einstellungen', tabBarIcon: tabIcon('settings', 'settings-outline') }}
+          options={{
+            title: 'Einstellungen',
+            tabBarIcon: tabIcon('settings', 'settings-outline', 'Einstellungen'),
+          }}
         />
       </Tabs>
       <CreateFab />
@@ -59,19 +76,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   tabBar: {
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
-    borderRadius: radius.xl,
     backgroundColor: colors.surface,
-    borderTopWidth: 0,
-    paddingTop: spacing.xxs,
-    paddingBottom: spacing.xxs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
     height: 64,
-    ...shadows.soft,
   },
-  tabBarItem: {
-    borderRadius: radius.lg,
-    marginHorizontal: spacing.xxs,
-    overflow: 'hidden',
+  tabItem: {
+    alignItems: 'center',
+    gap: spacing.xs / 2,
+  },
+  tabLabel: {
+    fontSize: typography.caption.fontSize,
+    lineHeight: typography.caption.lineHeight,
+  },
+  tabIndicator: {
+    width: 16,
+    height: 2,
+    backgroundColor: 'transparent',
+  },
+  tabIndicatorActive: {
+    backgroundColor: colors.accent,
   },
 });

@@ -5,7 +5,7 @@ import { Button } from './Button';
 import { CategoryBadge } from './CategoryBadge';
 import { IconBadge } from './IconBadge';
 import { colors, pressedOpacity, radius, spacing, typography, type CategoryColorFamily } from '../theme';
-import { getCategoryColorVariant } from '../theme/categoryVariant';
+import { legacyCategoryPalette } from '../theme/categoryVariant';
 import { CATEGORY_ICON_OPTIONS } from '../categoryIcons';
 
 export interface CategoryFormValues {
@@ -23,29 +23,28 @@ export interface CategoryFormProps {
   testID?: string;
 }
 
-const PALETTE_FAMILIES = Object.keys(colors.categories) as CategoryColorFamily[];
+const PALETTE_FAMILIES = Object.keys(legacyCategoryPalette) as CategoryColorFamily[];
 
-// The preview shows how any one item in this category would look; the
-// concrete seed doesn't matter here since categories have no seed of their
-// own (only individual routines/tasks do, per docs/DATA_MODEL.md).
-const PREVIEW_SEED = 0;
+// Categories are told apart by name and glyph, never by hue (Quiet Atelier,
+// docs/DESIGN_SYSTEM.md) — the form no longer offers a color picker, but
+// `base_color` remains a persisted, non-null column (docs/DATA_MODEL.md), so
+// new categories still get a stable value from the retained legacy palette.
+const DEFAULT_BASE_COLOR = legacyCategoryPalette[PALETTE_FAMILIES[0]].base;
 
-/** Shared name/base-color/preview form used by both the create and edit category screens. */
+/** Shared name/icon form used by both the create and edit category screens. */
 export function CategoryForm({
   initialName = '',
-  initialBaseColor = colors.categories[PALETTE_FAMILIES[0]].base,
+  initialBaseColor = DEFAULT_BASE_COLOR,
   initialIcon = null,
   submitLabel = 'Speichern',
   onSubmit,
   testID,
 }: CategoryFormProps) {
   const [name, setName] = useState(initialName);
-  const [baseColor, setBaseColor] = useState(initialBaseColor);
   const [icon, setIcon] = useState<string | null>(initialIcon);
 
   const trimmedName = name.trim();
   const canSave = trimmedName.length > 0;
-  const previewVariant = getCategoryColorVariant(baseColor, PREVIEW_SEED);
 
   return (
     <View testID={testID} style={styles.container}>
@@ -57,30 +56,6 @@ export function CategoryForm({
         style={styles.input}
         testID="category-form-name-input"
       />
-
-      <Text style={styles.label}>Farbe</Text>
-      <View style={styles.paletteRow}>
-        {PALETTE_FAMILIES.map((family) => {
-          const familyBaseColor = colors.categories[family].base;
-          const selected = familyBaseColor === baseColor;
-          return (
-            <Pressable
-              key={family}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              accessibilityLabel={family}
-              testID={`category-form-color-${family}`}
-              onPress={() => setBaseColor(familyBaseColor)}
-              style={({ pressed }) => [
-                styles.swatch,
-                { backgroundColor: familyBaseColor },
-                selected && styles.swatchSelected,
-                pressed && styles.pressed,
-              ]}
-            />
-          );
-        })}
-      </View>
 
       <Text style={styles.label}>Symbol</Text>
       <View style={styles.paletteRow}>
@@ -103,8 +78,7 @@ export function CategoryForm({
               <IconBadge
                 name={option}
                 size="sm"
-                backgroundColor={selected ? previewVariant.background : colors.surfaceMuted}
-                iconColor={selected ? previewVariant.accent : colors.textSecondary}
+                iconColor={selected ? colors.accent : colors.textSecondary}
               />
             </Pressable>
           );
@@ -114,15 +88,13 @@ export function CategoryForm({
       <Text style={styles.label}>Vorschau</Text>
       <CategoryBadge
         label={trimmedName || 'Vorschau'}
-        baseColor={baseColor}
-        colorVariantSeed={PREVIEW_SEED}
         icon={icon}
         testID="category-form-preview"
       />
 
       <Button
         label={submitLabel}
-        onPress={() => onSubmit({ name: trimmedName, baseColor, icon })}
+        onPress={() => onSubmit({ name: trimmedName, baseColor: initialBaseColor, icon })}
         disabled={!canSave}
         testID="category-form-save"
       />
@@ -138,40 +110,29 @@ const styles = StyleSheet.create({
     opacity: pressedOpacity,
   },
   label: {
-    fontSize: typography.bodySmall.fontSize,
-    lineHeight: typography.bodySmall.lineHeight,
-    fontWeight: typography.bodySmall.fontWeight,
+    fontSize: typography.label.fontSize,
+    lineHeight: typography.label.lineHeight,
+    fontWeight: typography.label.fontWeight,
+    letterSpacing: typography.label.letterSpacing,
+    textTransform: typography.label.textTransform,
     color: colors.textSecondary,
   },
   input: {
-    borderWidth: 1,
+    borderBottomWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: typography.body.fontSize,
     color: colors.textPrimary,
-    backgroundColor: colors.surface,
   },
   paletteRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
-  swatch: {
-    width: spacing.xl,
-    height: spacing.xl,
-    borderRadius: radius.full,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  swatchSelected: {
-    borderColor: colors.textPrimary,
-  },
   iconOption: {
     borderWidth: 2,
     borderColor: 'transparent',
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
   },
   iconOptionSelected: {
     borderColor: colors.accent,

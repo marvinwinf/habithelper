@@ -1,14 +1,17 @@
-import { colors, type CategoryColorFamily } from '../colors';
-import { getCategoryColorVariant } from '../categoryVariant';
+import {
+  getCategoryColorVariant,
+  legacyCategoryPalette,
+  type CategoryColorFamily,
+} from '../categoryVariant';
 
-const FAMILIES = Object.keys(colors.categories) as CategoryColorFamily[];
+const FAMILIES = Object.keys(legacyCategoryPalette) as CategoryColorFamily[];
 const SEEDS = [0, 1, 2, 3, 4, 5, 7, 13, 21, 100, -1, -5];
 
 describe('getCategoryColorVariant', () => {
   it('is deterministic for the same base color and seed', () => {
     for (const family of FAMILIES) {
       for (const seed of SEEDS) {
-        const baseColor = colors.categories[family].base;
+        const baseColor = legacyCategoryPalette[family].base;
         const first = getCategoryColorVariant(baseColor, seed);
         const second = getCategoryColorVariant(baseColor, seed);
         expect(second).toEqual(first);
@@ -18,9 +21,9 @@ describe('getCategoryColorVariant', () => {
 
   it('only ever produces colors from the matching family, never another family', () => {
     for (const family of FAMILIES) {
-      const baseColor = colors.categories[family].base;
+      const baseColor = legacyCategoryPalette[family].base;
       const allowedValues = new Set<string>(
-        Object.values(colors.categories[family])
+        Object.values(legacyCategoryPalette[family])
       );
 
       for (const seed of SEEDS) {
@@ -34,14 +37,14 @@ describe('getCategoryColorVariant', () => {
   });
 
   it('is case-insensitive when matching the base color', () => {
-    const baseColor = colors.categories.mint.base;
+    const baseColor = legacyCategoryPalette.mint.base;
     expect(getCategoryColorVariant(baseColor.toLowerCase(), 3)).toEqual(
       getCategoryColorVariant(baseColor.toUpperCase(), 3)
     );
   });
 
   it('produces more than one distinct variant across a range of seeds', () => {
-    const baseColor = colors.categories.lavender.base;
+    const baseColor = legacyCategoryPalette.lavender.base;
     const results = new Set(
       SEEDS.map((seed) => JSON.stringify(getCategoryColorVariant(baseColor, seed)))
     );
