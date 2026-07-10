@@ -1,13 +1,13 @@
-// Spacing scale per docs/DESIGN_SYSTEM.md's "generous spacing" direction.
+// Spacing scale per docs/DESIGN_SYSTEM.md's Quiet Atelier direction —
+// deliberately coarse and more generous than the previous scale, so screens
+// get their hierarchy from negative space rather than from borders and fills.
 
 export const spacing = {
-  xxs: 4,
   xs: 8,
   sm: 12,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  xxl: 48,
+  md: 20,
+  lg: 32,
+  xl: 48,
 } as const;
 
 export type SpacingToken = keyof typeof spacing;

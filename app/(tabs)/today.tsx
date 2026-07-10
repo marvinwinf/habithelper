@@ -238,7 +238,7 @@ export default function TodayScreen() {
               scales this whole card. */}
           <Animated.View style={{ transform: [{ scale: streakScale }] }}>
             <Card style={styles.streakCard}>
-              <Ionicons name="flame" size={iconBadgeSizes.sm.icon} color={colors.streakFlame} />
+              <Ionicons name="flame" size={iconBadgeSizes.sm.icon} color={colors.accent} />
               <View>
                 <Text style={styles.streakLabel}>Gesamt-Streak</Text>
                 <Text style={styles.streakValue} testID="today-app-streak">
@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
   },
   headerGreetingBlock: {
     flex: 1,
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   greeting: {
     fontSize: typography.title.fontSize,

@@ -134,7 +134,7 @@ export default function RoutinesScreen() {
           </Text>
           {subtitle.length > 0 && <Text style={styles.subtitle}>{subtitle}</Text>}
           <View style={styles.streakRow}>
-            <Ionicons name="flame" size={typography.caption.fontSize} color={colors.streakFlame} />
+            <Ionicons name="flame" size={typography.caption.fontSize} color={colors.accent} />
             <Text style={styles.streak} testID={`routine-streak-${item.id}`}>
               Streak {streak}
             </Text>
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
   },
   rowMain: {
     flex: 1,
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   routineName: {
     fontSize: typography.body.fontSize,
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
   streakRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   streak: {
     fontSize: typography.caption.fontSize,

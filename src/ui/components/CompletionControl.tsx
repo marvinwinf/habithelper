@@ -110,8 +110,8 @@ export function CompletionControl({
 
 const styles = StyleSheet.create({
   control: {
-    width: spacing.xxl,
-    height: spacing.xxl,
+    width: spacing.xl,
+    height: spacing.xl,
     borderRadius: radius.full,
     borderWidth: 1,
     alignItems: 'center',

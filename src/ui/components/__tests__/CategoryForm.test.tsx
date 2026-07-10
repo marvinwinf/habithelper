@@ -1,8 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { CategoryForm } from '../CategoryForm';
-import { colors } from '../../theme';
-import { getCategoryColorVariant } from '../../theme/categoryVariant';
+import { getCategoryColorVariant, legacyCategoryPalette } from '../../theme/categoryVariant';
 import { CATEGORY_ICON_OPTIONS } from '../../categoryIcons';
 
 describe('CategoryForm', () => {
@@ -30,7 +29,7 @@ describe('CategoryForm', () => {
   it('offers all six palette families from the design system', async () => {
     await render(<CategoryForm onSubmit={jest.fn()} />);
 
-    for (const family of Object.keys(colors.categories)) {
+    for (const family of Object.keys(legacyCategoryPalette)) {
       expect(screen.getByTestId(`category-form-color-${family}`)).toBeTruthy();
     }
   });
@@ -45,7 +44,7 @@ describe('CategoryForm', () => {
       ? Object.assign({}, ...preview.props.style.filter(Boolean))
       : preview.props.style;
 
-    const expectedVariant = getCategoryColorVariant(colors.categories.lavender.base, 0);
+    const expectedVariant = getCategoryColorVariant(legacyCategoryPalette.lavender.base, 0);
     expect(style.backgroundColor).toBe(expectedVariant.background);
   });
 
@@ -59,7 +58,7 @@ describe('CategoryForm', () => {
 
     expect(onSubmit).toHaveBeenCalledWith({
       name: 'Sport',
-      baseColor: colors.categories.apricot.base,
+      baseColor: legacyCategoryPalette.apricot.base,
       icon: null,
     });
   });

@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   },
   main: {
     flex: 1,
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   title: {
     fontSize: typography.body.fontSize,

@@ -1,19 +1,18 @@
 import { render, screen } from '@testing-library/react-native';
 
 import { CategoryBadge } from '../CategoryBadge';
-import { colors } from '../../theme';
-import { getCategoryColorVariant } from '../../theme/categoryVariant';
+import { getCategoryColorVariant, legacyCategoryPalette } from '../../theme/categoryVariant';
 
 describe('CategoryBadge', () => {
   it('renders the label', async () => {
     await render(
-      <CategoryBadge label="Sport" baseColor={colors.categories.mint.base} colorVariantSeed={2} />
+      <CategoryBadge label="Sport" baseColor={legacyCategoryPalette.mint.base} colorVariantSeed={2} />
     );
     expect(screen.getByText('Sport')).toBeTruthy();
   });
 
   it('applies the same-family variant colors from T014s mapping function', async () => {
-    const baseColor = colors.categories.lavender.base;
+    const baseColor = legacyCategoryPalette.lavender.base;
     const seed = 3;
     const expectedVariant = getCategoryColorVariant(baseColor, seed);
 

@@ -257,7 +257,7 @@ export default function RoutineDetailScreen() {
                     <Ionicons
                       name="flame"
                       size={typography.body.fontSize}
-                      color={colors.streakFlame}
+                      color={colors.accent}
                     />
                     <Text style={styles.heroMetaValue} testID="routine-detail-streak">
                       {cache?.currentStreak ?? 0} Tage
@@ -305,13 +305,13 @@ export default function RoutineDetailScreen() {
       <View style={styles.tileRow}>
         <StatTile
           icon="flame"
-          iconColor={colors.streakFlame}
+          iconColor={colors.accent}
           label="Streak"
           value={`${cache?.currentStreak ?? 0} Tage`}
         />
         <StatTile
           icon="trophy"
-          iconColor={colors.streakFlame}
+          iconColor={colors.accent}
           label="Rekord"
           value={`${cache?.bestStreak ?? 0} Tage`}
           testID="routine-detail-best-streak"
@@ -417,7 +417,7 @@ export default function RoutineDetailScreen() {
           <Ionicons
             name={routine.isPaused ? 'play' : 'pause'}
             size={typography.body.fontSize}
-            color={colors.streakFlame}
+            color={colors.accent}
           />
           <Text style={[styles.actionLabel, styles.pauseLabel]}>
             {routine.isPaused ? 'Reaktivieren' : 'Pausieren'}
@@ -458,12 +458,12 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   heroStreakBlock: {
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   heroStreakRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   heroLevelBlock: {
     flexDirection: 'row',
@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
     borderColor: colors.accent,
   },
   pauseButton: {
-    borderColor: colors.streakFlame,
+    borderColor: colors.accent,
   },
   actionLabel: {
     fontSize: typography.body.fontSize,
@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
   pauseLabel: {
-    color: colors.streakFlame,
+    color: colors.accent,
   },
   weekdayCard: {
     gap: spacing.sm,
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
   },
   weekdayToggle: {
     alignItems: 'center',
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   weekdayToggleLabel: {
     fontSize: typography.caption.fontSize,

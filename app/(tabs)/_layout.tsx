@@ -4,7 +4,7 @@ import type { ColorValue } from 'react-native';
 import { StyleSheet, View } from 'react-native';
 
 import { CreateFab } from '../../src/ui/components/CreateFab';
-import { colors, radius, shadows, spacing } from '../../src/ui/theme';
+import { colors, radius, spacing } from '../../src/ui/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -22,13 +22,12 @@ export default function TabLayout() {
         screenOptions={{
           tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.textSecondary,
-          // Floating rounded tab bar per the design reference mockup: kept
-          // in normal layout flow (not absolutely positioned) so screen
-          // content can never hide behind it; the margins let the warm
-          // background show around it, which is what reads as "floating".
+          // Kept in normal layout flow (not absolutely positioned) so screen
+          // content can never hide behind it. T077 replaces the remaining
+          // floating geometry with a flat, hairline-topped bar and a gold
+          // underline for the active tab.
           tabBarStyle: styles.tabBar,
           tabBarItemStyle: styles.tabBarItem,
-          tabBarActiveBackgroundColor: colors.categories.mint.lighter,
         }}
       >
         <Tabs.Screen
@@ -61,17 +60,17 @@ const styles = StyleSheet.create({
   tabBar: {
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
-    borderRadius: radius.xl,
+    borderRadius: radius.md,
     backgroundColor: colors.surface,
-    borderTopWidth: 0,
-    paddingTop: spacing.xxs,
-    paddingBottom: spacing.xxs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs,
     height: 64,
-    ...shadows.soft,
   },
   tabBarItem: {
-    borderRadius: radius.lg,
-    marginHorizontal: spacing.xxs,
+    borderRadius: radius.md,
+    marginHorizontal: spacing.xs,
     overflow: 'hidden',
   },
 });

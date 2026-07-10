@@ -5,7 +5,7 @@ import { Button } from './Button';
 import { CategoryBadge } from './CategoryBadge';
 import { IconBadge } from './IconBadge';
 import { colors, pressedOpacity, radius, spacing, typography, type CategoryColorFamily } from '../theme';
-import { getCategoryColorVariant } from '../theme/categoryVariant';
+import { getCategoryColorVariant, legacyCategoryPalette } from '../theme/categoryVariant';
 import { CATEGORY_ICON_OPTIONS } from '../categoryIcons';
 
 export interface CategoryFormValues {
@@ -23,7 +23,7 @@ export interface CategoryFormProps {
   testID?: string;
 }
 
-const PALETTE_FAMILIES = Object.keys(colors.categories) as CategoryColorFamily[];
+const PALETTE_FAMILIES = Object.keys(legacyCategoryPalette) as CategoryColorFamily[];
 
 // The preview shows how any one item in this category would look; the
 // concrete seed doesn't matter here since categories have no seed of their
@@ -33,7 +33,7 @@ const PREVIEW_SEED = 0;
 /** Shared name/base-color/preview form used by both the create and edit category screens. */
 export function CategoryForm({
   initialName = '',
-  initialBaseColor = colors.categories[PALETTE_FAMILIES[0]].base,
+  initialBaseColor = legacyCategoryPalette[PALETTE_FAMILIES[0]].base,
   initialIcon = null,
   submitLabel = 'Speichern',
   onSubmit,
@@ -61,7 +61,7 @@ export function CategoryForm({
       <Text style={styles.label}>Farbe</Text>
       <View style={styles.paletteRow}>
         {PALETTE_FAMILIES.map((family) => {
-          const familyBaseColor = colors.categories[family].base;
+          const familyBaseColor = legacyCategoryPalette[family].base;
           const selected = familyBaseColor === baseColor;
           return (
             <Pressable

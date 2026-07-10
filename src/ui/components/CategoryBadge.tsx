@@ -43,12 +43,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingVertical: spacing.xxs,
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
     borderRadius: radius.full,
   },
   icon: {
-    marginRight: spacing.xxs,
+    marginRight: spacing.xs,
   },
   label: {
     fontSize: typography.caption.fontSize,

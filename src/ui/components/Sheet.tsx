@@ -83,8 +83,8 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
+    borderTopLeftRadius: radius.md,
+    borderTopRightRadius: radius.md,
     padding: spacing.lg,
   },
 });

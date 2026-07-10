@@ -373,17 +373,18 @@ const styles = StyleSheet.create({
     fontSize: typography.body.fontSize,
     color: colors.textPrimary,
   },
-  // Dashed outline per the mockup's "+ Neue Kategorie erstellen" button;
-  // lavender text distinguishes it from the primary save action.
+  // Dashed outline for "+ Neue Kategorie erstellen", muted so it never
+  // competes with the primary save action. T078 replaces it with a plain
+  // text/icon action.
   createCategoryButton: {
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: colors.categories.lavender.base,
+    borderColor: colors.border,
     borderRadius: radius.md,
     paddingVertical: spacing.sm,
     textAlign: 'center',
     fontSize: typography.bodySmall.fontSize,
-    color: colors.categories.lavender.dark,
+    color: colors.textSecondary,
   },
   chipRow: {
     flexDirection: 'row',
@@ -393,7 +394,7 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xxs,
+    gap: spacing.xs,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.full,
@@ -402,7 +403,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   chipSelected: {
-    backgroundColor: colors.categories.mint.lighter,
+    backgroundColor: colors.surfaceMuted,
     borderColor: colors.accent,
   },
   chipLabel: {
@@ -477,7 +478,7 @@ const styles = StyleSheet.create({
   },
   weekdayToggle: {
     alignItems: 'center',
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   weekdayToggleLabel: {
     fontSize: typography.caption.fontSize,

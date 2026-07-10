@@ -35,11 +35,15 @@ The result should feel elegant, calm, and confident — polished and quietly lux
 |---|---|---|
 | background | `#FAFAF9` | `#1C1917` |
 | surface | `#FFFFFF` | `#242220` |
+| surface muted | `#F2F0EC` | `#2A2724` |
 | text | `#1C1917` | `#F5F3F0` |
 | muted text | `#78716C` | `#A8A29E` |
+| text on accent | `#FAFAF9` | `#1C1917` |
 | border | `#E7E4DD` | `#3A3532` |
 | accent (gold) | `#A16207` | `#C08A2E` |
 | missed (rose) | `#9F6B5C` | `#9F6B5C` |
+
+`surface muted` is reserved for inset fills that are not list surfaces (disabled controls, calendar day cells) — never to tint an item by category. Destructive actions reuse the `missed` rose; there is no separate destructive token.
 
 The accent color is the only color used for meaning (primary action, active nav state, completed mark, streak numeral). It must not be reused decoratively elsewhere. "Missed" uses the rose token; there is no separate green "success" color — completion is communicated by the accent plus a non-color signal (underline/glyph), not by color alone.
 
@@ -48,6 +52,8 @@ The accent color is the only color used for meaning (primary action, active nav 
 - Display/serif (Playfair Display or Cormorant): screen titles, greeting text, and streak numerals only.
 - Functional/sans (Inter or Jost): everything else — list items, buttons, labels, body text.
 - Buttons and section labels use small-caps-style treatment with slightly increased letter-spacing (+0.02–0.05em) rather than size/weight alone for emphasis.
+
+No custom font files are bundled in the MVP: the `serif`/`sans` family tokens in `src/ui/theme/typography.ts` resolve to the platform's own faces (Noto Serif / Roboto on Android). Swapping in Playfair Display and Inter is a change to that one file plus a font-loading step at the app root.
 
 ## Categories
 

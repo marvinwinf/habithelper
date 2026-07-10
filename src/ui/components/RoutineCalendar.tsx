@@ -33,39 +33,39 @@ const STATE_VISUALS: Record<
   not_due: { background: 'transparent', icon: null, iconColor: colors.textSecondary },
   pending: { background: colors.surface, icon: null, iconColor: colors.textSecondary },
   completed: {
-    background: colors.categories.mint.light,
+    background: colors.surfaceMuted,
     icon: 'checkmark',
-    iconColor: colors.categories.mint.dark,
+    iconColor: colors.accent,
   },
   exceeded: {
-    background: colors.categories.mint.base,
+    background: colors.accent,
     icon: 'checkmark-done',
     iconColor: colors.textOnAccent,
   },
   missed: {
-    background: colors.categories.softPeach.light,
+    background: colors.surfaceMuted,
     icon: 'close',
-    iconColor: colors.destructive,
+    iconColor: colors.missed,
   },
   skipped: {
     background: colors.surfaceMuted,
     icon: 'ellipse-outline',
-    iconColor: colors.categories.lavender.dark,
+    iconColor: colors.textSecondary,
   },
   moved: {
-    background: colors.categories.skyBlue.light,
+    background: colors.surfaceMuted,
     icon: 'arrow-forward',
-    iconColor: colors.categories.skyBlue.dark,
+    iconColor: colors.textSecondary,
   },
   joker_protected: {
-    background: colors.categories.warmCream.light,
+    background: colors.surfaceMuted,
     icon: 'star',
-    iconColor: colors.categories.warmCream.dark,
+    iconColor: colors.accent,
   },
   paused: {
-    background: colors.categories.lavender.light,
+    background: colors.surfaceMuted,
     icon: 'pause',
-    iconColor: colors.categories.lavender.dark,
+    iconColor: colors.textSecondary,
   },
 };
 
@@ -193,8 +193,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   navButton: {
-    width: spacing.xxl,
-    height: spacing.xxl,
+    width: spacing.xl,
+    height: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   legendSwatch: {
     width: 20,

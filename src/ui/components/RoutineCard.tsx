@@ -201,7 +201,7 @@ export function RoutineCard({
                 <Ionicons
                   name="flame"
                   size={typography.caption.fontSize}
-                  color={colors.streakFlame}
+                  color={colors.accent}
                 />
                 <Text style={styles.streak} testID={testID ? `${testID}-streak` : undefined}>
                   Streak {streak}
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
   },
   main: {
     flex: 1,
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   name: {
     fontSize: typography.body.fontSize,
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
   streakRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xxs,
+    gap: spacing.xs,
   },
   streak: {
     fontSize: typography.caption.fontSize,
