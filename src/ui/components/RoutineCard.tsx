@@ -18,13 +18,11 @@ import { scheduleFromRoutineRow } from '../../domain/routines/schedule';
 import { scheduleLabel } from '../../domain/routines/scheduleLabel';
 import type { ScheduleType } from '../../data/db/schema';
 
-// The level-up milestone scales the whole row so it reads as visually
-// distinct from a normal/exceeded completion (T042), which now only shows
-// via CompletionControl's own gold underline draw-in (no per-tap scale).
-const LEVEL_UP_ROW_SCALE_PEAK = 1.05;
-// How far the row rises into place during its mount animation — small
-// enough to read as a soft settle, not a slide-in.
-const MOUNT_RISE_DISTANCE = 8;
+// The level-up milestone briefly dims the whole row (an opacity dip, not a
+// scale/bounce, per docs/DESIGN_SYSTEM.md's fade-only Motion section) so it
+// reads as visually distinct from a normal/exceeded completion (T042), which
+// only shows via CompletionControl's own gold underline draw-in.
+const LEVEL_UP_FADE_OPACITY = 0.4;
 
 export type RoutineCardOccurrenceState = 'pending' | 'completed' | 'exceeded' | 'skipped';
 
@@ -136,15 +134,13 @@ export function RoutineCard({
     maybeStartLevelUpMilestone(await onExceed());
   }
 
-  const rowScale = levelUpAnimation.progress.interpolate({
+  // Mount fades the row in (0→1); a level-up milestone briefly dips it (1→0.4
+  // and back). Multiplied so both drive the single opacity with no transform.
+  const levelUpDip = levelUpAnimation.progress.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, LEVEL_UP_ROW_SCALE_PEAK],
+    outputRange: [1, LEVEL_UP_FADE_OPACITY],
   });
-
-  const mountTranslateY = mountAnimation.progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [MOUNT_RISE_DISTANCE, 0],
-  });
+  const rowOpacity = Animated.multiply(mountAnimation.progress, levelUpDip);
 
   return (
     <>
@@ -153,12 +149,7 @@ export function RoutineCard({
         testID={testID}
         style={({ pressed }) => pressed && styles.pressed}
       >
-        <Animated.View
-          style={{
-            opacity: mountAnimation.progress,
-            transform: [{ scale: rowScale }, { translateY: mountTranslateY }],
-          }}
-        >
+        <Animated.View style={{ opacity: rowOpacity }}>
           <View style={styles.row}>
             <IconBadge name={categoryIconName(category?.icon)} />
             <View style={styles.main}>

@@ -88,10 +88,12 @@ function ReorderableRow<T>({
       runOnJS(handleDragEnd)(rowsMoved);
     });
 
+  // zIndex lifts the dragged row above its siblings; no elevation, since
+  // Quiet Atelier forbids shadows (docs/DESIGN_SYSTEM.md) — the translate and
+  // stacking alone communicate the drag.
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
     zIndex: isDragging.value ? 1 : 0,
-    elevation: isDragging.value ? 4 : 0,
   }));
 
   return (

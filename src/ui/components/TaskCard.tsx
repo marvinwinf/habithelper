@@ -10,10 +10,6 @@ import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
 import { categoryIconName } from '../categoryIcons';
 import { todayDateString } from '../../domain/dates';
 
-// Mirrors RoutineCard's mount entrance distance — small enough to read as a
-// soft settle rather than a slide-in.
-const MOUNT_RISE_DISTANCE = 8;
-
 export interface TaskCardTask {
   id: string;
   title: string;
@@ -80,19 +76,9 @@ export function TaskCard({
     action();
   }
 
-  const mountTranslateY = mountAnimation.progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [MOUNT_RISE_DISTANCE, 0],
-  });
-
   return (
     <>
-      <Animated.View
-        style={{
-          opacity: mountAnimation.progress,
-          transform: [{ translateY: mountTranslateY }],
-        }}
-      >
+      <Animated.View style={{ opacity: mountAnimation.progress }}>
         <View style={styles.row} testID={testID}>
           <IconBadge name={categoryIconName(category?.icon)} />
           <View style={styles.main}>

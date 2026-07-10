@@ -181,8 +181,11 @@ const styles = StyleSheet.create({
     paddingBottom: 160,
   },
   sectionTitle: {
-    fontSize: typography.bodySmall.fontSize,
-    fontWeight: typography.bodySmall.fontWeight,
+    fontSize: typography.label.fontSize,
+    lineHeight: typography.label.lineHeight,
+    fontWeight: typography.label.fontWeight,
+    letterSpacing: typography.label.letterSpacing,
+    textTransform: typography.label.textTransform,
     color: colors.textSecondary,
     marginBottom: spacing.xs,
   },
