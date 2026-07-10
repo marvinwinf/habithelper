@@ -21,8 +21,8 @@ describe('color tokens', () => {
       textSecondary: '#78716C',
       textOnAccent: '#FAFAF9',
       accent: '#A16207',
-      missed: '#9F6B5C',
-      destructive: '#9F6B5C',
+      missed: '#8F5A49',
+      destructive: '#8F5A49',
     });
   });
 

@@ -110,6 +110,9 @@ export function TaskCard({
             accessibilityRole="checkbox"
             accessibilityState={{ checked: task.isCompleted }}
             onPress={onToggleComplete}
+            // The glyph is a compact 28dp outline; hitSlop grows the tap area
+            // to the 44dp minimum without enlarging the visual (T082).
+            hitSlop={spacing.xs}
             style={({ pressed }) => [
               styles.toggle,
               { borderColor: task.isCompleted ? 'transparent' : colors.border },

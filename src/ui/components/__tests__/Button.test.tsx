@@ -49,6 +49,11 @@ describe('Button', () => {
     expect(destructiveStyle.borderColor).toBe(colors.destructive);
   });
 
+  it('keeps a >=44dp touch target for its compact small-caps label (T082)', async () => {
+    await render(<Button label="OK" testID="button" />);
+    expect(flatten(screen.getByTestId('button').props.style).minHeight).toBeGreaterThanOrEqual(44);
+  });
+
   it('reduces opacity and disables interaction when disabled', async () => {
     const onPress = jest.fn();
     await render(<Button label="Aktion" onPress={onPress} disabled testID="button" />);

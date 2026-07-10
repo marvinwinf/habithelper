@@ -88,6 +88,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
+    // Keeps every button a >=44dp touch target regardless of its short
+    // small-caps label (docs/DESIGN_SYSTEM.md's Accessibility section, T082);
+    // padding alone left the caption-sized label at ~40dp.
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },

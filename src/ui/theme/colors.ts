@@ -9,10 +9,13 @@
 // actions. The direction forbids an alarm red, and both readings want the
 // same muted rose, so they share one constant rather than drifting apart.
 //
-// Rose on `background` measures 4.25:1 — AA for large text and graphics, but
-// under the 4.5:1 that normal-size body text needs. T082 resolves this by
-// darkening the rose or confining it to glyphs and large text.
-const rose = '#9F6B5C';
+// The earlier rose (#9F6B5C) measured only 4.25:1 on `background` — fine for
+// glyphs and large text, but under the 4.5:1 that normal-size body text needs,
+// and destructive/overdue labels render rose at caption size. T082 darkens it
+// to clear AA for small text on every light surface (background 5.40:1,
+// surface 5.64:1, surfaceMuted 4.95:1) while staying a muted clay-rose, never
+// an alarm red. See docs/ACCESSIBILITY.md for the full pairing table.
+const rose = '#8F5A49';
 
 export const colors = {
   background: '#FAFAF9',
@@ -33,9 +36,10 @@ export const colors = {
 } as const;
 
 // Defined now so the token pairings can be contrast-checked as a set; dark
-// mode is not shipped in the MVP and nothing consumes these yet. The gold is
-// lightened to keep 4.5:1 against the dark surface.
-const roseDark = '#9F6B5C';
+// mode is not shipped in the MVP and nothing consumes these yet. Both the gold
+// and the rose are lightened relative to their light-theme values to keep
+// 4.5:1 against the dark surfaces (rose: background 5.77:1, surface 5.23:1).
+const roseDark = '#BC8878';
 
 export const colorsDark = {
   background: '#1C1917',

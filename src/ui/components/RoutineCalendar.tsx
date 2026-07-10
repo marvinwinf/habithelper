@@ -28,46 +28,72 @@ const WEEKDAY_HEADERS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 // and not_due days show only the day number (with not_due dimmed). Icon
 // colors are monochrome-plus-gold — ink (textPrimary/textSecondary) or the
 // accent — never a distinct hue per state (T080).
+// `labelColor` is the day-number ink; it must contrast the cell background at
+// AA for small text (T082). Every state but `exceeded` sits on a light surface
+// and reads in charcoal; the `exceeded` cell fills with the gold accent, where
+// charcoal only reaches 3.55:1, so its number switches to the on-accent stone.
 const STATE_VISUALS: Record<
   CalendarDayState,
-  { background: string; icon: keyof typeof Ionicons.glyphMap | null; iconColor: string }
+  {
+    background: string;
+    icon: keyof typeof Ionicons.glyphMap | null;
+    iconColor: string;
+    labelColor: string;
+  }
 > = {
-  not_due: { background: 'transparent', icon: null, iconColor: colors.textSecondary },
-  pending: { background: colors.surface, icon: null, iconColor: colors.textSecondary },
+  not_due: {
+    background: 'transparent',
+    icon: null,
+    iconColor: colors.textSecondary,
+    labelColor: colors.textPrimary,
+  },
+  pending: {
+    background: colors.surface,
+    icon: null,
+    iconColor: colors.textSecondary,
+    labelColor: colors.textPrimary,
+  },
   completed: {
     background: colors.surfaceMuted,
     icon: 'checkmark',
     iconColor: colors.accent,
+    labelColor: colors.textPrimary,
   },
   exceeded: {
     background: colors.accent,
     icon: 'checkmark-done',
     iconColor: colors.textOnAccent,
+    labelColor: colors.textOnAccent,
   },
   missed: {
     background: colors.surfaceMuted,
     icon: 'close',
     iconColor: colors.textPrimary,
+    labelColor: colors.textPrimary,
   },
   skipped: {
     background: colors.surfaceMuted,
     icon: 'ellipse-outline',
     iconColor: colors.textSecondary,
+    labelColor: colors.textPrimary,
   },
   moved: {
     background: colors.surfaceMuted,
     icon: 'arrow-forward',
     iconColor: colors.textSecondary,
+    labelColor: colors.textPrimary,
   },
   joker_protected: {
     background: colors.surfaceMuted,
     icon: 'star',
     iconColor: colors.accent,
+    labelColor: colors.textPrimary,
   },
   paused: {
     background: colors.surfaceMuted,
     icon: 'pause',
     iconColor: colors.textSecondary,
+    labelColor: colors.textPrimary,
   },
 };
 
@@ -147,7 +173,13 @@ export function RoutineCalendar({
                   pressed && styles.dayPressed,
                 ]}
               >
-                <Text style={[styles.dayLabel, day.state === 'not_due' && styles.dayLabelDimmed]}>
+                <Text
+                  style={[
+                    styles.dayLabel,
+                    { color: visuals.labelColor },
+                    day.state === 'not_due' && styles.dayLabelDimmed,
+                  ]}
+                >
                   {Number(day.date.slice(8, 10))}
                 </Text>
                 {visuals.icon && (
