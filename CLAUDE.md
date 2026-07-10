@@ -71,14 +71,14 @@ Report:
 
 ## Design Direction
 
-Follow the Soft Momentum design direction:
+Follow the Quiet Atelier design direction (see `docs/DESIGN_SYSTEM.md` for full detail):
 
 - light theme,
-- warm off-white background,
-- pastel category colors,
-- rounded modern cards,
-- subtle same-family gradients,
-- clear hierarchy,
-- short visible animations,
+- warm stone-white background, charcoal text, single antique-gold accent,
+- no pastel category colors, no per-item background tinting,
+- near-square corners, hairline dividers instead of cards/shadows,
+- serif display type for titles/streak numerals only, sans for everything functional,
+- typographic (not graphic/gamified) streak and progress display,
+- short, deliberate fade-only animations (no bounce/spring),
 - routines visually prioritized over tasks,
 - no mascots.

@@ -690,3 +690,117 @@ Brings every existing screen up to the visual level of `docs/design_reference.pn
 **Manual verification:** the entire aggregated checklist itself — run every manual verification step from T001–T060 relevant to shipped functionality, in one pass, on the release build.
 **Dependencies:** T060.
 **Commit message:** `docs: record full manual regression pass results`
+
+---
+
+## Phase 11 — Quiet Atelier Design Refactor
+
+Replaces the "Soft Momentum" visual direction implemented through Phase 2 and Phase 8b with "Quiet Atelier" (see `docs/DESIGN_SYSTEM.md`): charcoal-on-stone neutrals, a single antique-gold accent, near-square corners, hairline dividers instead of cards/shadows, a serif display face used sparingly, and typographic (not graphic/gamified) streak display. No schema changes are expected — `category.base_color` and `color_variant_seed` remain in the data model but stop being used for UI tinting.
+
+### T071 — Replace `docs/DESIGN_SYSTEM.md` with the Quiet Atelier direction
+**Goal:** land the Quiet Atelier direction as the new source of truth, replacing every Soft Momentum reference.
+**Files/areas:** `docs/DESIGN_SYSTEM.md` (done), `CLAUDE.md`'s Design Direction section (done).
+**Acceptance criteria:** both files describe Quiet Atelier consistently; no remaining Soft Momentum description in either.
+**Required automated tests:** none (docs-only).
+**Manual verification:** none.
+**Dependencies:** none.
+**Commit message:** `docs: replace Soft Momentum with Quiet Atelier design direction`
+
+### T072 — Rework design tokens
+**Goal:** replace `src/ui/theme/colors.ts`/`radius.ts`/`spacing.ts`/`typography.ts` with the Quiet Atelier token set (color table, 2/4/999 radius scale, 8/12/20/32/48 spacing, serif+sans font pair); remove the pastel palette-family tokens and the shadow/elevation token added in T062.
+**Files/areas:** `src/ui/theme/*`.
+**Acceptance criteria:** token tests updated to assert the new values; no consumer left referencing removed tokens (compile-clean).
+**Required automated tests:** token shape/value tests.
+**Manual verification:** none (no UI yet in isolation).
+**Dependencies:** T071.
+**Commit message:** `feat: replace design tokens with Quiet Atelier values`
+
+### T073 — Retire category color tinting
+**Goal:** stop using `category.base_color` / `color_variant_seed` for UI tinting anywhere (`categoryVariant.ts` consumers); keep the schema columns and repository fields untouched (no migration — data is simply no longer rendered as a tint) per the "don't delete persistent data to solve a styling problem" rule.
+**Files/areas:** `src/ui/theme/categoryVariant.ts` (mark unused/retained for data compatibility, or remove UI-facing exports while keeping the pure function + its tests for potential future use), `src/ui/components/CategoryBadge.tsx`, `src/ui/components/IconBadge.tsx` (tint prop becomes neutral-only).
+**Acceptance criteria:** no screen renders a category-colored background/badge/tint; category icon still renders in neutral/hairline style; existing category data (base_color, icon) is unaffected in the DB.
+**Required automated tests:** updated component tests for `CategoryBadge`/`IconBadge` asserting neutral rendering regardless of category color.
+**Manual verification:** on-device, confirm categories no longer show colored tints anywhere they previously did.
+**Dependencies:** T072.
+**Commit message:** `refactor: remove category color tinting from UI`
+
+### T074 — Restyle core primitives (Card, Button, CompletionControl)
+**Goal:** `Card` becomes a plain hairline-divided surface (no shadow/elevation); `Button` gets solid-primary/underlined-secondary/destructive variants per the new style; `CompletionControl` visual becomes an outline glyph → gold check + underline draw-in (interaction/callback contract unchanged from T016).
+**Files/areas:** `src/ui/components/Card.tsx`, `Button.tsx`, `CompletionControl.tsx`, `src/ui/animation/useCompletionAnimation.ts` (swap scale/bounce for underline draw-in fade).
+**Acceptance criteria:** existing tap/long-press callback tests still pass unchanged; new visual-variant tests assert no shadow/tint styles remain and the new completion visual is gold-underline-based; reduced-motion still yields an instant state change.
+**Required automated tests:** updated component tests per component listed above.
+**Manual verification:** dev preview screen (T019) shows the restyled primitives.
+**Dependencies:** T072.
+**Commit message:** `feat: restyle Card, Button, and CompletionControl to Quiet Atelier`
+
+### T075 — Redesign RoutineCard and TaskCard as hairline list rows
+**Goal:** remove category-tinted backgrounds, rounded icon containers, and colorful badges from both cards; render as single-surface rows with a hairline divider, serif streak numeral (routines) or subtitle (tasks), and the new completion control.
+**Files/areas:** `src/ui/components/RoutineCard.tsx`, `src/ui/components/TaskCard.tsx`.
+**Acceptance criteria:** all existing interaction behavior (tap-to-complete, long-press-to-exceed, tap-to-open-detail, overflow menu, subdued completed state, bookmark on "For later") is unchanged; visuals match `docs/DESIGN_SYSTEM.md`'s Routine/Task Item Design section.
+**Required automated tests:** existing RoutineCard/TaskCard tests updated for new markup/assertions, not behavior.
+**Manual verification:** on-device with seed data (T047), confirm rows render correctly across completed/skipped/missed/paused states.
+**Dependencies:** T073, T074.
+**Commit message:** `feat: redesign routine and task cards as hairline list rows`
+
+### T076 — Redesign Today screen header and progress display
+**Goal:** replace the colorful streak-card/progress-bar header block with a typographic header — greeting + date in the serif face, streak as a plain serif numeral, "x von y erledigt" as text with a thin rule-based progress indicator instead of a filled bar widget.
+**Files/areas:** `app/(tabs)/today.tsx` header section.
+**Acceptance criteria:** `today-app-streak` testID and first-completion burst behavior (now the underline/fade treatment, not a scale burst) still function; progress text format unchanged ("x von y erledigt").
+**Required automated tests:** updated header assertions in `today.test.tsx`.
+**Manual verification:** on-device, complete a routine and confirm the header updates and the first-of-day feedback still fires once.
+**Dependencies:** T072, T074.
+**Commit message:** `feat: redesign Today header to Quiet Atelier`
+
+### T077 — Redesign bottom navigation
+**Goal:** replace the floating rounded/pill-highlighted tab bar with a flat, hairline-topped bar; active tab indicated by a small gold underline/dot instead of a filled pill.
+**Files/areas:** `app/(tabs)/_layout.tsx`, `src/ui/components/CreateFab.tsx` (reposition relative to the flat bar).
+**Acceptance criteria:** all four tabs remain reachable; FAB sheet still opens correctly; no floating card-style shadow remains.
+**Required automated tests:** existing CreateFab/tab-layout smoke tests updated where markup changed.
+**Manual verification:** on-device, verify bar/FAB on tall and short screens, and Android gesture navigation does not clip the bar.
+**Dependencies:** T072, T074.
+**Commit message:** `refactor: restyle bottom navigation to Quiet Atelier`
+
+### T078 — Redesign create/edit forms (Routine, Task, Category)
+**Goal:** replace colored frequency option-cards, dashed "create category" button, and rounded category-color pickers with underlined inputs, small-caps section labels, and a plain text/icon "+ New category" action; category color picker is removed or reduced to icon-only selection per T073.
+**Files/areas:** `src/ui/components/RoutineForm.tsx`, `TaskForm`/task create-edit screens, `CategoryForm.tsx`.
+**Acceptance criteria:** all existing form behavior (validation, weekly-target suggestion, weekday toggling, advanced/collapsible sections, save) is unchanged; category form no longer offers a color palette picker (icon-only selection remains).
+**Required automated tests:** existing form tests updated for new markup/assertions; a test confirming the category color picker UI is gone.
+**Manual verification:** on-device, create/edit one routine, one task, and one category end-to-end.
+**Dependencies:** T073, T074.
+**Commit message:** `feat: redesign create and edit forms to Quiet Atelier`
+
+### T079 — Redesign routine detail hero and stats
+**Goal:** replace the category-tinted hero card and colorful stat tiles with a typographic hero — serif streak numeral, text-based level/remaining-completions line, plain-text stat row (streak / record / total) — and underlined (not filled) edit/pause action buttons.
+**Files/areas:** `app/routine/[id]/index.tsx`, `src/ui/components/StatTile.tsx` (restyled or replaced with a plain text row).
+**Acceptance criteria:** all real cache-driven values (streak, best streak, total completions, level/remaining-to-next-level, joker inventory pre-66) still render correctly; level-up animation still plays, restyled to match the new motion language (fade, not a burst).
+**Required automated tests:** existing detail-screen tests updated for new structure/assertions, not underlying values.
+**Manual verification:** on-device with a seeded near-level-boundary routine, verify hero/stat values and both action buttons.
+**Dependencies:** T073, T074, T075.
+**Commit message:** `feat: redesign routine detail hero and stats to Quiet Atelier`
+
+### T080 — Redesign calendar status indicators and legend
+**Goal:** replace the multi-color status icon set (green check / red x / purple circle / gold star / pause bars) with a monochrome-plus-gold system: each day state gets a distinct glyph in ink or gold (never a distinct hue per state) so meaning comes from shape, not a rainbow of colors; legend updated to match.
+**Files/areas:** `src/ui/components/RoutineCalendar.tsx`.
+**Acceptance criteria:** every `CalendarDayState` still maps to a visually distinct glyph (color-never-sole-signal preserved); today's ring highlight and retroactive-completion-by-tap behavior unchanged.
+**Required automated tests:** existing RoutineCalendar tests updated for the new icon/color mapping per state.
+**Manual verification:** on-device with seed data containing each state (including joker-protected), walk months and check the legend.
+**Dependencies:** T072, T079.
+**Commit message:** `refactor: restyle calendar status icons to Quiet Atelier`
+
+### T081 — Visual consistency pass
+**Goal:** re-run the equivalent of T056 against the new direction — audit every screen for leftover Soft Momentum remnants (stray shadows, rounded-16px radii, pastel colors, category tints, spring/bounce animation) and correct drift.
+**Files/areas:** cross-cutting.
+**Acceptance criteria:** an explicit per-screen checklist (Today, Routines, Routine detail, Tasks, Settings, Category management, all create/edit forms) confirms no inline literals outside `src/ui/theme`, no remaining pastel/shadow/tint usage, motion durations within the new 250–350ms fade-only bounds.
+**Required automated tests:** none beyond existing suite; optional lint rule confirming no raw color/radius literals outside theme files.
+**Manual verification:** walk the checklist on-device.
+**Dependencies:** T075, T076, T077, T078, T079, T080.
+**Commit message:** `chore: Quiet Atelier visual consistency pass`
+
+### T082 — Accessibility re-verification
+**Goal:** re-run the equivalent of T058 against the new, more monochrome palette — confirm gold/rose/charcoal-on-stone contrast ratios, that every state still has a non-color signal, and touch targets remain compliant despite the visually minimal row design.
+**Files/areas:** cross-cutting; likely small fixes to row padding, glyph sizing, or the missed-state dot.
+**Acceptance criteria:** documented contrast check for every text/icon-on-background pairing in the new token set meets WCAG AA (or better where noted in `docs/DESIGN_SYSTEM.md`); all interactive targets remain ≥44dp; destructive actions still require confirmation.
+**Required automated tests:** existing destructive-confirmation test still passes; any new contrast-dependent logic gets a unit test if applicable (most contrast verification is manual/tooling-based, not testable in Jest).
+**Manual verification:** Android accessibility scanner / TalkBack spot-check across main screens; manual color-contrast check of gold-on-stone and rose-on-stone pairings.
+**Dependencies:** T081.
+**Commit message:** `fix: address Quiet Atelier accessibility review findings`
