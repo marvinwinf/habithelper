@@ -3,7 +3,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from './Button';
-import { Card } from './Card';
 import { IconBadge } from './IconBadge';
 import { Sheet } from './Sheet';
 import { useMountAnimation } from '../animation/useMountAnimation';
@@ -53,14 +52,12 @@ function subtitleFor(task: TaskCardTask, forLater: boolean): string {
 }
 
 /**
- * A single task's card, per docs/SCREEN_SPECIFICATIONS.md's Task Card and
- * the design reference mockup: rounded icon container (category icon,
- * neutral fallback), title with a short subtitle ("Heute", the date, or
- * "Für später"), completion toggle (which also serves as undo) on the
- * right, and an overflow menu. Deliberately stays on the neutral surface —
- * task cards are visually quieter than routine cards per
- * docs/DESIGN_SYSTEM.md. Shared between the Tasks screen and the Today
- * screen's Tasks/For-later sections (T049/T066).
+ * A single task's row, per docs/DESIGN_SYSTEM.md's Routine and Task Item
+ * Design: a single-surface hairline-divided row (no card, no category
+ * tint), title with a short subtitle ("Heute", the date, or "Für später"),
+ * an outline-glyph completion toggle (which also serves as undo) on the
+ * right, and an overflow menu. Shared between the Tasks screen and the
+ * Today screen's Tasks/For-later sections (T049/T066).
  */
 export function TaskCard({
   task,
@@ -96,10 +93,13 @@ export function TaskCard({
           transform: [{ translateY: mountTranslateY }],
         }}
       >
-        <Card style={[styles.card, task.isCompleted && styles.cardSubdued]} testID={testID}>
+        <View style={styles.row} testID={testID}>
           <IconBadge name={categoryIconName(category?.icon)} />
           <View style={styles.main}>
-            <Text style={styles.title} numberOfLines={1}>
+            <Text
+              style={[styles.title, task.isCompleted && styles.titleCompleted]}
+              numberOfLines={1}
+            >
               {task.title}
             </Text>
             {subtitle.length > 0 && <Text style={styles.subtitle}>{subtitle}</Text>}
@@ -126,7 +126,7 @@ export function TaskCard({
             onPress={onToggleComplete}
             style={({ pressed }) => [
               styles.toggle,
-              task.isCompleted && styles.toggleChecked,
+              { borderColor: task.isCompleted ? 'transparent' : colors.border },
               pressed && styles.togglePressed,
             ]}
             testID={`${testID}-toggle`}
@@ -139,7 +139,7 @@ export function TaskCard({
             onPress={() => setMenuOpen(true)}
             testID={`${testID}-menu-button`}
           />
-        </Card>
+        </View>
       </Animated.View>
 
       <Sheet visible={menuOpen} onClose={() => setMenuOpen(false)} testID={`${testID}-menu`}>
@@ -170,29 +170,34 @@ export function TaskCard({
 }
 
 const styles = StyleSheet.create({
-  card: {
-    marginBottom: spacing.sm,
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-  },
-  cardSubdued: {
-    opacity: 0.5,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   main: {
     flex: 1,
     gap: spacing.xs,
   },
   title: {
+    fontFamily: typography.body.fontFamily,
     fontSize: typography.body.fontSize,
     fontWeight: typography.body.fontWeight,
     color: colors.textPrimary,
   },
+  titleCompleted: {
+    color: colors.textSecondary,
+  },
   subtitle: {
+    fontFamily: typography.caption.fontFamily,
     fontSize: typography.caption.fontSize,
     color: colors.textSecondary,
   },
   overdueLabel: {
+    fontFamily: typography.caption.fontFamily,
     fontSize: typography.caption.fontSize,
     color: colors.destructive,
   },
@@ -201,20 +206,15 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  toggleChecked: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
   },
   togglePressed: {
     opacity: pressedOpacity,
   },
   checkmark: {
-    color: colors.textOnAccent,
+    color: colors.accent,
     fontSize: typography.bodySmall.fontSize,
     fontWeight: typography.bodySmall.fontWeight,
   },
