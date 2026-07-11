@@ -81,4 +81,8 @@ Follow the Soft Momentum design direction (see `docs/DESIGN_SYSTEM.md` for full 
 - streaks and gentle milestone acknowledgement are the extent of gamification — no punishment for a missed day, no points/leaderboards,
 - short, gentle motion: fades for mount/dismiss, a subtle non-bouncy spring for completion/milestones,
 - routines visually prioritized over tasks,
+- clear per-screen reading order — sections carry weight proportional to importance, never all-equal (Today: greeting → daily progress → focus of the day → routines → tasks),
+- generous whitespace between sections and inside cards; when a screen feels crowded, add space and remove elements rather than packing tighter; simplify before adding UI,
+- light, soft-paper cards: soft low-contrast borders, light backgrounds, generous internal padding, extra rounding, at most an extremely subtle shadow — never heavy containers,
+- list rows are for viewing and completing only — no overflow / three-dot menus on rows; item actions (edit, pause, change color, statistics, delete) live in the detail screen or a bottom sheet opened by tapping the row,
 - no mascots.
