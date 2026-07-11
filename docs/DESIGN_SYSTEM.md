@@ -49,8 +49,8 @@ The layout should breathe — Soft Momentum reads as calm paper, and crowding ki
 
 Routine and task **list rows do not show a three-dot / overflow menu**. A list is for viewing and completing items — that is its entire job, and per-row menus add visual noise to the screen that matters most.
 
-- Tapping a row opens its dedicated detail screen (or a bottom sheet) — that is the single place item actions live.
-- Item actions (**Edit, Pause/Reactivate, Change color, Statistics, Delete**, plus routine-specific move/skip) belong only in that detail screen or bottom sheet, never inline on the row.
+- Tapping a row opens an actions bottom sheet (or, where one exists, the item's dedicated detail screen) — that is the single place item actions live.
+- Item actions belong only in that sheet/detail, never inline on the row: **Statistik** (opens the routine detail — streak, level, calendar), **Edit** (the form is where category, and therefore color, is changed), **Pause/Reactivate**, **Delete**, plus the routine's today-occurrence actions (**move to tomorrow**, **conscious skip**).
 - The only inline control a list row carries is its completion control.
 
 ## Color Tokens

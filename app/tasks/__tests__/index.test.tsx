@@ -140,23 +140,23 @@ describe('TasksScreen', () => {
     expect(toggleTaskCompletion).toHaveBeenCalledWith({}, 'task-1');
   });
 
-  it('moves a task to tomorrow from the overflow menu', async () => {
+  it('moves a task to tomorrow from the actions sheet', async () => {
     const task = makeTask({ id: 'task-1', date: TODAY });
     (listTasksForToday as jest.Mock).mockResolvedValue([task]);
 
     await render(<TasksScreen />);
-    await fireEvent.press(await screen.findByTestId('task-row-task-1-menu-button'));
+    await fireEvent.press(await screen.findByTestId('task-row-task-1'));
     await fireEvent.press(screen.getByTestId('task-row-task-1-menu-move'));
 
     expect(moveTask).toHaveBeenCalledWith({}, 'task-1', TOMORROW);
   });
 
-  it('deletes a task from the overflow menu only after confirmation', async () => {
+  it('deletes a task from the actions sheet only after confirmation', async () => {
     const task = makeTask({ id: 'task-1', date: TODAY });
     (listTasksForToday as jest.Mock).mockResolvedValue([task]);
 
     await render(<TasksScreen />);
-    await fireEvent.press(await screen.findByTestId('task-row-task-1-menu-button'));
+    await fireEvent.press(await screen.findByTestId('task-row-task-1'));
     await fireEvent.press(screen.getByTestId('task-row-task-1-menu-delete'));
 
     expect(deleteTask).not.toHaveBeenCalled();
@@ -178,7 +178,7 @@ describe('TasksScreen', () => {
 
     await render(<TasksScreen />);
     await fireEvent.press(await screen.findByTestId('tasks-completed-toggle'));
-    await fireEvent.press(await screen.findByTestId('task-row-done-1-menu-button'));
+    await fireEvent.press(await screen.findByTestId('task-row-done-1'));
 
     expect(screen.queryByTestId('task-row-done-1-menu-move')).toBeNull();
     expect(screen.getByTestId('task-row-done-1-menu-edit')).toBeTruthy();

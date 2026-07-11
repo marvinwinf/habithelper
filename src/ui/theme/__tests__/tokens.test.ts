@@ -4,6 +4,7 @@ import {
   fontFamilies,
   iconBadgeSizes,
   radius,
+  softShadow,
   spacing,
   typography,
 } from '../index';
@@ -54,6 +55,17 @@ describe('spacing tokens', () => {
 describe('radius tokens', () => {
   it('defines the soft sm/md/lg scale plus a pill for circular elements', () => {
     expect(radius).toEqual({ sm: 10, md: 18, lg: 26, full: 999 });
+  });
+});
+
+describe('elevation token', () => {
+  it('keeps the card shadow an extremely subtle, warm whisper — never a Material slab', () => {
+    // Soft paper: barely-there opacity, a soft (large) blur, and minimal
+    // Android elevation, tinted with the warm text color rather than black.
+    expect(softShadow.shadowOpacity).toBeLessThanOrEqual(0.1);
+    expect(softShadow.shadowColor).toBe(colors.textPrimary);
+    expect(softShadow.elevation).toBeLessThanOrEqual(2);
+    expect(softShadow.shadowRadius).toBeGreaterThanOrEqual(12);
   });
 });
 

@@ -66,12 +66,12 @@ No overflow / three-dot menu on the row.
 
 Interactions:
 
-- tap card: open routine detail (the single place item actions live),
+- tap card: open the routine's actions bottom sheet,
 - tap completion button: complete,
 - long press completion button: exceeded,
 - tap completion button again once completed or exceeded: undo (see `docs/ROUTINE_RULES.md`'s Undo Completion).
 
-All non-completion actions (move to tomorrow, conscious skip, edit, pause, change color, statistics, delete) live in the Routine Detail screen or a bottom sheet opened from it — never inline on the row (see `docs/DESIGN_SYSTEM.md`'s List Row Actions).
+The actions bottom sheet is the one place a routine's non-completion actions live — the row itself carries only the completion control (see `docs/DESIGN_SYSTEM.md`'s List Row Actions). It contains: **Statistik** (opens the full Routine Detail — streak, level, calendar), **move to tomorrow** and **conscious skip** (today's occurrence, shown only while it is unresolved and, for skip, allowed), **edit**, **pause**, and **delete** (destructive, confirmed).
 
 Completed routines remain visible in a subdued completed state and move toward the end of the section.
 
@@ -182,10 +182,10 @@ Each routine card shows:
 
 Interactions:
 
-- tap card: open detail (where all item actions live),
-- drag and drop: reorder.
+- tap card: open the routine's actions bottom sheet (Statistik, edit, pause/reactivate, delete; Statistik opens the full Routine Detail),
+- long press + drag: reorder.
 
-No overflow / three-dot menu on the row. Edit, pause or reactivate, change color, statistics, and delete are reached from the Routine Detail screen or a bottom sheet opened from it (see `docs/DESIGN_SYSTEM.md`'s List Row Actions).
+No overflow / three-dot menu on the row (see `docs/DESIGN_SYSTEM.md`'s List Row Actions).
 
 ## Routine Detail Screen
 
@@ -220,14 +220,13 @@ Past days can be edited for retroactive completion.
 
 ### Actions
 
-This screen (or a bottom sheet opened from it) is the single home for every routine action — the list rows no longer carry an overflow menu (see `docs/DESIGN_SYSTEM.md`'s List Row Actions). Actions available here:
+This screen is the rich home for a routine — the list rows never carry an overflow menu, and it is reached via the "Statistik" entry in each row's actions bottom sheet (see `docs/DESIGN_SYSTEM.md`'s List Row Actions). It carries the whole statistics view (streak, level, record, completions, calendar) plus an action row:
 
-- Edit,
-- Pause / Reactivate,
-- Change color,
-- Statistics,
-- Delete (destructive, terracotta, always confirmed),
-- plus the Today-context actions where applicable (move to tomorrow, conscious skip).
+- **Bearbeiten** (edit — the form is also where a routine's category, and therefore its color, is changed),
+- **Pausieren / Reaktivieren**,
+- **Löschen** (destructive, terracotta, always confirmed; returns to the previous screen).
+
+The today-occurrence quick actions (move to tomorrow, conscious skip) live in the Today row's actions bottom sheet, where they are in context — not here.
 
 ## Tasks Screen
 

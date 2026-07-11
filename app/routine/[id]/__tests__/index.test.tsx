@@ -3,7 +3,11 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import RoutineDetailScreen from '../index';
 import { todayDateString } from '../../../../src/domain/dates';
-import { getRoutine, updateRoutine } from '../../../../src/data/repositories/routineRepository';
+import {
+  getRoutine,
+  softDeleteRoutine,
+  updateRoutine,
+} from '../../../../src/data/repositories/routineRepository';
 import { listCategories } from '../../../../src/data/repositories/categoryRepository';
 import { listRoutineEvents } from '../../../../src/data/repositories/routineEventRepository';
 import { getRoutineStateCache } from '../../../../src/data/repositories/routineStateCacheRepository';
@@ -18,6 +22,7 @@ jest.mock('../../../../src/data/db/client', () => ({ db: {} }));
 jest.mock('../../../../src/data/repositories/routineRepository', () => ({
   getRoutine: jest.fn(),
   updateRoutine: jest.fn().mockResolvedValue(undefined),
+  softDeleteRoutine: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('../../../../src/data/repositories/categoryRepository', () => ({
   listCategories: jest.fn().mockResolvedValue([]),
@@ -161,6 +166,23 @@ describe('RoutineDetailScreen', () => {
 
     expect(reactivateRoutine).toHaveBeenCalledWith({}, 'routine-1', TODAY);
     expect(pauseRoutine).not.toHaveBeenCalled();
+  });
+
+  it('deletes the routine from the detail action, only after confirmation, then returns', async () => {
+    await render(<RoutineDetailScreen />);
+    await screen.findByText('Laufen');
+
+    await fireEvent.press(screen.getByTestId('routine-detail-delete'));
+
+    // Confirmed via the shared alert, not immediately.
+    expect(softDeleteRoutine).not.toHaveBeenCalled();
+
+    const alertCall = (Alert.alert as jest.Mock).mock.calls.at(-1);
+    const buttons = alertCall[2] as { text: string; onPress?: () => void }[];
+    await buttons.find((b) => b.text === 'Löschen')?.onPress?.();
+
+    expect(softDeleteRoutine).toHaveBeenCalledWith({}, 'routine-1');
+    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
   it.each([

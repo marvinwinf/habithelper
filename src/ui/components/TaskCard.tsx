@@ -6,7 +6,7 @@ import { Button } from './Button';
 import { IconBadge } from './IconBadge';
 import { Sheet } from './Sheet';
 import { useMountAnimation } from '../animation/useMountAnimation';
-import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
+import { colors, pressedOpacity, radius, softShadow, spacing, typography } from '../theme';
 import { getCategoryColorVariant, getCategorySolidFill } from '../theme/categoryVariant';
 import { categoryIconName } from '../categoryIcons';
 import { todayDateString } from '../../domain/dates';
@@ -50,10 +50,12 @@ function subtitleFor(task: TaskCardTask, forLater: boolean): string {
 
 /**
  * A single task's row, per docs/DESIGN_SYSTEM.md's Routine and Task Item
- * Design: a soft card lightly tinted by its category's color variant, title
- * with a short subtitle ("Heute", the date, or "Für später"), a filled-circle
- * completion toggle (which also serves as undo) on the right, and an
- * overflow menu. Shared between the Tasks screen and the Today screen's
+ * Design: a light soft-paper card lightly tinted by its category's color
+ * variant, title with a short subtitle ("Heute", the date, or "Für später"),
+ * and a filled-circle completion toggle (which also serves as undo) on the
+ * right. Per the design system's List Row Actions rule the row has no inline
+ * overflow menu; tapping the card opens an actions bottom sheet (edit, move,
+ * delete). Shared between the Tasks screen and the Today screen's
  * Tasks/For-later sections (T049/T066).
  */
 export function TaskCard({
@@ -84,8 +86,14 @@ export function TaskCard({
   return (
     <>
       <Animated.View style={{ opacity: mountAnimation.progress }}>
-        <View
-          style={[styles.row, variant && { backgroundColor: variant.background }]}
+        <Pressable
+          onPress={() => setMenuOpen(true)}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.row,
+            variant && { backgroundColor: variant.background },
+            pressed && styles.rowPressed,
+          ]}
           testID={testID}
         >
           <IconBadge
@@ -136,13 +144,7 @@ export function TaskCard({
               <Text style={[styles.checkmark, styles.checkmarkCompleted]}>✓</Text>
             ) : null}
           </Pressable>
-          <Button
-            label="⋯"
-            variant="secondary"
-            onPress={() => setMenuOpen(true)}
-            testID={`${testID}-menu-button`}
-          />
-        </View>
+        </Pressable>
       </Animated.View>
 
       <Sheet visible={menuOpen} onClose={() => setMenuOpen(false)} testID={`${testID}-menu`}>
@@ -177,12 +179,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    padding: spacing.sm,
-    marginBottom: spacing.sm,
+    // Generous internal padding so the card breathes — soft paper, not a
+    // tight container (docs/DESIGN_SYSTEM.md's Whitespace and Rhythm).
+    padding: spacing.md,
     borderRadius: radius.lg,
-    borderWidth: 1,
+    // Soft hairline + subtle shadow rather than a full 1px stroke.
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     backgroundColor: colors.surface,
+    ...softShadow,
+  },
+  rowPressed: {
+    opacity: pressedOpacity,
   },
   main: {
     flex: 1,

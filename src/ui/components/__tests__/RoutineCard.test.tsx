@@ -134,50 +134,60 @@ describe('RoutineCard', () => {
     await waitFor(() => expect(triggerLevelMilestoneHaptic).toHaveBeenCalledTimes(1));
   });
 
-  it('tapping the card body outside the completion button navigates to detail, not completion', async () => {
+  it('tapping the card body opens the actions sheet rather than completing', async () => {
     const { callbacks } = await renderCard();
 
     await fireEvent.press(screen.getByTestId('routine-card'));
 
-    expect(callbacks.onOpenDetail).toHaveBeenCalledTimes(1);
+    // The sheet's actions become reachable, and the tap did not complete.
+    expect(screen.getByTestId('routine-card-menu-detail')).toBeTruthy();
     expect(callbacks.onComplete).not.toHaveBeenCalled();
     expect(callbacks.onExceed).not.toHaveBeenCalled();
   });
 
-  it('omits conscious skip from the overflow menu when the routine disallows it', async () => {
+  it('opens the detail from the actions sheet Statistik entry', async () => {
+    const { callbacks } = await renderCard();
+
+    await fireEvent.press(screen.getByTestId('routine-card'));
+    await fireEvent.press(screen.getByTestId('routine-card-menu-detail'));
+
+    expect(callbacks.onOpenDetail).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits conscious skip from the actions sheet when the routine disallows it', async () => {
     await renderCard({ routine: { ...routine, allowConsciousSkip: false } });
 
-    await fireEvent.press(screen.getByTestId('routine-card-menu-button'));
+    await fireEvent.press(screen.getByTestId('routine-card'));
 
     expect(screen.queryByTestId('routine-card-menu-skip')).toBeNull();
     expect(screen.getByTestId('routine-card-menu-move')).toBeTruthy();
   });
 
-  it('includes conscious skip in the overflow menu when the routine allows it', async () => {
+  it('includes conscious skip in the actions sheet when the routine allows it', async () => {
     const { callbacks } = await renderCard({ routine: { ...routine, allowConsciousSkip: true } });
 
-    await fireEvent.press(screen.getByTestId('routine-card-menu-button'));
+    await fireEvent.press(screen.getByTestId('routine-card'));
     await fireEvent.press(screen.getByTestId('routine-card-menu-skip'));
 
     expect(callbacks.onSkip).toHaveBeenCalledTimes(1);
   });
 
-  it('wires the remaining overflow menu actions', async () => {
+  it('wires the remaining actions-sheet entries', async () => {
     const { callbacks } = await renderCard();
 
-    await fireEvent.press(screen.getByTestId('routine-card-menu-button'));
+    await fireEvent.press(screen.getByTestId('routine-card'));
     await fireEvent.press(screen.getByTestId('routine-card-menu-move'));
     expect(callbacks.onMoveToTomorrow).toHaveBeenCalledTimes(1);
 
-    await fireEvent.press(screen.getByTestId('routine-card-menu-button'));
+    await fireEvent.press(screen.getByTestId('routine-card'));
     await fireEvent.press(screen.getByTestId('routine-card-menu-edit'));
     expect(callbacks.onEdit).toHaveBeenCalledTimes(1);
 
-    await fireEvent.press(screen.getByTestId('routine-card-menu-button'));
+    await fireEvent.press(screen.getByTestId('routine-card'));
     await fireEvent.press(screen.getByTestId('routine-card-menu-pause'));
     expect(callbacks.onPause).toHaveBeenCalledTimes(1);
 
-    await fireEvent.press(screen.getByTestId('routine-card-menu-button'));
+    await fireEvent.press(screen.getByTestId('routine-card'));
     await fireEvent.press(screen.getByTestId('routine-card-menu-delete'));
     expect(callbacks.onDelete).toHaveBeenCalledTimes(1);
   });
@@ -256,16 +266,17 @@ describe('RoutineCard', () => {
     expect(screen.getByText('Mo, Mi, Fr')).toBeTruthy();
   });
 
-  it('hides move and skip in the overflow menu once the occurrence is resolved', async () => {
+  it('hides move and skip in the actions sheet once the occurrence is resolved', async () => {
     await renderCard({
       routine: { ...routine, allowConsciousSkip: true },
       state: 'completed',
     });
 
-    await fireEvent.press(screen.getByTestId('routine-card-menu-button'));
+    await fireEvent.press(screen.getByTestId('routine-card'));
 
     expect(screen.queryByTestId('routine-card-menu-move')).toBeNull();
     expect(screen.queryByTestId('routine-card-menu-skip')).toBeNull();
+    expect(screen.getByTestId('routine-card-menu-detail')).toBeTruthy();
     expect(screen.getByTestId('routine-card-menu-edit')).toBeTruthy();
     expect(screen.getByTestId('routine-card-menu-delete')).toBeTruthy();
   });

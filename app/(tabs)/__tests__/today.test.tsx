@@ -291,11 +291,11 @@ describe('TodayScreen', () => {
     expect(completeRoutineOccurrence).toHaveBeenCalledWith({}, dailyRoutine.id, TODAY);
   });
 
-  it('moves a routine to tomorrow from the overflow menu', async () => {
+  it('moves a routine to tomorrow from the actions sheet', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
 
     await render(<TodayScreen />);
-    await fireEvent.press(await screen.findByTestId(`routine-card-${dailyRoutine.id}-menu-button`));
+    await fireEvent.press(await screen.findByTestId(`routine-card-${dailyRoutine.id}`));
     await fireEvent.press(screen.getByTestId(`routine-card-${dailyRoutine.id}-menu-move`));
 
     expect(moveRoutineOccurrence).toHaveBeenCalledWith(
@@ -306,11 +306,11 @@ describe('TodayScreen', () => {
     );
   });
 
-  it('deletes a routine from the overflow menu only after confirmation', async () => {
+  it('deletes a routine from the actions sheet only after confirmation', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
 
     await render(<TodayScreen />);
-    await fireEvent.press(await screen.findByTestId(`routine-card-${dailyRoutine.id}-menu-button`));
+    await fireEvent.press(await screen.findByTestId(`routine-card-${dailyRoutine.id}`));
     await fireEvent.press(screen.getByTestId(`routine-card-${dailyRoutine.id}-menu-delete`));
 
     expect(softDeleteRoutine).not.toHaveBeenCalled();
@@ -391,17 +391,17 @@ describe('TodayScreen', () => {
     expect(toggleTaskCompletion).toHaveBeenCalledWith({}, 'task-1');
   });
 
-  it('moves and deletes a task from the Today screen overflow menu', async () => {
+  it('moves and deletes a task from the Today screen actions sheet', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([]);
     (listTasksForToday as jest.Mock).mockResolvedValue([makeTask({ id: 'task-1', date: TODAY })]);
 
     await render(<TodayScreen />);
-    await fireEvent.press(await screen.findByTestId('today-task-task-1-menu-button'));
+    await fireEvent.press(await screen.findByTestId('today-task-task-1'));
     await fireEvent.press(screen.getByTestId('today-task-task-1-menu-move'));
 
     expect(moveTask).toHaveBeenCalledWith({}, 'task-1', expect.any(String));
 
-    await fireEvent.press(await screen.findByTestId('today-task-task-1-menu-button'));
+    await fireEvent.press(await screen.findByTestId('today-task-task-1'));
     await fireEvent.press(screen.getByTestId('today-task-task-1-menu-delete'));
 
     const alertCall = (Alert.alert as jest.Mock).mock.calls.at(-1);
