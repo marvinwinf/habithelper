@@ -15,8 +15,12 @@ function tabIcon(focused: IconName, unfocused: IconName, label: string) {
   function TabIcon({ focused: isFocused, color }: { focused: boolean; color: ColorValue }) {
     return (
       <View style={[styles.tabItem, isFocused && styles.tabItemActive]}>
-        <Ionicons name={isFocused ? focused : unfocused} color={color} size={22} />
-        <Text style={[styles.tabLabel, { color }]}>{label}</Text>
+        <View style={styles.tabIconWrapper}>
+          <Ionicons name={isFocused ? focused : unfocused} color={color} size={22} />
+        </View>
+        <Text style={[styles.tabLabel, { color }]} numberOfLines={1}>
+          {label}
+        </Text>
       </View>
     );
   }
@@ -87,15 +91,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    height: 64,
+    height: 72,
   },
   tabItem: {
-    flexDirection: 'row',
+    flex: 1,
+    flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.xxs,
-    paddingVertical: spacing.xxs,
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
     borderRadius: radius.full,
+  },
+  tabIconWrapper: {
+    flexShrink: 0,
   },
   tabItemActive: {
     backgroundColor: colors.surfaceMuted,
@@ -103,6 +112,8 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: typography.caption.fontSize,
     lineHeight: typography.caption.lineHeight,
+    textAlign: 'center',
+    flexShrink: 1,
   },
   createButtonWrapper: {
     flex: 1,
