@@ -2,11 +2,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import type { ColorValue } from 'react-native';
 import { StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CreateFab } from '../../src/ui/components/CreateFab';
 import { colors, radius, spacing, typography } from '../../src/ui/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
+
+// Usable content height of the bar, above the Android bottom safe-area inset.
+// Must fit the item's icon+label pill (paddingTop 8 + icon 22 + gap 4 + label
+// 16 + paddingBottom 8 = 58) plus the tab button's own 5px top/bottom padding
+// that React Navigation adds around it (= 68), with a little slack. The
+// safe-area inset is ADDED below this (see TabLayout) rather than carved out of
+// it, so the icon+label column is never clipped regardless of the device's
+// gesture-nav inset.
+const TAB_BAR_CONTENT_HEIGHT = 72;
 
 // Labels render inside the custom tabBarIcon (not the default
 // tabBarShowLabel slot) so the soft pill fill can wrap the icon+label group,
@@ -41,6 +51,7 @@ function CreateTabButton() {
 }
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
@@ -50,8 +61,13 @@ export default function TabLayout() {
         // Kept in normal layout flow (not absolutely positioned) so screen
         // content can never hide behind it. A flat, hairline-topped bar with
         // a soft pill fill marking the active tab, per docs/DESIGN_SYSTEM.md's
-        // Navigation section.
-        tabBarStyle: styles.tabBar,
+        // Navigation section. Height is the fixed content height PLUS the
+        // Android bottom safe-area inset (added as paddingBottom), so the
+        // icon+label column always has its full height and is never clipped.
+        tabBarStyle: [
+          styles.tabBar,
+          { height: TAB_BAR_CONTENT_HEIGHT + insets.bottom, paddingBottom: insets.bottom },
+        ],
       }}
     >
       <Tabs.Screen
@@ -91,7 +107,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    height: 72,
+    // Height is set dynamically in TabLayout (content height + safe-area
+    // inset). Keep overflow visible so the center create button, which floats
+    // up out of the bar via createButtonWrapper's negative marginTop, is not
+    // clipped.
+    overflow: 'visible',
   },
   tabItem: {
     flex: 1,
