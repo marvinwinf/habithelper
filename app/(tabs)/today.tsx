@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { db } from '../../src/data/db/client';
 import { listCategories, type Category } from '../../src/data/repositories/categoryRepository';
@@ -42,14 +43,18 @@ import { scheduleFromRoutineRow } from '../../src/domain/routines/schedule';
 import { isFirstCompletionOfDay } from '../../src/domain/streaks/appStreak';
 import { compareByDateThenTime } from '../../src/domain/tasks/ordering';
 import { isDueTodayOrEarlier } from '../../src/domain/tasks/section';
+import { focusOfTheDay } from '../../src/domain/focusOfTheDay';
 import { confirmRoutineDeletion, confirmTaskDeletion } from '../../src/ui/alerts';
 import { triggerFirstCompletionOfDayHaptic } from '../../src/ui/animation/haptics';
 import { useStreakBurst } from '../../src/ui/animation/useStreakBurst';
+import { Button } from '../../src/ui/components/Button';
 import { EmptyState } from '../../src/ui/components/EmptyState';
+import { FocusOfTheDayCard } from '../../src/ui/components/FocusOfTheDayCard';
 import { ProgressBar } from '../../src/ui/components/ProgressBar';
 import { RoutineCard, type RoutineCardOccurrenceState } from '../../src/ui/components/RoutineCard';
+import { Sheet } from '../../src/ui/components/Sheet';
 import { TaskCard } from '../../src/ui/components/TaskCard';
-import { colors, spacing, typography } from '../../src/ui/theme';
+import { colors, pressedOpacity, spacing, typography } from '../../src/ui/theme';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('de-DE', {
   weekday: 'long',
@@ -80,6 +85,8 @@ export default function TodayScreen() {
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
   const [undatedTasks, setUndatedTasks] = useState<Task[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const streakBurst = useStreakBurst();
 
   const loadData = useCallback(() => {
@@ -223,14 +230,41 @@ export default function TodayScreen() {
   const greeting = getGreeting(new Date().getHours(), displayName);
   const formattedDate = DATE_FORMATTER.format(new Date());
 
+  const focusPrompt = focusOfTheDay(todayDateString());
+
   return (
+    <>
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}>
+        <View style={styles.iconRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Schnellzugriffe"
+            onPress={() => setShortcutsOpen(true)}
+            hitSlop={spacing.xs}
+            style={({ pressed }) => pressed && styles.iconButtonPressed}
+            testID="today-shortcuts-button"
+          >
+            <Ionicons name="menu-outline" size={24} color={colors.textPrimary} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Benachrichtigungen"
+            onPress={() => setNotificationsOpen(true)}
+            hitSlop={spacing.xs}
+            style={({ pressed }) => pressed && styles.iconButtonPressed}
+            testID="today-notifications-button"
+          >
+            <Ionicons name="notifications-outline" size={24} color={colors.textPrimary} />
+          </Pressable>
+        </View>
+
         <View style={styles.headerTopRow}>
           <View style={styles.headerGreetingBlock}>
             <Text style={styles.greeting} testID="today-greeting">
               {greeting}
             </Text>
+            <Text style={styles.greetingSubtitle}>Kleine Schritte, sanfter Schwung.</Text>
             <Text style={styles.date} testID="today-date">
               {formattedDate}
             </Text>
@@ -262,6 +296,8 @@ export default function TodayScreen() {
           />
         </View>
       </View>
+
+      <FocusOfTheDayCard prompt={focusPrompt} testID="today-focus-of-the-day" />
 
       {dueRoutines.length === 0 && todayTasks.length === 0 && laterTasks.length === 0 ? (
         <EmptyState
@@ -387,6 +423,44 @@ export default function TodayScreen() {
         </View>
       )}
     </ScrollView>
+
+    <Sheet
+      visible={shortcutsOpen}
+      onClose={() => setShortcutsOpen(false)}
+      testID="today-shortcuts-sheet"
+    >
+      <View style={styles.menu}>
+        <Button
+          label="Kategorien verwalten"
+          onPress={() => {
+            setShortcutsOpen(false);
+            router.push('/category');
+          }}
+          testID="today-shortcuts-categories"
+        />
+        <Button
+          label="Me"
+          variant="secondary"
+          onPress={() => {
+            setShortcutsOpen(false);
+            router.push('/(tabs)/settings');
+          }}
+          testID="today-shortcuts-me"
+        />
+      </View>
+    </Sheet>
+
+    <Sheet
+      visible={notificationsOpen}
+      onClose={() => setNotificationsOpen(false)}
+      testID="today-notifications-sheet"
+    >
+      <View style={styles.menu}>
+        <Text style={styles.body}>Benachrichtigungen sind noch nicht verfügbar.</Text>
+        <Button label="Schließen" onPress={() => setNotificationsOpen(false)} />
+      </View>
+    </Sheet>
+    </>
   );
 }
 
@@ -397,14 +471,18 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
-    // Clears the floating create button (bottom 92 + 56 tall, see
-    // CreateFab.tsx) so the last card's completion control is never
-    // covered by it.
-    paddingBottom: 160,
+    paddingBottom: spacing.xl,
   },
   header: {
     marginBottom: spacing.md,
     gap: spacing.md,
+  },
+  iconRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  iconButtonPressed: {
+    opacity: pressedOpacity,
   },
   headerTopRow: {
     flexDirection: 'row',
@@ -422,6 +500,10 @@ const styles = StyleSheet.create({
     lineHeight: typography.title.lineHeight,
     fontWeight: typography.title.fontWeight,
     color: colors.textPrimary,
+  },
+  greetingSubtitle: {
+    fontSize: typography.bodySmall.fontSize,
+    color: colors.textSecondary,
   },
   date: {
     fontSize: typography.body.fontSize,
@@ -477,5 +559,12 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: spacing.sm,
+  },
+  menu: {
+    gap: spacing.sm,
+  },
+  body: {
+    fontSize: typography.body.fontSize,
+    color: colors.textPrimary,
   },
 });

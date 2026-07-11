@@ -1,7 +1,7 @@
 import { Alert } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import TasksScreen from '../tasks';
+import TasksScreen from '../index';
 import { todayDateString, addDaysToDateString } from '../../../src/domain/dates';
 import { listCategories } from '../../../src/data/repositories/categoryRepository';
 import {

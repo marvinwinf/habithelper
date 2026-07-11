@@ -13,7 +13,7 @@ import {
 import { useLevelUpAnimation } from '../animation/useLevelUpAnimation';
 import { useMountAnimation } from '../animation/useMountAnimation';
 import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
-import { getCategoryColorVariant } from '../theme/categoryVariant';
+import { getCategoryColorVariant, getCategorySolidFill } from '../theme/categoryVariant';
 import { categoryIconName } from '../categoryIcons';
 import { scheduleFromRoutineRow } from '../../domain/routines/schedule';
 import { scheduleLabel } from '../../domain/routines/scheduleLabel';
@@ -106,6 +106,7 @@ export function RoutineCard({
   const variant = category
     ? getCategoryColorVariant(category.baseColor, routine.colorVariantSeed)
     : null;
+  const solidFill = category ? getCategorySolidFill(category.baseColor) : null;
 
   function closeMenuThen(action: () => void) {
     setMenuOpen(false);
@@ -158,8 +159,8 @@ export function RoutineCard({
           <View style={[styles.row, variant && { backgroundColor: variant.background }]}>
             <IconBadge
               name={categoryIconName(category?.icon)}
-              backgroundColor={variant?.gradientStart}
-              iconColor={variant?.accent}
+              backgroundColor={solidFill?.background}
+              iconColor={solidFill?.iconColor}
             />
             <View style={styles.main}>
               <Text style={[styles.name, isSkipped && styles.nameSkipped]}>{routine.name}</Text>

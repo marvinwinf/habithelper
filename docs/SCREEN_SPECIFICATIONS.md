@@ -2,32 +2,42 @@
 
 ## Main Navigation
 
-Bottom navigation contains four tabs:
+Bottom navigation contains four destinations:
 
 1. Heute
-2. Routinen
-3. Aufgaben
-4. Einstellungen
+2. Plan
+3. Progress
+4. Me
 
-A central floating create button opens a type selection:
+A create button is embedded in the center of the bottom navigation bar itself (not a FAB floating above it) and opens a type selection:
 
 - Routine
 - Aufgabe
+
+"Me" carries the same content the Settings screen (below) describes — display name, category management, export/import — just relabeled and re-iconed to match the new navigation.
+
+The standalone Routinen and Aufgaben tabs are retired as top-level tabs; the screens themselves are unchanged and relocated to plain (non-tab) routes, reachable via two entry links on the new **Plan** screen ("Alle Routinen verwalten" / "Alle Aufgaben verwalten"). Today's due items still surface on the Today screen exactly as before.
 
 ## Today Screen
 
 ### Header
 
-- Time-based greeting, for example "Guten Morgen, Marvin".
+- Leading shortcuts icon (opens a small sheet linking to Kategorien verwalten and Me); trailing bell icon (placeholder only — opens a small sheet noting notifications aren't available yet; carries no push-notification functionality, per `docs/MVP_SCOPE.md`).
+- Time-based greeting, for example "Guten Morgen, Marvin", with a short static subtitle line under it.
 - Current date.
 - Subtle overall app streak.
 - Daily routine progress only.
 
+### Focus of the Day
+
+A card between the header and the routine list: accent-tinted, short "Fokus des Tages" label, a one-line rotating prompt (static list keyed by day-of-year), and a placeholder decorative icon/illustration. See `docs/DESIGN_SYSTEM.md`'s Focus of the Day section.
+
 ### Content Order
 
-1. Routines.
-2. Tasks.
-3. For later.
+1. Focus of the day.
+2. Routines.
+3. Tasks.
+4. For later.
 
 ### Routine Card
 
@@ -210,9 +220,25 @@ Long press can be used for manual reordering or moving where appropriate.
 
 Completed tasks remain stored permanently.
 
-## Settings Screen
+## Plan Screen
 
-Contains:
+Reachable from the bottom navigation (see Main Navigation). Two parts:
+
+1. **Week overview**: a day-strip (Mon–Sun, current week) with the current day highlighted; below it, each due routine for the visible week shown as a row of per-day completion dots (completed/exceeded = filled accent, missed = muted taupe dot, not-due/future = hollow outline) — built from existing `routine`/`routine_event` data, no new schema.
+2. **Manage links**: "Alle Routinen verwalten" and "Alle Aufgaben verwalten", opening the existing Routines screen (Aktiv/Pausiert tabs, reorder, overflow menu) and Tasks screen (five sections) unchanged, now reachable as plain routes instead of tabs.
+
+## Progress Screen
+
+Reachable from the bottom navigation. A read-only dashboard, built entirely from existing cached/derived data (no new schema):
+
+- **Streak hero**: a card with a short encouragement line and a circular streak ring (see `docs/DESIGN_SYSTEM.md`'s Streak Ring) showing the overall app streak.
+- **Overview stat tiles** (2×2): completion rate for the visible period, longest streak across all routines, total active routines, and completions this period. (The mockup's "Total time" tile has no backing field in the data model — no duration is tracked per completion — so it is not implemented; this is a deliberate adaptation, not a silent scope cut.)
+- **Completion over time**: a line/area chart of daily routine-completion rate across the current week.
+- **Habit breakdown**: a donut chart of active routines grouped by category, with a color-keyed legend.
+
+## Settings Screen ("Me")
+
+Reachable from the bottom navigation as **Me**. Contains:
 
 - display name,
 - category management,

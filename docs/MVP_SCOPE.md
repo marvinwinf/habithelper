@@ -14,11 +14,25 @@ The architecture must avoid unnecessary Android-specific decisions that would bl
 - current date,
 - subtle overall app streak,
 - routine progress for the current day,
+- a "Focus of the day" card (static rotating prompt, placeholder illustration only — no personalization/backend),
+- a header shortcuts icon and a notifications-placeholder icon (visual only; no push-notification delivery, see Explicitly Excluded below),
 - routines displayed before tasks,
 - visible completion controls,
 - completed items remain visible in a subdued completed state,
 - "For later" section,
-- floating create button.
+- a create button embedded in the bottom navigation bar.
+
+### Plan Screen
+
+- current-week day-strip with a per-routine completion dot-matrix (derived from existing routine/event data),
+- entry points into the existing Routines screen (Aktiv/Pausiert) and Tasks screen (five sections), relocated to plain routes.
+
+### Progress Screen
+
+- overall-streak ring hero,
+- stat tiles: completion rate, longest streak, active routine count, completions this period (all derived from existing cached data; no duration/time tracking),
+- completion-over-time chart for the current week,
+- category-based habit-breakdown donut chart.
 
 ### Routines
 
@@ -98,11 +112,10 @@ The architecture must avoid unnecessary Android-specific decisions that would bl
 ## Explicitly Excluded from the MVP
 
 - iOS release,
-- push notifications,
+- push notifications (the Today header's bell icon is a visual placeholder only — no delivery mechanism, permission request, or scheduling exists),
 - morning report,
 - evening report,
 - focus sessions,
-- statistics dashboard,
 - search,
 - dark mode,
 - cloud synchronization,

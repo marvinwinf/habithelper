@@ -244,9 +244,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   listContent: {
-    // Clears the floating create button (see CreateFab.tsx) so the last
-    // row's controls are never covered by it.
-    paddingBottom: 160,
+    paddingBottom: spacing.xl,
   },
   // Soft pill-filled segmented control, matching the bottom nav's tab pill,
   // per docs/DESIGN_SYSTEM.md's Navigation section.

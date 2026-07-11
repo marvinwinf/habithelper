@@ -176,9 +176,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   listContent: {
-    // Clears the floating create button (see CreateFab.tsx) so the last
-    // row's controls are never covered by it.
-    paddingBottom: 160,
+    paddingBottom: spacing.xl,
   },
   sectionTitle: {
     ...typography.label,

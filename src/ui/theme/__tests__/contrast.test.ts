@@ -1,4 +1,5 @@
 import { colors, colorsDark } from '../index';
+import { categoryPalette, getCategorySolidFill } from '../categoryVariant';
 
 // WCAG 2.1 relative luminance + contrast ratio, so the documented token
 // pairings (docs/ACCESSIBILITY.md) stay regression-proof: a future tweak to a
@@ -94,6 +95,16 @@ describe('token contrast (WCAG AA)', () => {
   it('keeps the destructive terracotta above AA for small text on every light surface', () => {
     for (const surface of ['background', 'surface', 'surfaceMuted'] as const) {
       expect(contrastRatio(colors.destructive, colors[surface])).toBeGreaterThanOrEqual(NORMAL);
+    }
+  });
+
+  // Today row icon badges (Phase 12/T086) fill with a category's solid
+  // `dark` stop; getCategorySolidFill picks white or dark ink per family so
+  // the glyph clears the graphic bar either way.
+  it('keeps the icon glyph above the graphic bar on every category solid fill', () => {
+    for (const family of Object.keys(categoryPalette) as (keyof typeof categoryPalette)[]) {
+      const { background, iconColor } = getCategorySolidFill(categoryPalette[family].base);
+      expect(contrastRatio(iconColor, background)).toBeGreaterThanOrEqual(LARGE_OR_GRAPHIC);
     }
   });
 });

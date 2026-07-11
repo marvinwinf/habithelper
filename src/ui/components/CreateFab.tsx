@@ -7,10 +7,11 @@ import { Sheet } from './Sheet';
 import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
 
 /**
- * Global floating create entry point (docs/SCREEN_SPECIFICATIONS.md): opens
- * a type-selection sheet offering "Routine" / "Aufgabe," each navigating to
- * its respective create screen (T031 / T045). Rendered once above the tab
- * navigator (T050) so it stays visible across every tab.
+ * Global create entry point (docs/SCREEN_SPECIFICATIONS.md): opens a
+ * type-selection sheet offering "Routine" / "Aufgabe," each navigating to
+ * its respective create screen (T031 / T045). Embedded in the center of the
+ * bottom tab bar (app/(tabs)/_layout.tsx, T084) so it stays reachable from
+ * every tab.
  */
 export function CreateFab() {
   const router = useRouter();
@@ -54,12 +55,6 @@ export function CreateFab() {
 
 const styles = StyleSheet.create({
   fab: {
-    position: 'absolute',
-    right: spacing.lg,
-    // Clears the flat tab bar (64dp tall, flush to the screen bottom, see
-    // app/(tabs)/_layout.tsx) with breathing room above it, so it overlaps
-    // content but never the bar's touch targets.
-    bottom: 80,
     width: 56,
     height: 56,
     borderRadius: radius.full,

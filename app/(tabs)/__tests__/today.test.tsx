@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 
 import TodayScreen from '../today';
 import { todayDateString } from '../../../src/domain/dates';
+import { focusOfTheDay } from '../../../src/domain/focusOfTheDay';
 import { listCategories } from '../../../src/data/repositories/categoryRepository';
 import { listRoutines, softDeleteRoutine } from '../../../src/data/repositories/routineRepository';
 import { listRoutineEventsInRange } from '../../../src/data/repositories/routineEventRepository';
@@ -143,6 +144,12 @@ describe('TodayScreen', () => {
     (listCompletedTasks as jest.Mock).mockResolvedValue([]);
     (listRoutineStateCaches as jest.Mock).mockResolvedValue([]);
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    // Some tests below override todayDateString's implementation (not just
+    // its calls, which jest.clearAllMocks() does reset); reset it back to
+    // the real implementation so later tests aren't affected by ordering.
+    (todayDateString as jest.Mock).mockImplementation(
+      jest.requireActual('../../../src/domain/dates').todayDateString,
+    );
   });
 
   it('shows the overall app streak from the cache', async () => {
@@ -456,5 +463,40 @@ describe('TodayScreen', () => {
     await fireEvent(screen.getByTestId(`routine-card-${routineA.id}-complete`), 'pressIn');
     await fireEvent(screen.getByTestId(`routine-card-${routineA.id}-complete`), 'pressOut');
     await waitFor(() => expect(triggerFirstCompletionOfDayHaptic).toHaveBeenCalledTimes(2));
+  });
+
+  it('shows the Focus of the day card with the prompt for today', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([]);
+
+    await render(<TodayScreen />);
+
+    expect(await screen.findByTestId('today-focus-of-the-day')).toBeTruthy();
+    expect(screen.getByText('Fokus des Tages')).toBeTruthy();
+    expect(screen.getByText(focusOfTheDay(TODAY))).toBeTruthy();
+  });
+
+  it('opens the shortcuts sheet from the header icon and closes it again', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([]);
+
+    await render(<TodayScreen />);
+
+    expect(screen.queryByTestId('today-shortcuts-categories')).toBeNull();
+
+    await fireEvent.press(await screen.findByTestId('today-shortcuts-button'));
+    expect(screen.getByTestId('today-shortcuts-categories')).toBeTruthy();
+    expect(screen.getByTestId('today-shortcuts-me')).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('today-shortcuts-categories'));
+    expect(screen.queryByTestId('today-shortcuts-categories')).toBeNull();
+  });
+
+  it('opens the notifications placeholder sheet from the header icon', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([]);
+
+    await render(<TodayScreen />);
+
+    await fireEvent.press(await screen.findByTestId('today-notifications-button'));
+
+    expect(screen.getByText('Benachrichtigungen sind noch nicht verfügbar.')).toBeTruthy();
   });
 });
