@@ -8,6 +8,8 @@
 // sage/Health, skyBlue ~ Work/Focus, lavender ~ Personal care, softPeach ~
 // Social/soft rose, apricot ~ Household, warmCream as a spare sixth family).
 
+import { colors } from './colors';
+
 export const categoryPalette = {
   mint: {
     base: '#8FBFA0',
@@ -115,4 +117,41 @@ export function getCategoryColorVariant(
     VARIANT_RECIPES.length;
 
   return VARIANT_RECIPES[recipeIndex](categoryPalette[family]);
+}
+
+// Not every family's `dark` stop clears the 3:1 graphic contrast bar against
+// a white icon (apricot/softPeach/warmCream are too light) — this picks
+// whichever of white/dark-ink actually clears the bar for each family, so
+// `getCategorySolidFill` never has to be called with knowledge of which.
+// Verified in src/ui/theme/__tests__/contrast.test.ts.
+const SOLID_FILL_ICON_COLOR: Record<CategoryColorFamily, string> = {
+  mint: colors.textOnAccent,
+  lavender: colors.textOnAccent,
+  apricot: colors.textPrimary,
+  skyBlue: colors.textOnAccent,
+  softPeach: colors.textPrimary,
+  warmCream: colors.textPrimary,
+};
+
+export interface CategorySolidFill {
+  background: string;
+  iconColor: string;
+}
+
+/**
+ * A category's fixed, most-saturated family stop plus a contrast-safe icon
+ * color — unlike `getCategoryColorVariant`, this does not vary with
+ * `color_variant_seed`. Used for the Today row icon badges' solid fill
+ * (Phase 12/T086), which should read as one consistent color per category
+ * rather than shifting per item.
+ */
+export function getCategorySolidFill(baseColor: string): CategorySolidFill {
+  const family = findFamilyByBaseColor(baseColor);
+  if (!family) {
+    throw new Error(`Unknown category base color: ${baseColor}`);
+  }
+  return {
+    background: categoryPalette[family].dark,
+    iconColor: SOLID_FILL_ICON_COLOR[family],
+  };
 }
