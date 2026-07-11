@@ -85,9 +85,15 @@ describe('token contrast (WCAG AA)', () => {
     });
   });
 
-  it('keeps the muted rose above AA for small text on every light surface', () => {
+  it('keeps "missed" above the graphic bar on every light surface (glyph/dot use only, never small text)', () => {
     for (const surface of ['background', 'surface', 'surfaceMuted'] as const) {
-      expect(contrastRatio(colors.missed, colors[surface])).toBeGreaterThanOrEqual(NORMAL);
+      expect(contrastRatio(colors.missed, colors[surface])).toBeGreaterThanOrEqual(LARGE_OR_GRAPHIC);
+    }
+  });
+
+  it('keeps the destructive terracotta above AA for small text on every light surface', () => {
+    for (const surface of ['background', 'surface', 'surfaceMuted'] as const) {
+      expect(contrastRatio(colors.destructive, colors[surface])).toBeGreaterThanOrEqual(NORMAL);
     }
   });
 });

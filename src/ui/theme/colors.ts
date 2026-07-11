@@ -1,59 +1,50 @@
-// Color tokens per docs/DESIGN_SYSTEM.md's Quiet Atelier direction: a warm
-// stone-white background, charcoal ink, a single antique-gold accent used
-// only to carry meaning (primary action, active nav state, completion,
-// streak), and a muted rose for the "missed" state. There is deliberately no
-// green "success" color and no pastel category palette — categories are
-// distinguished by name and glyph, never by tint.
-
-// Rose does double duty: the "missed" occurrence state and destructive
-// actions. The direction forbids an alarm red, and both readings want the
-// same muted rose, so they share one constant rather than drifting apart.
-//
-// The earlier rose (#9F6B5C) measured only 4.25:1 on `background` — fine for
-// glyphs and large text, but under the 4.5:1 that normal-size body text needs,
-// and destructive/overdue labels render rose at caption size. T082 darkens it
-// to clear AA for small text on every light surface (background 5.40:1,
-// surface 5.64:1, surfaceMuted 4.95:1) while staying a muted clay-rose, never
-// an alarm red. See docs/ACCESSIBILITY.md for the full pairing table.
-const rose = '#8F5A49';
+// Color tokens per docs/DESIGN_SYSTEM.md's Soft Momentum direction: warm
+// off-white surfaces with gentle layering (no shadows needed — `surface` and
+// `background` differ just enough to read as a card), a single muted sage
+// green as the app's calm "primary" accent (buttons, progress, streak,
+// focus), and a soft warm taupe for "missed" so an off day never reads as a
+// warning. Category identity comes from the pastel family palette in
+// categoryVariant.ts, not from this file.
 
 export const colors = {
-  background: '#FAFAF9',
-  surface: '#FFFFFF',
-  // Reserved for inset fills that are not list surfaces (disabled controls,
-  // calendar day cells). List content sits on `surface` separated by hairline
-  // `border` dividers, never on a tinted card.
-  surfaceMuted: '#F2F0EC',
-  border: '#E7E4DD',
+  background: '#F7F1E6',
+  surface: '#FFFCF6',
+  // Inset fills: disabled controls, calendar day cells, muted chip
+  // backgrounds — a touch more saturated than `surface` for gentle contrast.
+  surfaceMuted: '#EFE6D5',
+  border: '#E4D9C7',
 
-  textPrimary: '#1C1917',
-  textSecondary: '#78716C',
-  textOnAccent: '#FAFAF9',
+  textPrimary: '#3A342E',
+  textSecondary: '#6E6459',
+  textOnAccent: '#FFFCF6',
 
-  accent: '#A16207',
-  missed: rose,
-  destructive: rose,
+  // Muted sage — the one dominant accent: primary buttons, progress fill,
+  // streak numeral, selected states, focus rings.
+  accent: '#3F7256',
+  // A gentle warm taupe, not a color associated with failure — an imperfect
+  // day should never look punished (see Gamification in the design doc).
+  // Used for glyphs/dots (3:1 graphic bar), never for small text.
+  missed: '#8A7B6A',
+  // Distinct from `missed`: only real destructive confirmations (delete
+  // routine/task/category) use this muted terracotta. Clears 4.5:1 for
+  // small text on every light surface (see docs/ACCESSIBILITY.md).
+  destructive: '#9C4A41',
 } as const;
 
-// Defined now so the token pairings can be contrast-checked as a set; dark
-// mode is not shipped in the MVP and nothing consumes these yet. Both the gold
-// and the rose are lightened relative to their light-theme values to keep
-// 4.5:1 against the dark surfaces (rose: background 5.77:1, surface 5.23:1).
-const roseDark = '#BC8878';
-
+// Defined for future use; no runtime theme switch consumes this yet.
 export const colorsDark = {
-  background: '#1C1917',
-  surface: '#242220',
-  surfaceMuted: '#2A2724',
-  border: '#3A3532',
+  background: '#231F1A',
+  surface: '#2B2620',
+  surfaceMuted: '#332C24',
+  border: '#453C31',
 
-  textPrimary: '#F5F3F0',
-  textSecondary: '#A8A29E',
-  textOnAccent: '#1C1917',
+  textPrimary: '#F3EEE4',
+  textSecondary: '#BBAE9B',
+  textOnAccent: '#1B2620',
 
-  accent: '#C08A2E',
-  missed: roseDark,
-  destructive: roseDark,
+  accent: '#7FB093',
+  missed: '#8A7D6D',
+  destructive: '#E0968B',
 } as const;
 
 export type ColorToken = keyof typeof colors;

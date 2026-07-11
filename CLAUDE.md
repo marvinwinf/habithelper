@@ -71,14 +71,14 @@ Report:
 
 ## Design Direction
 
-Follow the Quiet Atelier design direction (see `docs/DESIGN_SYSTEM.md` for full detail):
+Follow the Soft Momentum design direction (see `docs/DESIGN_SYSTEM.md` for full detail):
 
 - light theme,
-- warm stone-white background, charcoal text, single antique-gold accent,
-- no pastel category colors, no per-item background tinting,
-- near-square corners, hairline dividers instead of cards/shadows,
-- serif display type for titles/streak numerals only, sans for everything functional,
-- typographic (not graphic/gamified) streak and progress display,
-- short, deliberate fade-only animations (no bounce/spring),
+- warm off-white background, dark warm-gray text, single muted sage-green accent used generously (buttons, progress, streaks, focus states),
+- pastel category colors tint each routine/task's card (one dominant color per card, never several competing hues on one screen),
+- soft rounded geometry throughout — cards, buttons, inputs, pills, circular icon badges,
+- one typeface, hierarchy from weight/size rather than a second display face,
+- streaks and gentle milestone acknowledgement are the extent of gamification — no punishment for a missed day, no points/leaderboards,
+- short, gentle motion: fades for mount/dismiss, a subtle non-bouncy spring for completion/milestones,
 - routines visually prioritized over tasks,
 - no mascots.

@@ -437,11 +437,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   actionLabel: {
-    fontSize: typography.label.fontSize,
-    lineHeight: typography.label.lineHeight,
-    fontWeight: typography.label.fontWeight,
-    letterSpacing: typography.label.letterSpacing,
-    textTransform: typography.label.textTransform,
+    ...typography.label,
     textDecorationLine: 'underline',
   },
   editLabel: {

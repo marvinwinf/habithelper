@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react-native';
 
 import { CategoryBadge } from '../CategoryBadge';
 import { colors } from '../../theme';
-import { legacyCategoryPalette } from '../../theme/categoryVariant';
+import { categoryPalette } from '../../theme/categoryVariant';
 
 describe('CategoryBadge', () => {
   it('renders the label', async () => {
@@ -18,7 +18,7 @@ describe('CategoryBadge', () => {
       ? Object.assign({}, ...badge.props.style.filter(Boolean))
       : badge.props.style;
 
-    expect(badgeStyle.backgroundColor).not.toBe(legacyCategoryPalette.lavender.base);
+    expect(badgeStyle.backgroundColor).not.toBe(categoryPalette.lavender.base);
     expect(badgeStyle.borderColor).toBe(colors.border);
   });
 });

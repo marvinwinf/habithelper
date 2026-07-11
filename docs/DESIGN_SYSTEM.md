@@ -2,120 +2,132 @@
 
 ## Design Direction
 
-Working direction: Quiet Atelier.
+Working direction: Soft Momentum.
 
 The visual style combines:
 
-- restrained, quietly premium neutrals (charcoal / warm stone),
-- a single precious accent color used only for meaning (primary action, streak, completion),
-- typographic hierarchy over graphic/gamified widgets,
-- generous negative space,
-- near-square, considered geometry.
+- warm, calm surfaces (off-white background, a lightly lifted cream card surface),
+- a single muted sage-green accent used generously for primary actions, progress, and streaks,
+- soft rounded geometry everywhere (cards, buttons, inputs, pills, circular icons),
+- pastel category colors that gently tint each routine/task's identity,
+- restrained, purposeful gamification (streaks, milestones — never punishment),
+- short, gentle motion, including a subtle spring on completion.
 
-The result should feel elegant, calm, and confident — polished and quietly luxurious without becoming ornate, dark-academia, or corporate-luxury cold.
+The result should feel friendly, calm, and lightweight — pleasant to open repeatedly throughout the day. Playful without becoming childish; modern without feeling cold or corporate.
+
+Soft Momentum was this app's original direction before the "Quiet Atelier" MVP restyle; this revives and refreshes it rather than starting over — most of the underlying plumbing (category palette, `color_variant_seed`) survived that detour and is live again.
 
 ## Core Visual Style
 
 - Light theme as the primary/default MVP theme (dark tokens defined for future use, not shipped as default).
-- Warm stone-white app background, not pure white.
-- Charcoal primary text; single antique-gold accent; muted rose for "missed" (never alarm red, never a green "success" color distinct from the accent).
-- No pastel category color-coding and no per-item background tinting.
-- Near-square corners (2–4px radius) on the rare surfaces that have any.
-- No card containers for list content — hairline dividers on a single surface instead.
-- No shadows, no gradients, no decorative textures.
-- Clear typographic hierarchy: a serif display face for titles/greeting/streak numerals only; a sans face for everything functional.
-- Generous, editorial spacing.
-- Icons used sparingly, hairline stroke — hierarchy comes from type and space, not iconography.
-- Short, deliberate fades (no bounce/spring motion).
-- No visually aggressive warning states; every status also has a non-color signal (icon/glyph, underline, italic, label).
+- Warm off-white app background (`background`); cards sit on a lightly lifted cream `surface` — the two-tone contrast is what reads as "layered," not a shadow.
+- Dark warm-gray primary text, never pure black; medium warm-gray secondary text.
+- One muted sage accent (`accent`) carries primary actions, progress fill, streak numerals, selected/focus states. It's used more freely than a "precious" accent — that's the point of Soft Momentum.
+- Pastel category colors (see Categories below) tint a routine/task's card lightly — one dominant color per card, never several competing hues on one screen.
+- Soft, consistently rounded geometry: `sm`/`md`/`lg` radii plus a `full` pill/circle step — see Spacing, Radius, Surfaces.
+- Cards use soft surface contrast and a thin low-contrast border rather than drop shadows; gentle layering, not floating panels.
+- One typeface, hierarchy from weight and size, not a second display face.
+- Icons are simple, rounded, and circular-badged; used a bit more freely than Quiet Atelier's hairline sparsity, but still support labels rather than replace them.
+- Motion is short and gentle: fades for mount/dismiss, a subtle spring for completion and milestones — never a bounce/overshoot loop or long transition.
+- No status is punishing: a missed day reads as neutral, not alarming; only real destructive actions (delete) use an assertive color, and always with confirmation.
 
 ## Color Tokens
 
 | Token | Light | Dark (future) |
 |---|---|---|
-| background | `#FAFAF9` | `#1C1917` |
-| surface | `#FFFFFF` | `#242220` |
-| surface muted | `#F2F0EC` | `#2A2724` |
-| text | `#1C1917` | `#F5F3F0` |
-| muted text | `#78716C` | `#A8A29E` |
-| text on accent | `#FAFAF9` | `#1C1917` |
-| border | `#E7E4DD` | `#3A3532` |
-| accent (gold) | `#A16207` | `#C08A2E` |
-| missed (rose) | `#8F5A49` | `#BC8878` |
+| background | `#F7F1E6` | `#231F1A` |
+| surface | `#FFFCF6` | `#2B2620` |
+| surface muted | `#EFE6D5` | `#332C24` |
+| text | `#3A342E` | `#F3EEE4` |
+| muted text | `#6E6459` | `#BBAE9B` |
+| text on accent | `#FFFCF6` | `#1B2620` |
+| border | `#E4D9C7` | `#453C31` |
+| accent (sage) | `#3F7256` | `#7FB093` |
+| missed (taupe) | `#8A7B6A` | `#8A7D6D` |
+| destructive (terracotta) | `#9C4A41` | `#E0968B` |
 
-`surface muted` is reserved for inset fills that are not list surfaces (disabled controls, calendar day cells) — never to tint an item by category. Destructive actions reuse the `missed` rose; there is no separate destructive token. The rose is deliberately a deep, muted clay tone (not the lighter `#9F6B5C` used pre-T082): destructive and overdue labels render it at caption size, so it must clear WCAG AA (4.5:1) for small text on every light surface — see `docs/ACCESSIBILITY.md`.
+`missed` and `destructive` are deliberately different colors now (they were aliased under Quiet Atelier): a missed day is not a failure state and must never look like one, so it sits at a gentle, low-saturation taupe that only needs to clear the graphic/icon contrast bar (3:1) — it is never used for small text. `destructive` is reserved for real, confirmed deletions and is tuned to clear 4.5:1 for small text on every light surface (see `docs/ACCESSIBILITY.md`).
 
-The accent color is the only color used for meaning (primary action, active nav state, completed mark, streak numeral). It must not be reused decoratively elsewhere. "Missed" uses the rose token; there is no separate green "success" color — completion is communicated by the accent plus a non-color signal (underline/glyph), not by color alone.
+Category identity does **not** live in this table — see `src/ui/theme/categoryVariant.ts` and Categories below.
 
 ## Typography
 
-- Display/serif (Playfair Display or Cormorant): screen titles, greeting text, and streak numerals only.
-- Functional/sans (Inter or Jost): everything else — list items, buttons, labels, body text.
-- Buttons and section labels use small-caps-style treatment with slightly increased letter-spacing (+0.02–0.05em) rather than size/weight alone for emphasis.
+One typeface (the platform system sans) for the whole app — no separate display/serif face. Hierarchy comes from weight and size:
 
-No custom font files are bundled in the MVP: the `serif`/`sans` family tokens in `src/ui/theme/typography.ts` resolve to the platform's own faces (Noto Serif / Roboto on Android). Swapping in Playfair Display and Inter is a change to that one file plus a font-loading step at the app root.
+- `display` / `title` / `streak`: bold (700), sized for confident section titles and the streak numeral — prominent but not oversized.
+- `heading` / `body` / `bodySmall` / `caption`: regular/medium weight, functional text.
+- `label` (buttons, section headings): medium weight (600), normal case — no small-caps/letter-spacing treatment.
+
+No custom font files are bundled in the MVP: `fontFamilies.serif`/`.sans` in `src/ui/theme/typography.ts` both resolve to the platform's own sans face. The `serif` token name is kept only so `typography.display/title/streak` don't need touching elsewhere; swapping in a genuinely rounded display font (e.g. Baloo 2, Quicksand) later is a change to that one file plus a font-loading step.
 
 ## Categories
 
-Categories are distinguished by name and (optionally) a small hairline icon — not by background color or tint. The existing per-category base color and stable color-variant seed remain in the data model for backward compatibility but are no longer used to tint UI surfaces; category color values, if shown at all, are limited to a small neutral-weight icon glyph.
+Categories are told apart by a pastel color family in addition to name/icon — reviving the mapping that Quiet Atelier had retired to "legacy" compatibility-only status. `src/ui/theme/categoryVariant.ts`'s `categoryPalette` defines six families (`mint`, `lavender`, `apricot`, `skyBlue`, `softPeach`, `warmCream`), each with `base`/`light`/`lighter`/`dark` stops; `getCategoryColorVariant(base_color, color_variant_seed)` deterministically maps a category's persisted `base_color` and an item's persisted `color_variant_seed` to a same-family `{background, accent, gradientStart, gradientEnd}` variant. No new migration is needed — `base_color`, `icon`, and `color_variant_seed` were never removed from the data model.
+
+Suggested role mapping when presenting category choices: Health → `mint` (sage), Work/Focus → `skyBlue`, Personal care → `lavender`, Social → `softPeach` (soft rose), Household → `apricot`, with `warmCream` as a spare sixth family.
+
+A screen should still show one dominant color at a time — a category's tint applies to its own card only; it must never spill into unrelated chrome (nav bar, headers, primary buttons all stay on the sage `accent`).
 
 ## Spacing, Radius, Surfaces
 
-- Spacing scale: 8 / 12 / 20 / 32 / 48 (more generous than the previous scale).
-- Radius scale: 2px (small) / 4px (default) / 999px (pill, rare — e.g. a single tag).
-- No card elevation. List content sits on a single surface separated by 1px hairline dividers (`border` token). A focused/leading item may show a 1px inset border in the accent color at reduced opacity — this is the only permitted "highlight" treatment.
+- Spacing scale: 4 / 8 / 12 / 20 / 32 / 48 (`xxs`…`xl`) — the 4px step exists for tight card-internal padding.
+- Radius scale: `sm` 10px (compact controls/tags), `md` 18px (buttons, input fields), `lg` 26px (cards, sheets), `full` 999px (pills, toggles, circular icon badges).
+- Cards (`src/ui/components/Card.tsx`) use `radius.lg` and a 1px `border`, sitting on `surface` against the `background` — that tonal contrast is the only "elevation," no shadows.
 
 ## Buttons and Interaction
 
-- Primary actions: solid charcoal-on-stone (light) button, small-caps label.
-- Secondary actions: underlined text, not filled/ghost buttons.
-- Destructive actions remain visually distinct (rose/muted-red text or outline) and require confirmation, per Accessibility below.
+- Primary actions: solid `accent` (sage) fill, `textOnAccent` label, `radius.md`, normal-case medium-weight label.
+- Secondary actions: soft `surfaceMuted` fill or outline, not underlined text.
+- Destructive actions: `destructive` terracotta text/outline, and always require confirmation.
+- Every tappable control gets a gentle press response: `pressedOpacity` (0.85) plus `pressedScale` (0.96) — a small scale-down reads as tactile, per `src/ui/theme/interaction.ts`.
 
 ## Routine and Task Item Design
 
-- No card container, no category tint. A single-surface row with a hairline divider below it.
-- Leading: optional hairline category icon. Title in sans. Trailing: serif streak numeral for routines (size may grow slightly with streak length) or a date/subtitle for tasks.
-- Completion control: a small outline glyph (not a filled circle/checkbox) that becomes a gold check mark on completion, with a thin gold underline drawing in beneath the title (~250ms fade, left-to-right).
+- Each row is a soft card (`radius.lg`, `surface` background, 1px `border`), lightly tinted by its category's `getCategoryColorVariant` background when a category is set.
+- Leading: circular `IconBadge` (now fully round, `radius.full`). Title in the functional weight. Trailing: bold streak numeral for routines (size may grow modestly with streak length) or a date/subtitle for tasks.
+- Completion control: a circular tap target that fills with the accent color and shows a checkmark on completion, with a quick, gentle spring (`GENTLE_SPRING`) rather than a plain fade — tactile, not flashy.
 
 ## Completed / Skipped / Missed / Paused States
 
-- Completed: gold underline beneath the title + gold check glyph.
-- Skipped: title dims to the muted-text token, no colored icon.
-- Missed: a small muted-rose dot in the row's leading margin; the row itself does not change color.
-- Paused: row set in italic, reduced opacity; a text label, not a badge.
+- Completed: `CompletionControl` fills with the accent + checkmark, brief spring pop.
+- Skipped: title dims to muted text, outline-circle glyph.
+- Missed: a small taupe (`missed` token) dot/glyph — never the destructive terracotta, never a filled red state. Framing stays "you can continue," not "you failed."
+- Paused: reduced opacity + a text label, not a badge.
 
-Every state must remain distinguishable without color (shape/glyph/typography difference), per Accessibility below.
+Every state keeps a shape/glyph/typographic difference so color is never the only signal (see Accessibility).
 
 ## Streak and Progress Visualization
 
-- No rings, badges, flame icons, or dot-rows. The streak count itself, set in the serif display face, is the primary visual — its size may scale modestly with streak length as the sole "gamified" flourish.
-- A weekly/period summary, where needed, is a single thin horizontal rule-based graph, not a multi-segment bar or ring widget.
-- Level/milestone information (where retained) is presented as text, not a colorful multi-tile stat block.
+- The streak count, bold and prominent, remains the primary visual, sized modestly by streak length.
+- Level/milestone moments get a brief, gentle acknowledgement (a short spring pulse, a small supportive message) — never confetti, never a loss-framed warning.
+- Progress bars (`src/ui/components/ProgressBar.tsx`) keep rounded ends and a low-contrast track, filled with the accent color.
 
 ## Navigation
 
-- A minimal bottom bar (or a top segmented control for ≤3 destinations) with ultra-thin icon strokes.
-- Active state: a small gold underline/dot beneath the icon+label — no filled pill background, no floating card-style bar.
+- Bottom tab bar and the Routines Active/Paused control both use soft pill-shaped selected states (`radius.full`, `surfaceMuted`/accent-tinted fill) rather than an underline — selection should look tactile and filled, not just marked.
 
 ## Icon Style
 
-- Hairline stroke (1px), used sparingly and only where it aids scanning (category glyphs, nav icons, a small set of state glyphs). No icon-heavy card decoration.
+- Simple, friendly Ionicons glyphs in circular badges (`IconBadge`, now `radius.full`). Icons support labels; they don't replace important text.
 
 ## Motion and Micro-interactions
 
-- 250–350ms ease-in-out fades; no spring/bounce/overshoot.
-- The signature interaction is the gold underline drawing in on completion (~250ms).
-- No animation blocks interaction; `prefers-reduced-motion`/reduced-motion settings disable the underline draw-in in favor of an instant state change.
+- Fades/timings stay short (`MAX_SHORT_ANIMATION_DURATION_MS`, 400ms ceiling) for mount/dismiss/progress transitions.
+- Completion and milestone moments use `GENTLE_SPRING` (`src/ui/animation/constants.ts`) — a quick, non-bouncy settle (high friction relative to tension), not a plain fade and not an exaggerated bounce.
+- Reduced-motion settings collapse any spring/fade to an instant state change.
+
+## Gamification
+
+- Streaks, weekly completion summaries, and gentle milestone text are the full extent of gamification — no points/currency, no leaderboards, no countdown pressure.
+- A broken streak is communicated neutrally (the `missed` taupe, a plain count reset) — never a loss-framed message or a red warning state.
 
 ## Accessibility
 
 - Category (or any) color must never be the only source of information — every state above pairs color with a shape/glyph/typographic change.
-- Text contrast: charcoal-on-stone and gold-on-stone pass WCAG AA at minimum for body text (verify each token pairing, especially gold text/icons on the stone background, at implementation time); dark-mode gold token (`#C08A2E`) exists specifically to keep 4.5:1 on the dark surface once dark mode ships.
-- Touch targets remain minimum 44dp regardless of the visually minimal row design (achieved via row padding, not visual size).
-- Destructive actions remain visually distinct (rose/muted-red) and require explicit confirmation.
-
-The verified contrast table for every real text/icon-on-surface pairing, the touch-target audit, and the non-color-signal inventory live in `docs/ACCESSIBILITY.md` (re-verified against this token set in T082).
+- Text contrast: verified per-pairing in `src/ui/theme/__tests__/contrast.test.ts` against WCAG AA (4.5:1 normal text, 3:1 large text/icons); see `docs/ACCESSIBILITY.md` for the full table.
+- Touch targets remain minimum 44dp.
+- Destructive actions stay visually distinct (terracotta) and require explicit confirmation.
 
 ## Reference
 
-`docs/design_reference.png` (the prior Soft Momentum mockup) is retired as the implementation reference. No new reference mockup exists yet; screens are built directly from the token/style rules above, validated against the Pre-Delivery Checklist in the `ui-ux-pro-max` skill (contrast, touch targets, icon consistency, reduced-motion) before each task is considered done.
+`docs/design_reference.png` is the original Soft Momentum mockup this direction is reviving — useful as a loose visual reference, though the token values above are the source of truth. Screens are built directly from the token/style rules above; validate each screen against Usability → Accessibility → Clarity → Consistency → Calm appearance → Delight → Decoration, in that priority order, before considering it done.

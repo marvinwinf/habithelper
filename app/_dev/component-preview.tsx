@@ -11,7 +11,7 @@ import { IconBadge } from '../../src/ui/components/IconBadge';
 import { ProgressBar } from '../../src/ui/components/ProgressBar';
 import { Sheet } from '../../src/ui/components/Sheet';
 import { colors, spacing, typography, type CategoryColorFamily } from '../../src/ui/theme';
-import { legacyCategoryPalette } from '../../src/ui/theme/categoryVariant';
+import { categoryPalette } from '../../src/ui/theme/categoryVariant';
 
 // Dev-only design system preview (TASKS.md's T019). Never linked from
 // production navigation (see the Settings screen's dev-only entry point);
@@ -23,7 +23,7 @@ export default function ComponentPreviewScreen() {
     return <Redirect href="/(tabs)/today" />;
   }
 
-  const categoryFamilies = Object.keys(legacyCategoryPalette) as CategoryColorFamily[];
+  const categoryFamilies = Object.keys(categoryPalette) as CategoryColorFamily[];
 
   return (
     <ScrollView

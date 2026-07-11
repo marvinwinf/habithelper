@@ -1,8 +1,9 @@
-// Spacing scale per docs/DESIGN_SYSTEM.md's Quiet Atelier direction —
-// deliberately coarse and more generous than the previous scale, so screens
-// get their hierarchy from negative space rather than from borders and fills.
+// Spacing scale per docs/DESIGN_SYSTEM.md's Soft Momentum direction —
+// generous but efficient: open enough to breathe, tight enough that cards
+// still read as organized sections rather than editorial whitespace.
 
 export const spacing = {
+  xxs: 4,
   xs: 8,
   sm: 12,
   md: 20,

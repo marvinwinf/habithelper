@@ -102,11 +102,7 @@ const styles = StyleSheet.create({
     opacity: pressedOpacity,
   },
   label: {
-    fontSize: typography.label.fontSize,
-    lineHeight: typography.label.lineHeight,
-    fontWeight: typography.label.fontWeight,
-    letterSpacing: typography.label.letterSpacing,
-    textTransform: typography.label.textTransform,
+    ...typography.label,
   },
   labelUnderline: {
     textDecorationLine: 'underline',

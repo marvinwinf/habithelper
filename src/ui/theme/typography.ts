@@ -1,56 +1,43 @@
 import { Platform } from 'react-native';
 
-// Type scale per docs/DESIGN_SYSTEM.md's Quiet Atelier direction. Two faces:
-// a serif display face used only for screen titles, the greeting, and streak
-// numerals, and a sans face for everything functional. No custom font files
-// are loaded in the MVP — these resolve to the platform's own serif/sans, so
-// swapping in Playfair Display / Inter later means editing this file only.
+// Type scale per docs/DESIGN_SYSTEM.md's Soft Momentum direction: one
+// friendly, highly-readable sans everywhere — hierarchy comes from weight
+// and size, not from a second display face. `serif` is kept as a token name
+// (rather than deleted) purely so `typography.display/title/streak` don't
+// need touching; it now resolves to the same rounded system sans as `sans`.
+// No custom font files are bundled in the MVP.
 export const fontFamilies = {
-  serif: Platform.select({
-    android: 'serif',
-    ios: 'Times New Roman',
-    default: 'serif',
-  }),
-  sans: Platform.select({
-    android: 'sans-serif',
-    ios: 'System',
-    default: 'System',
-  }),
+  serif: Platform.select({ android: 'sans-serif-medium', ios: 'System', default: 'System' }),
+  sans: Platform.select({ android: 'sans-serif', ios: 'System', default: 'System' }),
 } as const;
 
-// Small-caps-style tracking for buttons and section labels: the direction
-// asks for emphasis via letter-spacing rather than size or weight alone.
-// 0.05em at 12px.
-const labelTracking = 0.6;
-
 export const typography = {
-  // Serif — titles, greeting, streak numerals only.
+  // Confident but not oversized — hierarchy comes from weight, not scale.
   display: {
     fontFamily: fontFamilies.serif,
-    fontSize: 34,
-    lineHeight: 42,
-    fontWeight: '400',
+    fontSize: 30,
+    lineHeight: 38,
+    fontWeight: '700',
   },
   title: {
     fontFamily: fontFamilies.serif,
-    fontSize: 26,
-    lineHeight: 34,
-    fontWeight: '400',
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '700',
   },
   // Base size for the streak numeral; callers may scale it modestly with
-  // streak length, which is the direction's sole permitted flourish.
+  // streak length, the direction's one permitted gamified flourish.
   streak: {
     fontFamily: fontFamilies.serif,
-    fontSize: 44,
-    lineHeight: 52,
-    fontWeight: '400',
+    fontSize: 40,
+    lineHeight: 46,
+    fontWeight: '700',
   },
 
-  // Sans — everything functional.
   heading: {
     fontFamily: fontFamilies.sans,
-    fontSize: 18,
-    lineHeight: 26,
+    fontSize: 17,
+    lineHeight: 24,
     fontWeight: '600',
   },
   body: {
@@ -71,14 +58,12 @@ export const typography = {
     lineHeight: 16,
     fontWeight: '400',
   },
-  /** Button labels and section labels: tracked-out uppercase, not bold. */
+  /** Button labels and section headings: medium weight, normal case. */
   label: {
     fontFamily: fontFamilies.sans,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '600',
-    letterSpacing: labelTracking,
-    textTransform: 'uppercase',
   },
 } as const;
 

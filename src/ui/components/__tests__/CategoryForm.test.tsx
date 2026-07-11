@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { CategoryForm } from '../CategoryForm';
-import { legacyCategoryPalette } from '../../theme/categoryVariant';
+import { categoryPalette } from '../../theme/categoryVariant';
 import { CATEGORY_ICON_OPTIONS } from '../../categoryIcons';
 
 describe('CategoryForm', () => {
@@ -29,7 +29,7 @@ describe('CategoryForm', () => {
   it('offers no color palette picker (Quiet Atelier: categories distinguished by name and glyph, not color)', async () => {
     await render(<CategoryForm onSubmit={jest.fn()} />);
 
-    for (const family of Object.keys(legacyCategoryPalette)) {
+    for (const family of Object.keys(categoryPalette)) {
       expect(screen.queryByTestId(`category-form-color-${family}`)).toBeNull();
     }
     expect(screen.queryByText('Farbe')).toBeNull();
@@ -58,7 +58,7 @@ describe('CategoryForm', () => {
 
   it('preserves an existing category base color unchanged, since it is no longer user-editable', async () => {
     const onSubmit = jest.fn();
-    const existingBaseColor = legacyCategoryPalette.apricot.base;
+    const existingBaseColor = categoryPalette.apricot.base;
     await render(
       <CategoryForm onSubmit={onSubmit} initialName="Sport" initialBaseColor={existingBaseColor} />
     );

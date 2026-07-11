@@ -3,13 +3,12 @@
 // map deterministically to a concrete style value, and items in the same
 // category must only ever get same-family variants.
 //
-// The Quiet Atelier direction (docs/DESIGN_SYSTEM.md) retires category color
-// tinting: categories are told apart by name and glyph, never by hue. The
-// pastel families below are therefore no longer design tokens — they live
-// here, next to their only consumer, purely so persisted `base_color` values
-// keep resolving. Nothing in the color token set references them.
+// docs/DESIGN_SYSTEM.md's Soft Momentum direction restores category color
+// coding: each family below reads as one of the spec's pastel roles (mint ~
+// sage/Health, skyBlue ~ Work/Focus, lavender ~ Personal care, softPeach ~
+// Social/soft rose, apricot ~ Household, warmCream as a spare sixth family).
 
-export const legacyCategoryPalette = {
+export const categoryPalette = {
   mint: {
     base: '#8FBFA0',
     light: '#C9E4D2',
@@ -48,8 +47,8 @@ export const legacyCategoryPalette = {
   },
 } as const;
 
-export type CategoryColorFamily = keyof typeof legacyCategoryPalette;
-export type CategoryColorStop = keyof typeof legacyCategoryPalette.mint;
+export type CategoryColorFamily = keyof typeof categoryPalette;
+export type CategoryColorStop = keyof typeof categoryPalette.mint;
 
 export interface CategoryColorVariant {
   background: string;
@@ -59,7 +58,7 @@ export interface CategoryColorVariant {
 }
 
 type VariantRecipe = (
-  family: (typeof legacyCategoryPalette)[CategoryColorFamily]
+  family: (typeof categoryPalette)[CategoryColorFamily]
 ) => CategoryColorVariant;
 
 const VARIANT_RECIPES: readonly VariantRecipe[] = [
@@ -91,16 +90,16 @@ const VARIANT_RECIPES: readonly VariantRecipe[] = [
 
 function findFamilyByBaseColor(baseColor: string): CategoryColorFamily | undefined {
   const normalized = baseColor.toLowerCase();
-  return (Object.keys(legacyCategoryPalette) as CategoryColorFamily[]).find(
-    (family) => legacyCategoryPalette[family].base.toLowerCase() === normalized
+  return (Object.keys(categoryPalette) as CategoryColorFamily[]).find(
+    (family) => categoryPalette[family].base.toLowerCase() === normalized
   );
 }
 
 /**
  * Deterministically maps a category's base color and an item's persisted
  * `color_variant_seed` to a concrete, same-family style value. Throws if
- * `baseColor` is not one of the legacy palette family base colors, since only
- * those are offered by the category form (T022).
+ * `baseColor` is not one of the palette family base colors, since only those
+ * are offered by the category form (T022).
  */
 export function getCategoryColorVariant(
   baseColor: string,
@@ -115,5 +114,5 @@ export function getCategoryColorVariant(
     ((colorVariantSeed % VARIANT_RECIPES.length) + VARIANT_RECIPES.length) %
     VARIANT_RECIPES.length;
 
-  return VARIANT_RECIPES[recipeIndex](legacyCategoryPalette[family]);
+  return VARIANT_RECIPES[recipeIndex](categoryPalette[family]);
 }

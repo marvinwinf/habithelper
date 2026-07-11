@@ -5,7 +5,7 @@ import { Button } from './Button';
 import { CategoryBadge } from './CategoryBadge';
 import { IconBadge } from './IconBadge';
 import { colors, pressedOpacity, radius, spacing, typography, type CategoryColorFamily } from '../theme';
-import { legacyCategoryPalette } from '../theme/categoryVariant';
+import { categoryPalette } from '../theme/categoryVariant';
 import { CATEGORY_ICON_OPTIONS } from '../categoryIcons';
 
 export interface CategoryFormValues {
@@ -23,13 +23,13 @@ export interface CategoryFormProps {
   testID?: string;
 }
 
-const PALETTE_FAMILIES = Object.keys(legacyCategoryPalette) as CategoryColorFamily[];
+const PALETTE_FAMILIES = Object.keys(categoryPalette) as CategoryColorFamily[];
 
 // Categories are told apart by name and glyph, never by hue (Quiet Atelier,
 // docs/DESIGN_SYSTEM.md) — the form no longer offers a color picker, but
 // `base_color` remains a persisted, non-null column (docs/DATA_MODEL.md), so
 // new categories still get a stable value from the retained legacy palette.
-const DEFAULT_BASE_COLOR = legacyCategoryPalette[PALETTE_FAMILIES[0]].base;
+const DEFAULT_BASE_COLOR = categoryPalette[PALETTE_FAMILIES[0]].base;
 
 /** Shared name/icon form used by both the create and edit category screens. */
 export function CategoryForm({
@@ -110,11 +110,7 @@ const styles = StyleSheet.create({
     opacity: pressedOpacity,
   },
   label: {
-    fontSize: typography.label.fontSize,
-    lineHeight: typography.label.lineHeight,
-    fontWeight: typography.label.fontWeight,
-    letterSpacing: typography.label.letterSpacing,
-    textTransform: typography.label.textTransform,
+    ...typography.label,
     color: colors.textSecondary,
   },
   input: {
