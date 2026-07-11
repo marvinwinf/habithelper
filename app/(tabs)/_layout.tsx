@@ -44,9 +44,9 @@ export default function TabLayout() {
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textSecondary,
         // Kept in normal layout flow (not absolutely positioned) so screen
-        // content can never hide behind it. A flat, hairline-topped bar —
-        // no floating margin, rounded corners, or shadow — with a gold
-        // underline marking the active tab (T077).
+        // content can never hide behind it. A flat, hairline-topped bar with
+        // a soft pill fill marking the active tab, per docs/DESIGN_SYSTEM.md's
+        // Navigation section.
         tabBarStyle: styles.tabBar,
       }}
     >
