@@ -72,7 +72,7 @@ export default function CategoryListScreen() {
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
             <Card style={styles.row} testID={`category-row-${item.id}`}>
-              <CategoryBadge label={item.name} icon={item.icon} />
+              <CategoryBadge label={item.name} icon={item.icon} baseColor={item.baseColor} />
               <View style={styles.rowActions}>
                 <Link
                   href={`/category/${item.id}/edit`}

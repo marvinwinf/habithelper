@@ -12,7 +12,8 @@ import {
 } from '../animation/haptics';
 import { useLevelUpAnimation } from '../animation/useLevelUpAnimation';
 import { useMountAnimation } from '../animation/useMountAnimation';
-import { colors, pressedOpacity, spacing, typography } from '../theme';
+import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
+import { getCategoryColorVariant } from '../theme/categoryVariant';
 import { categoryIconName } from '../categoryIcons';
 import { scheduleFromRoutineRow } from '../../domain/routines/schedule';
 import { scheduleLabel } from '../../domain/routines/scheduleLabel';
@@ -70,9 +71,9 @@ export interface RoutineCardProps {
 
 /**
  * A single routine's Today-screen row, per docs/DESIGN_SYSTEM.md's Routine
- * and Task Item Design: a single-surface hairline-divided row (no card, no
- * category tint), a "time · schedule" subtitle, a serif streak numeral, and
- * an overflow menu wired to docs/ROUTINE_RULES.md's per-occurrence actions
+ * and Task Item Design: a soft card lightly tinted by its category's color
+ * variant, a "time · schedule" subtitle, a bold streak numeral, and an
+ * overflow menu wired to docs/ROUTINE_RULES.md's per-occurrence actions
  * (T030/T065).
  */
 export function RoutineCard({
@@ -101,6 +102,10 @@ export function RoutineCard({
   const subtitle = [routine.timeOfDay, scheduleLabel(scheduleFromRoutineRow(routine))]
     .filter(Boolean)
     .join(' · ');
+
+  const variant = category
+    ? getCategoryColorVariant(category.baseColor, routine.colorVariantSeed)
+    : null;
 
   function closeMenuThen(action: () => void) {
     setMenuOpen(false);
@@ -150,8 +155,12 @@ export function RoutineCard({
         style={({ pressed }) => pressed && styles.pressed}
       >
         <Animated.View style={{ opacity: rowOpacity }}>
-          <View style={styles.row}>
-            <IconBadge name={categoryIconName(category?.icon)} />
+          <View style={[styles.row, variant && { backgroundColor: variant.background }]}>
+            <IconBadge
+              name={categoryIconName(category?.icon)}
+              backgroundColor={variant?.gradientStart}
+              iconColor={variant?.accent}
+            />
             <View style={styles.main}>
               <Text style={[styles.name, isSkipped && styles.nameSkipped]}>{routine.name}</Text>
               {subtitle.length > 0 && <Text style={styles.subtitle}>{subtitle}</Text>}
@@ -235,9 +244,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   main: {
     flex: 1,
@@ -268,6 +280,7 @@ const styles = StyleSheet.create({
   },
   streakValue: {
     fontFamily: typography.title.fontFamily,
+    fontWeight: typography.title.fontWeight,
     fontSize: 20,
     color: colors.textPrimary,
   },

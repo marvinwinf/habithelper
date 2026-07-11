@@ -69,7 +69,7 @@ export default function ComponentPreviewScreen() {
       <Text style={styles.sectionTitle}>CategoryBadge</Text>
       <View style={[styles.row, styles.spacingBelow]}>
         {categoryFamilies.map((family) => (
-          <CategoryBadge key={family} label={family} />
+          <CategoryBadge key={family} label={family} baseColor={categoryPalette[family].base} />
         ))}
       </View>
 

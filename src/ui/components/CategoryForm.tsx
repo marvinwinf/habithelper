@@ -25,13 +25,11 @@ export interface CategoryFormProps {
 
 const PALETTE_FAMILIES = Object.keys(categoryPalette) as CategoryColorFamily[];
 
-// Categories are told apart by name and glyph, never by hue (Quiet Atelier,
-// docs/DESIGN_SYSTEM.md) — the form no longer offers a color picker, but
-// `base_color` remains a persisted, non-null column (docs/DATA_MODEL.md), so
-// new categories still get a stable value from the retained legacy palette.
+// New categories default to the first palette family; docs/DESIGN_SYSTEM.md's
+// Categories section lets the user pick a different family below.
 const DEFAULT_BASE_COLOR = categoryPalette[PALETTE_FAMILIES[0]].base;
 
-/** Shared name/icon form used by both the create and edit category screens. */
+/** Shared name/color/icon form used by both the create and edit category screens. */
 export function CategoryForm({
   initialName = '',
   initialBaseColor = DEFAULT_BASE_COLOR,
@@ -41,6 +39,7 @@ export function CategoryForm({
   testID,
 }: CategoryFormProps) {
   const [name, setName] = useState(initialName);
+  const [baseColor, setBaseColor] = useState(initialBaseColor);
   const [icon, setIcon] = useState<string | null>(initialIcon);
 
   const trimmedName = name.trim();
@@ -56,6 +55,30 @@ export function CategoryForm({
         style={styles.input}
         testID="category-form-name-input"
       />
+
+      <Text style={styles.label}>Farbe</Text>
+      <View style={styles.paletteRow}>
+        {PALETTE_FAMILIES.map((family) => {
+          const familyBaseColor = categoryPalette[family].base;
+          const selected = familyBaseColor === baseColor;
+          return (
+            <Pressable
+              key={family}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              accessibilityLabel={family}
+              testID={`category-form-color-${family}`}
+              onPress={() => setBaseColor(familyBaseColor)}
+              style={({ pressed }) => [
+                styles.colorSwatch,
+                { backgroundColor: familyBaseColor },
+                selected && styles.colorSwatchSelected,
+                pressed && styles.pressed,
+              ]}
+            />
+          );
+        })}
+      </View>
 
       <Text style={styles.label}>Symbol</Text>
       <View style={styles.paletteRow}>
@@ -89,12 +112,13 @@ export function CategoryForm({
       <CategoryBadge
         label={trimmedName || 'Vorschau'}
         icon={icon}
+        baseColor={baseColor}
         testID="category-form-preview"
       />
 
       <Button
         label={submitLabel}
-        onPress={() => onSubmit({ name: trimmedName, baseColor: initialBaseColor, icon })}
+        onPress={() => onSubmit({ name: trimmedName, baseColor, icon })}
         disabled={!canSave}
         testID="category-form-save"
       />
@@ -124,6 +148,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+  },
+  colorSwatch: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  colorSwatchSelected: {
+    borderColor: colors.textPrimary,
   },
   iconOption: {
     borderWidth: 2,

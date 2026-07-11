@@ -26,13 +26,21 @@ describe('CategoryForm', () => {
     expect(screen.getByTestId('category-form-save').props.accessibilityState.disabled).toBe(true);
   });
 
-  it('offers no color palette picker (Quiet Atelier: categories distinguished by name and glyph, not color)', async () => {
-    await render(<CategoryForm onSubmit={jest.fn()} />);
+  it('offers a color family picker and submits the selected family', async () => {
+    const onSubmit = jest.fn();
+    await render(<CategoryForm onSubmit={onSubmit} initialName="Sport" />);
 
     for (const family of Object.keys(categoryPalette)) {
-      expect(screen.queryByTestId(`category-form-color-${family}`)).toBeNull();
+      expect(screen.getByTestId(`category-form-color-${family}`)).toBeTruthy();
     }
-    expect(screen.queryByText('Farbe')).toBeNull();
+    expect(screen.getByText('Farbe')).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('category-form-color-lavender'));
+    await fireEvent.press(screen.getByTestId('category-form-save'));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ baseColor: categoryPalette.lavender.base })
+    );
   });
 
   it('shows the entered name in the live preview', async () => {
@@ -56,7 +64,7 @@ describe('CategoryForm', () => {
     });
   });
 
-  it('preserves an existing category base color unchanged, since it is no longer user-editable', async () => {
+  it('preserves an existing category base color unless a different swatch is picked', async () => {
     const onSubmit = jest.fn();
     const existingBaseColor = categoryPalette.apricot.base;
     await render(

@@ -7,6 +7,7 @@ import { IconBadge } from './IconBadge';
 import { Sheet } from './Sheet';
 import { useMountAnimation } from '../animation/useMountAnimation';
 import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
+import { getCategoryColorVariant } from '../theme/categoryVariant';
 import { categoryIconName } from '../categoryIcons';
 import { todayDateString } from '../../domain/dates';
 
@@ -49,11 +50,11 @@ function subtitleFor(task: TaskCardTask, forLater: boolean): string {
 
 /**
  * A single task's row, per docs/DESIGN_SYSTEM.md's Routine and Task Item
- * Design: a single-surface hairline-divided row (no card, no category
- * tint), title with a short subtitle ("Heute", the date, or "Für später"),
- * an outline-glyph completion toggle (which also serves as undo) on the
- * right, and an overflow menu. Shared between the Tasks screen and the
- * Today screen's Tasks/For-later sections (T049/T066).
+ * Design: a soft card lightly tinted by its category's color variant, title
+ * with a short subtitle ("Heute", the date, or "Für später"), a filled-circle
+ * completion toggle (which also serves as undo) on the right, and an
+ * overflow menu. Shared between the Tasks screen and the Today screen's
+ * Tasks/For-later sections (T049/T066).
  */
 export function TaskCard({
   task,
@@ -70,6 +71,9 @@ export function TaskCard({
   const mountAnimation = useMountAnimation();
 
   const subtitle = subtitleFor(task, forLater);
+  const variant = category
+    ? getCategoryColorVariant(category.baseColor, task.colorVariantSeed)
+    : null;
 
   function closeMenuThen(action: () => void) {
     setMenuOpen(false);
@@ -79,8 +83,15 @@ export function TaskCard({
   return (
     <>
       <Animated.View style={{ opacity: mountAnimation.progress }}>
-        <View style={styles.row} testID={testID}>
-          <IconBadge name={categoryIconName(category?.icon)} />
+        <View
+          style={[styles.row, variant && { backgroundColor: variant.background }]}
+          testID={testID}
+        >
+          <IconBadge
+            name={categoryIconName(category?.icon)}
+            backgroundColor={variant?.gradientStart}
+            iconColor={variant?.accent}
+          />
           <View style={styles.main}>
             <Text
               style={[styles.title, task.isCompleted && styles.titleCompleted]}
@@ -115,12 +126,14 @@ export function TaskCard({
             hitSlop={spacing.xs}
             style={({ pressed }) => [
               styles.toggle,
-              { borderColor: task.isCompleted ? 'transparent' : colors.border },
+              task.isCompleted && styles.toggleCompleted,
               pressed && styles.togglePressed,
             ]}
             testID={`${testID}-toggle`}
           >
-            {task.isCompleted ? <Text style={styles.checkmark}>✓</Text> : null}
+            {task.isCompleted ? (
+              <Text style={[styles.checkmark, styles.checkmarkCompleted]}>✓</Text>
+            ) : null}
           </Pressable>
           <Button
             label="⋯"
@@ -163,9 +176,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   main: {
     flex: 1,
@@ -195,17 +211,24 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: radius.full,
     borderWidth: 1,
-    backgroundColor: 'transparent',
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  toggleCompleted: {
+    borderColor: 'transparent',
+    backgroundColor: colors.accent,
   },
   togglePressed: {
     opacity: pressedOpacity,
   },
   checkmark: {
-    color: colors.accent,
     fontSize: typography.bodySmall.fontSize,
     fontWeight: typography.bodySmall.fontWeight,
+  },
+  checkmarkCompleted: {
+    color: colors.textOnAccent,
   },
   menu: {
     gap: spacing.sm,

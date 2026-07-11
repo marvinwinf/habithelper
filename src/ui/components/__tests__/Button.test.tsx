@@ -20,8 +20,8 @@ describe('Button', () => {
   });
 
   it.each<[ButtonVariant, string]>([
-    ['primary', colors.textPrimary],
-    ['secondary', 'transparent'],
+    ['primary', colors.accent],
+    ['secondary', colors.surfaceMuted],
     ['destructive', 'transparent'],
   ])('renders the %s variant with its own background', async (variant, expectedBackground) => {
     await render(<Button label="Aktion" variant={variant} testID="button" />);
@@ -30,8 +30,8 @@ describe('Button', () => {
     expect(style.backgroundColor).toBe(expectedBackground);
   });
 
-  it('never uses the gold accent as a button fill (reserved for meaning-carrying elements)', async () => {
-    for (const variant of ['primary', 'secondary', 'destructive'] as const) {
+  it('reserves the accent fill for the primary action only', async () => {
+    for (const variant of ['secondary', 'destructive'] as const) {
       await render(<Button label="Aktion" variant={variant} testID={variant} />);
       expect(flatten(screen.getByTestId(variant).props.style).backgroundColor).not.toBe(
         colors.accent
@@ -39,17 +39,13 @@ describe('Button', () => {
     }
   });
 
-  it('renders secondary as underlined text and destructive as a rose outline', async () => {
-    await render(<Button label="Speichern" variant="secondary" testID="secondary" />);
-    const secondaryLabel = screen.getByText('Speichern');
-    expect(flatten(secondaryLabel.props.style).textDecorationLine).toBe('underline');
-
+  it('renders destructive as a terracotta outline', async () => {
     await render(<Button label="Löschen" variant="destructive" testID="destructive" />);
     const destructiveStyle = flatten(screen.getByTestId('destructive').props.style);
     expect(destructiveStyle.borderColor).toBe(colors.destructive);
   });
 
-  it('keeps a >=44dp touch target for its compact small-caps label (T082)', async () => {
+  it('keeps a >=44dp touch target for its compact label (T082)', async () => {
     await render(<Button label="OK" testID="button" />);
     expect(flatten(screen.getByTestId('button').props.style).minHeight).toBeGreaterThanOrEqual(44);
   });

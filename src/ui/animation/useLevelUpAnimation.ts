@@ -1,7 +1,9 @@
 import { useCallback, useState } from 'react';
 import { Animated } from 'react-native';
 
-const RISE_DURATION_MS = 175;
+import { POP_EASING } from './constants';
+
+const RISE_DURATION_MS = 200;
 const SETTLE_DURATION_MS = 175;
 
 export const LEVEL_UP_ANIMATION_DURATION_MS = RISE_DURATION_MS + SETTLE_DURATION_MS;
@@ -13,11 +15,11 @@ export interface LevelUpAnimation {
 }
 
 /**
- * Level-up milestone animation: a two-stage 0→1→0 dip that consumers map to
- * an opacity fade (docs/DESIGN_SYSTEM.md's Motion section — fade-only, no
- * scale/spring/bounce). The strongest of the completion-related animations,
- * distinct from routine completion and streak-burst feedback, while staying
- * within the 250–350ms short-animation bound.
+ * Level-up milestone animation: a two-stage 0→1→0 pulse — a gentle
+ * overshoot rise (`POP_EASING`) then a plain settle back down — that
+ * consumers map to a brief scale/opacity pulse (docs/DESIGN_SYSTEM.md's
+ * Gamification section: a gentle acknowledgement, never a loss-framed or
+ * flashy celebration), within the short-animation bound.
  */
 export function useLevelUpAnimation(): LevelUpAnimation {
   const [progress] = useState(() => new Animated.Value(0));
@@ -29,6 +31,7 @@ export function useLevelUpAnimation(): LevelUpAnimation {
         Animated.timing(progress, {
           toValue: 1,
           duration: RISE_DURATION_MS,
+          easing: POP_EASING,
           useNativeDriver: true,
         }),
         Animated.timing(progress, {

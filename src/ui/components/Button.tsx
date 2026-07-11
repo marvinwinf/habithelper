@@ -17,24 +17,23 @@ export interface ButtonProps {
   testID?: string;
 }
 
-// Per docs/DESIGN_SYSTEM.md's Buttons and Interaction section: solid
-// charcoal-on-stone primary, an underlined (not filled/ghost) secondary, and
-// a rose outline for destructive — gold is reserved for meaning-carrying
-// elements (primary action feedback, streak, completion), never a button fill.
+// Per docs/DESIGN_SYSTEM.md's Buttons and Interaction section: a solid
+// accent-filled primary (Soft Momentum uses the sage accent generously,
+// unlike Quiet Atelier's "precious, rarely-used" rule), a soft neutral-filled
+// secondary, and a terracotta outline for destructive.
 const VARIANT_STYLES: Record<
   ButtonVariant,
-  { background: string; text: string; borderColor: string; underline?: boolean }
+  { background: string; text: string; borderColor: string }
 > = {
   primary: {
-    background: colors.textPrimary,
+    background: colors.accent,
     text: colors.textOnAccent,
     borderColor: 'transparent',
   },
   secondary: {
-    background: 'transparent',
+    background: colors.surfaceMuted,
     text: colors.textPrimary,
     borderColor: 'transparent',
-    underline: true,
   },
   destructive: {
     background: 'transparent',
@@ -69,15 +68,7 @@ export function Button({
         pressed && !disabled && styles.pressed,
       ]}
     >
-      <Text
-        style={[
-          styles.label,
-          { color: variantStyle.text },
-          variantStyle.underline && styles.labelUnderline,
-        ]}
-      >
-        {label}
-      </Text>
+      <Text style={[styles.label, { color: variantStyle.text }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -89,8 +80,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
     // Keeps every button a >=44dp touch target regardless of its short
-    // small-caps label (docs/DESIGN_SYSTEM.md's Accessibility section, T082);
-    // padding alone left the caption-sized label at ~40dp.
+    // label (docs/DESIGN_SYSTEM.md's Accessibility section, T082); padding
+    // alone left the caption-sized label at ~40dp.
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
@@ -103,8 +94,5 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.label,
-  },
-  labelUnderline: {
-    textDecorationLine: 'underline',
   },
 });

@@ -14,7 +14,7 @@ describe('Card', () => {
     expect(screen.getByText('Card content')).toBeTruthy();
   });
 
-  it('applies the surface background and near-square radius tokens', async () => {
+  it('applies the surface background and soft card radius tokens', async () => {
     await render(<Card testID="card" />);
     const flattenedStyle = screen.getByTestId('card').props.style;
     const style = Array.isArray(flattenedStyle)
@@ -22,7 +22,7 @@ describe('Card', () => {
       : flattenedStyle;
 
     expect(style.backgroundColor).toBe(colors.surface);
-    expect(style.borderRadius).toBe(radius.md);
+    expect(style.borderRadius).toBe(radius.lg);
   });
 
   it('carries no shadow or elevation', async () => {

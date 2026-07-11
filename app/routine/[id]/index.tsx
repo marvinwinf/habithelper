@@ -42,6 +42,7 @@ import { ProgressBar } from '../../../src/ui/components/ProgressBar';
 import { RoutineCalendar, type CalendarDay } from '../../../src/ui/components/RoutineCalendar';
 import { ScreenHeader } from '../../../src/ui/components/ScreenHeader';
 import { colors, pressedOpacity, radius, spacing, typography } from '../../../src/ui/theme';
+import { getCategoryColorVariant } from '../../../src/ui/theme/categoryVariant';
 import { categoryIconName } from '../../../src/ui/categoryIcons';
 
 // Same distinguishing treatment as RoutineCard's level-up milestone (T042):
@@ -114,6 +115,10 @@ export default function RoutineDetailScreen() {
   const category = routine?.categoryId
     ? categories.find((c) => c.id === routine.categoryId)
     : undefined;
+  const heroVariant =
+    category && routine
+      ? getCategoryColorVariant(category.baseColor, routine.colorVariantSeed)
+      : null;
 
   const calendarDays = useMemo<CalendarDay[]>(() => {
     if (!routine) {
@@ -223,11 +228,29 @@ export default function RoutineDetailScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <ScreenHeader title={routine.name} testID="routine-detail-header" />
 
-      <Animated.View style={[styles.heroCard, { opacity: heroOpacity }]}>
+      <Animated.View
+        style={[
+          styles.heroCard,
+          heroVariant && { backgroundColor: heroVariant.background },
+          { opacity: heroOpacity },
+        ]}
+      >
         <View style={styles.heroTopRow}>
-          <IconBadge name={categoryIconName(category?.icon)} size="lg" />
+          <IconBadge
+            name={categoryIconName(category?.icon)}
+            size="lg"
+            backgroundColor={heroVariant?.gradientStart}
+            iconColor={heroVariant?.accent}
+          />
           <View style={styles.heroTopMain}>
-            {category && <CategoryBadge label={category.name} icon={category.icon} />}
+            {category && routine && (
+              <CategoryBadge
+                label={category.name}
+                icon={category.icon}
+                baseColor={category.baseColor}
+                colorVariantSeed={routine.colorVariantSeed}
+              />
+            )}
             <Text style={styles.heroStreakValue} testID="routine-detail-streak">
               {cache?.currentStreak ?? 0} Tage
             </Text>
@@ -378,9 +401,12 @@ const styles = StyleSheet.create({
   },
   heroCard: {
     gap: spacing.xs,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -392,6 +418,7 @@ const styles = StyleSheet.create({
   },
   heroStreakValue: {
     fontFamily: typography.streak.fontFamily,
+    fontWeight: typography.streak.fontWeight,
     fontSize: 36,
     color: colors.textPrimary,
   },
