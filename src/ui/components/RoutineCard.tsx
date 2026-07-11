@@ -12,7 +12,7 @@ import {
 } from '../animation/haptics';
 import { useLevelUpAnimation } from '../animation/useLevelUpAnimation';
 import { useMountAnimation } from '../animation/useMountAnimation';
-import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
+import { colors, pressedOpacity, radius, softShadow, spacing, typography } from '../theme';
 import { getCategoryColorVariant, getCategorySolidFill } from '../theme/categoryVariant';
 import { categoryIconName } from '../categoryIcons';
 import { scheduleFromRoutineRow } from '../../domain/routines/schedule';
@@ -71,10 +71,13 @@ export interface RoutineCardProps {
 
 /**
  * A single routine's Today-screen row, per docs/DESIGN_SYSTEM.md's Routine
- * and Task Item Design: a soft card lightly tinted by its category's color
- * variant, a "time · schedule" subtitle, a bold streak numeral, and an
- * overflow menu wired to docs/ROUTINE_RULES.md's per-occurrence actions
- * (T030/T065).
+ * and Task Item Design: a light soft-paper card lightly tinted by its
+ * category's color variant, a "time · schedule" subtitle, and a bold streak
+ * numeral. The row itself carries only the completion control — per the
+ * design system's List Row Actions rule there is no inline overflow menu;
+ * tapping the row opens an actions bottom sheet (Statistik/detail plus
+ * docs/ROUTINE_RULES.md's per-occurrence actions), so the list stays focused
+ * on viewing and completing (T030/T065).
  */
 export function RoutineCard({
   routine,
@@ -151,7 +154,8 @@ export function RoutineCard({
   return (
     <>
       <Pressable
-        onPress={onOpenDetail}
+        onPress={() => setMenuOpen(true)}
+        accessibilityRole="button"
         testID={testID}
         style={({ pressed }) => pressed && styles.pressed}
       >
@@ -181,12 +185,6 @@ export function RoutineCard({
                 onExceed={handleExceed}
                 testID={`${testID}-complete`}
               />
-              <Button
-                label="⋯"
-                variant="secondary"
-                onPress={() => setMenuOpen(true)}
-                testID={`${testID}-menu-button`}
-              />
             </View>
           </View>
         </Animated.View>
@@ -194,12 +192,21 @@ export function RoutineCard({
 
       <Sheet visible={menuOpen} onClose={() => setMenuOpen(false)} testID={`${testID}-menu`}>
         <View style={styles.menu}>
+          {/* The list row has no inline overflow menu; this sheet is the one
+              place a routine's actions live. "Statistik" opens the full
+              Routine Detail (streak, level, calendar). */}
+          <Button
+            label="Statistik"
+            onPress={() => closeMenuThen(onOpenDetail)}
+            testID={`${testID}-menu-detail`}
+          />
           {/* Move and skip act on today's occurrence, so they disappear once
               it is resolved — writing a second outcome event for the same
               date would leave the occurrence's state ambiguous. */}
           {!isResolved && (
             <Button
               label="Auf morgen verschieben"
+              variant="secondary"
               onPress={() => closeMenuThen(onMoveToTomorrow)}
               testID={`${testID}-menu-move`}
             />
@@ -245,12 +252,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.sm,
-    padding: spacing.sm,
-    marginBottom: spacing.sm,
+    // Generous internal padding so the card breathes — soft paper, not a
+    // tight container (docs/DESIGN_SYSTEM.md's Whitespace and Rhythm).
+    padding: spacing.md,
     borderRadius: radius.lg,
-    borderWidth: 1,
+    // Soft hairline + subtle shadow instead of a full 1px stroke: the card
+    // lifts by tone and shadow, not by a hard border.
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     backgroundColor: colors.surface,
+    ...softShadow,
   },
   main: {
     flex: 1,

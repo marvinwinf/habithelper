@@ -7,6 +7,7 @@ import { db } from '../../../src/data/db/client';
 import { listCategories, type Category } from '../../../src/data/repositories/categoryRepository';
 import {
   getRoutine,
+  softDeleteRoutine,
   updateRoutine,
   type Routine,
 } from '../../../src/data/repositories/routineRepository';
@@ -24,6 +25,7 @@ import {
   retroactivelyCompleteOccurrence,
 } from '../../../src/services/routineService';
 import { reconcileRoutine } from '../../../src/services/reconciliationService';
+import { confirmRoutineDeletion } from '../../../src/ui/alerts';
 import { toLocalDateString, todayDateString } from '../../../src/domain/dates';
 import { getCalendarDayState, listMonthDates } from '../../../src/domain/routines/calendar';
 import { scheduleFromRoutineRow, type IsoWeekday } from '../../../src/domain/routines/schedule';
@@ -196,6 +198,20 @@ export default function RoutineDetailScreen() {
       await pauseRoutine(db, id, todayDateString());
     }
     loadData();
+  }
+
+  // Delete lives here (and in the Today/Routines action sheets that open this
+  // screen), never as an inline row control — the list stays focused on
+  // viewing and completing (docs/DESIGN_SYSTEM.md's List Row Actions). Always
+  // confirmed, then returns to the previous screen.
+  function handleDelete() {
+    if (!routine) {
+      return;
+    }
+    confirmRoutineDeletion(routine.name, async () => {
+      await softDeleteRoutine(db, id);
+      router.back();
+    });
   }
 
   // Lets a weekly-target ("X times a week") routine's due weekdays be
@@ -382,6 +398,14 @@ export default function RoutineDetailScreen() {
             {routine.isPaused ? 'Reaktivieren' : 'Pausieren'}
           </Text>
         </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={handleDelete}
+          style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
+          testID="routine-detail-delete"
+        >
+          <Text style={[styles.actionLabel, styles.deleteLabel]}>Löschen</Text>
+        </Pressable>
       </View>
     </ScrollView>
   );
@@ -455,8 +479,9 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
-    gap: spacing.lg,
+    gap: spacing.md,
     justifyContent: 'center',
+    flexWrap: 'wrap',
   },
   actionButton: {
     alignItems: 'center',
@@ -472,6 +497,9 @@ const styles = StyleSheet.create({
   },
   pauseLabel: {
     color: colors.textPrimary,
+  },
+  deleteLabel: {
+    color: colors.destructive,
   },
   weekdayCard: {
     gap: spacing.sm,

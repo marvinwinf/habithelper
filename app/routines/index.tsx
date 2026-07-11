@@ -81,6 +81,11 @@ export default function RoutinesScreen() {
     setMenuRoutineId(null);
   }
 
+  function handleOpenDetail(routine: Routine) {
+    closeMenu();
+    router.push(`/routine/${routine.id}`);
+  }
+
   function handleEdit(routine: Routine) {
     closeMenu();
     router.push(`/routine/${routine.id}/edit`);
@@ -112,27 +117,31 @@ export default function RoutinesScreen() {
     const streak = routineStreaks[item.id]?.currentStreak ?? 0;
 
     return (
-      <Card style={styles.row} testID={`routine-row-${item.id}`}>
-        <IconBadge name={categoryIconName(category?.icon)} />
-        <View style={styles.rowMain}>
-          <Text style={styles.routineName} numberOfLines={1}>
-            {item.name}
-          </Text>
-          {subtitle.length > 0 && <Text style={styles.subtitle}>{subtitle}</Text>}
-          <View style={styles.streakRow}>
-            <Ionicons name="flame" size={typography.caption.fontSize} color={colors.accent} />
-            <Text style={styles.streak} testID={`routine-streak-${item.id}`}>
-              Streak {streak}
+      // The row has no inline overflow menu — tapping it opens the actions
+      // sheet (docs/DESIGN_SYSTEM.md's List Row Actions). Long-press still
+      // starts the drag-to-reorder gesture handled by ReorderableList.
+      <Pressable
+        onPress={() => setMenuRoutineId(item.id)}
+        accessibilityRole="button"
+        style={({ pressed }) => pressed && styles.rowPressed}
+        testID={`routine-row-${item.id}`}
+      >
+        <Card style={styles.row}>
+          <IconBadge name={categoryIconName(category?.icon)} />
+          <View style={styles.rowMain}>
+            <Text style={styles.routineName} numberOfLines={1}>
+              {item.name}
             </Text>
+            {subtitle.length > 0 && <Text style={styles.subtitle}>{subtitle}</Text>}
+            <View style={styles.streakRow}>
+              <Ionicons name="flame" size={typography.caption.fontSize} color={colors.accent} />
+              <Text style={styles.streak} testID={`routine-streak-${item.id}`}>
+                Streak {streak}
+              </Text>
+            </View>
           </View>
-        </View>
-        <Button
-          label="⋯"
-          variant="secondary"
-          onPress={() => setMenuRoutineId(item.id)}
-          testID={`routine-menu-button-${item.id}`}
-        />
-      </Card>
+        </Card>
+      </Pressable>
     );
   }
 
@@ -197,7 +206,13 @@ export default function RoutinesScreen() {
         {menuRoutine && (
           <View style={styles.menu}>
             <Button
+              label="Statistik"
+              onPress={() => handleOpenDetail(menuRoutine)}
+              testID="routine-menu-detail"
+            />
+            <Button
               label="Bearbeiten"
+              variant="secondary"
               onPress={() => handleEdit(menuRoutine)}
               testID="routine-menu-edit"
             />
@@ -274,6 +289,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.sm,
+  },
+  rowPressed: {
+    opacity: pressedOpacity,
   },
   rowMain: {
     flex: 1,

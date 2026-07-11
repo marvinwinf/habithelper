@@ -25,11 +25,33 @@ Soft Momentum was this app's original direction before the "Quiet Atelier" MVP r
 - One muted sage accent (`accent`) carries primary actions, progress fill, streak numerals, selected/focus states. It's used more freely than a "precious" accent — that's the point of Soft Momentum.
 - Pastel category colors (see Categories below) tint a routine/task's card lightly — one dominant color per card, never several competing hues on one screen.
 - Soft, consistently rounded geometry: `sm`/`md`/`lg` radii plus a `full` pill/circle step — see Spacing, Radius, Surfaces.
-- Cards use soft surface contrast and a thin low-contrast border rather than drop shadows; gentle layering, not floating panels.
+- Cards read as soft paper: a lightly lifted `surface`, a soft low-contrast border (lighter than a hairline divider), generous internal padding, and — where it genuinely helps lift a card off the background — an extremely subtle, low-opacity shadow. Layering stays gentle: never a hard border, never a pronounced floating panel, never competing tonal steps on one screen.
 - One typeface, hierarchy from weight and size, not a second display face.
 - Icons are simple, rounded, and circular-badged; used a bit more freely than Quiet Atelier's hairline sparsity, but still support labels rather than replace them.
 - Motion is short and gentle: fades for mount/dismiss, a subtle spring for completion and milestones — never a bounce/overshoot loop or long transition.
 - No status is punishing: a missed day reads as neutral, not alarming; only real destructive actions (delete) use an assertive color, and always with confirmation.
+
+## Visual Hierarchy and Reading Order
+
+Every screen must have one obvious reading order — sections must not all carry the same visual weight. The eye should be guided top-to-bottom by deliberate contrast in size, weight, spacing, and color emphasis, not left to scan an even grid of equal-looking blocks.
+
+The Today screen's canonical order is **Greeting → Daily progress (overall streak + today's completion) → Focus of the day → Today's routines → Tasks** (see `docs/SCREEN_SPECIFICATIONS.md`). Routines are always prioritized over tasks. When adding to any screen, place it in the reading order on purpose and give it a weight proportional to its importance; simplify or remove before you add.
+
+## Whitespace and Rhythm
+
+The layout should breathe — Soft Momentum reads as calm paper, and crowding kills that feeling.
+
+- Prefer generous vertical spacing **between** sections (use the larger `lg`/`xl` steps for section gaps) so each section reads as its own quiet block.
+- Give cards generous internal padding; content should never crowd a card's edges.
+- When a screen feels compressed, the fix is more space and fewer elements — never tighter packing. Add whitespace before adding UI.
+
+## List Row Actions (no overflow menus)
+
+Routine and task **list rows do not show a three-dot / overflow menu**. A list is for viewing and completing items — that is its entire job, and per-row menus add visual noise to the screen that matters most.
+
+- Tapping a row opens an actions bottom sheet (or, where one exists, the item's dedicated detail screen) — that is the single place item actions live.
+- Item actions belong only in that sheet/detail, never inline on the row: **Statistik** (opens the routine detail — streak, level, calendar), **Edit** (the form is where category, and therefore color, is changed), **Pause/Reactivate**, **Delete**, plus the routine's today-occurrence actions (**move to tomorrow**, **conscious skip**).
+- The only inline control a list row carries is its completion control.
 
 ## Color Tokens
 
@@ -72,7 +94,8 @@ A screen should still show one dominant color at a time — a category's tint ap
 
 - Spacing scale: 4 / 8 / 12 / 20 / 32 / 48 (`xxs`…`xl`) — the 4px step exists for tight card-internal padding.
 - Radius scale: `sm` 10px (compact controls/tags), `md` 18px (buttons, input fields), `lg` 26px (cards, sheets), `full` 999px (pills, toggles, circular icon badges).
-- Cards (`src/ui/components/Card.tsx`) use `radius.lg` and a 1px `border`, sitting on `surface` against the `background` — that tonal contrast is the only "elevation," no shadows.
+- Cards (`src/ui/components/Card.tsx`) use `radius.lg` (or larger for hero/soft-paper cards), generous internal padding, and a soft low-contrast `border`, sitting on `surface` against the `background`. Tonal contrast does most of the layering; an extremely subtle, low-opacity shadow may reinforce it where a card needs to lift off the background, but it must stay barely perceptible — never a Material drop shadow.
+- Use the larger spacing steps (`lg` 20 / `xl` 32, or more) for gaps between sections so the screen breathes; reserve the 4/8/12 steps for spacing inside a card.
 
 ## Buttons and Interaction
 
@@ -83,8 +106,9 @@ A screen should still show one dominant color at a time — a category's tint ap
 
 ## Routine and Task Item Design
 
-- Each row is a soft card (`radius.lg`, `surface` background, 1px `border`), lightly tinted by its category's `getCategoryColorVariant` background when a category is set.
+- Each row is a light, soft-paper card (`radius.lg` or larger, `surface` background, soft low-contrast border, generous internal padding), lightly tinted by its category's `getCategoryColorVariant` background when a category is set. Keep the card feeling light — lean on the tint and gentle rounding, not heavy borders or backgrounds — with at most an extremely subtle shadow.
 - Leading: circular `IconBadge` (now fully round, `radius.full`). Title in the functional weight. Trailing: bold streak numeral for routines (size may grow modestly with streak length) or a date/subtitle for tasks.
+- No overflow / three-dot menu on the row. The row carries only its title, category treatment, streak/date, and completion control; all other actions live in the routine/task detail screen or a bottom sheet opened by tapping the row (see List Row Actions above).
 - Completion control: a circular tap target that fills with the accent color and shows a checkmark on completion, with a quick, gentle spring (`GENTLE_SPRING`) rather than a plain fade — tactile, not flashy.
 
 ## Completed / Skipped / Missed / Paused States

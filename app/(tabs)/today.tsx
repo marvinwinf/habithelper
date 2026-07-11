@@ -472,9 +472,13 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.lg,
     paddingBottom: spacing.xl,
+    // Even, generous rhythm between the header, the Focus card, and the
+    // section list so each reads as its own calm block — the reading order
+    // (greeting → progress → focus → routines → tasks) is carried by
+    // whitespace, not dividers (docs/DESIGN_SYSTEM.md's Whitespace and Rhythm).
+    gap: spacing.lg,
   },
   header: {
-    marginBottom: spacing.md,
     gap: spacing.md,
   },
   iconRow: {
@@ -558,7 +562,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   list: {
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   menu: {
     gap: spacing.sm,

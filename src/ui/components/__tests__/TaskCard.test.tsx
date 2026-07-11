@@ -56,26 +56,35 @@ describe('TaskCard', () => {
     expect(screen.queryByTestId('task-card-overdue-label')).toBeNull();
   });
 
-  it('wires the overflow menu actions', async () => {
+  it('opens the actions sheet on card tap and wires its entries', async () => {
     const { callbacks } = await renderCard();
 
-    await fireEvent.press(screen.getByTestId('task-card-menu-button'));
+    await fireEvent.press(screen.getByTestId('task-card'));
     await fireEvent.press(screen.getByTestId('task-card-menu-move'));
     expect(callbacks.onMoveToTomorrow).toHaveBeenCalledTimes(1);
 
-    await fireEvent.press(screen.getByTestId('task-card-menu-button'));
+    await fireEvent.press(screen.getByTestId('task-card'));
     await fireEvent.press(screen.getByTestId('task-card-menu-edit'));
     expect(callbacks.onEdit).toHaveBeenCalledTimes(1);
 
-    await fireEvent.press(screen.getByTestId('task-card-menu-button'));
+    await fireEvent.press(screen.getByTestId('task-card'));
     await fireEvent.press(screen.getByTestId('task-card-menu-delete'));
     expect(callbacks.onDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not complete the task when tapping the card body to open actions', async () => {
+    const { callbacks } = await renderCard();
+
+    await fireEvent.press(screen.getByTestId('task-card'));
+
+    expect(callbacks.onToggleComplete).not.toHaveBeenCalled();
+    expect(screen.getByTestId('task-card-menu-edit')).toBeTruthy();
   });
 
   it('hides the move-to-tomorrow option once the task is completed', async () => {
     await renderCard({ task: { ...task, isCompleted: true } });
 
-    await fireEvent.press(screen.getByTestId('task-card-menu-button'));
+    await fireEvent.press(screen.getByTestId('task-card'));
 
     expect(screen.queryByTestId('task-card-menu-move')).toBeNull();
     expect(screen.getByTestId('task-card-menu-edit')).toBeTruthy();

@@ -20,6 +20,18 @@ The standalone Routinen and Aufgaben tabs are retired as top-level tabs; the scr
 
 ## Today Screen
 
+### Visual Hierarchy
+
+The screen reads top-to-bottom in one deliberate order, with each section given weight proportional to its importance (see `docs/DESIGN_SYSTEM.md`'s Visual Hierarchy and Reading Order):
+
+1. Greeting,
+2. Daily progress (overall streak + today's completion),
+3. Focus of the day,
+4. Today's routines,
+5. Tasks.
+
+Sections must not all carry equal visual weight — spacing, type size/weight, and accent emphasis should guide the eye through this order at a glance. Routines are prioritized over tasks. Keep generous whitespace between these sections so the screen feels calm rather than compressed.
+
 ### Header
 
 - Leading shortcuts icon (opens a small sheet linking to Kategorien verwalten and Me); trailing bell icon (placeholder only — opens a small sheet noting notifications aren't available yet; carries no push-notification functionality, per `docs/MVP_SCOPE.md`).
@@ -41,23 +53,25 @@ A card between the header and the routine list: accent-tinted, short "Fokus des 
 
 ### Routine Card
 
-Shows:
+A light, soft-paper card (see `docs/DESIGN_SYSTEM.md`) focused only on viewing and completing. Shows:
 
 - name,
 - category visual treatment,
 - optional time,
 - current streak,
 - weekly progress when relevant,
-- separate completion button,
-- overflow menu.
+- separate completion button.
+
+No overflow / three-dot menu on the row.
 
 Interactions:
 
-- tap card: open routine detail,
+- tap card: open the routine's actions bottom sheet,
 - tap completion button: complete,
 - long press completion button: exceeded,
-- tap completion button again once completed or exceeded: undo (see `docs/ROUTINE_RULES.md`'s Undo Completion),
-- overflow menu: move to tomorrow, conscious skip, edit, pause, delete.
+- tap completion button again once completed or exceeded: undo (see `docs/ROUTINE_RULES.md`'s Undo Completion).
+
+The actions bottom sheet is the one place a routine's non-completion actions live — the row itself carries only the completion control (see `docs/DESIGN_SYSTEM.md`'s List Row Actions). It contains: **Statistik** (opens the full Routine Detail — streak, level, calendar), **move to tomorrow** and **conscious skip** (today's occurrence, shown only while it is unresolved and, for skip, allowed), **edit**, **pause**, and **delete** (destructive, confirmed).
 
 Completed routines remain visible in a subdued completed state and move toward the end of the section.
 
@@ -68,8 +82,9 @@ Shows:
 - title,
 - category visual treatment,
 - date or time when present,
-- completion control,
-- overflow menu.
+- completion control.
+
+No overflow / three-dot menu on the row. Tapping the card opens the task's detail (or a bottom sheet), where edit/delete and other actions live.
 
 Overdue tasks are highlighted clearly but not aggressively.
 
@@ -167,9 +182,10 @@ Each routine card shows:
 
 Interactions:
 
-- tap card: open detail,
-- drag and drop: reorder,
-- overflow menu: edit, pause or reactivate, delete.
+- tap card: open the routine's actions bottom sheet (Statistik, edit, pause/reactivate, delete; Statistik opens the full Routine Detail),
+- long press + drag: reorder.
+
+No overflow / three-dot menu on the row (see `docs/DESIGN_SYSTEM.md`'s List Row Actions).
 
 ## Routine Detail Screen
 
@@ -202,6 +218,16 @@ Calendar states:
 
 Past days can be edited for retroactive completion.
 
+### Actions
+
+This screen is the rich home for a routine — the list rows never carry an overflow menu, and it is reached via the "Statistik" entry in each row's actions bottom sheet (see `docs/DESIGN_SYSTEM.md`'s List Row Actions). It carries the whole statistics view (streak, level, record, completions, calendar) plus an action row:
+
+- **Bearbeiten** (edit — the form is also where a routine's category, and therefore its color, is changed),
+- **Pausieren / Reaktivieren**,
+- **Löschen** (destructive, terracotta, always confirmed; returns to the previous screen).
+
+The today-occurrence quick actions (move to tomorrow, conscious skip) live in the Today row's actions bottom sheet, where they are in context — not here.
+
 ## Tasks Screen
 
 Sections:
@@ -225,7 +251,7 @@ Completed tasks remain stored permanently.
 Reachable from the bottom navigation (see Main Navigation). Two parts:
 
 1. **Week overview**: a day-strip (Mon–Sun, current week) with the current day highlighted; below it, each due routine for the visible week shown as a row of per-day completion dots (completed/exceeded = filled accent, missed = muted taupe dot, not-due/future = hollow outline) — built from existing `routine`/`routine_event` data, no new schema.
-2. **Manage links**: "Alle Routinen verwalten" and "Alle Aufgaben verwalten", opening the existing Routines screen (Aktiv/Pausiert tabs, reorder, overflow menu) and Tasks screen (five sections) unchanged, now reachable as plain routes instead of tabs.
+2. **Manage links**: "Alle Routinen verwalten" and "Alle Aufgaben verwalten", opening the existing Routines screen (Aktiv/Pausiert tabs, reorder; item actions via detail/bottom sheet, no row overflow menu) and Tasks screen (five sections) unchanged, now reachable as plain routes instead of tabs.
 
 ## Progress Screen
 

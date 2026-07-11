@@ -25,15 +25,16 @@ describe('Card', () => {
     expect(style.borderRadius).toBe(radius.lg);
   });
 
-  it('carries no shadow or elevation', async () => {
+  it('carries only an extremely subtle soft-paper shadow, not a heavy one', async () => {
     await render(<Card testID="card" />);
     const flattenedStyle = screen.getByTestId('card').props.style;
     const style = Array.isArray(flattenedStyle)
       ? Object.assign({}, ...flattenedStyle.filter(Boolean))
       : flattenedStyle;
 
-    expect(style.elevation).toBeUndefined();
-    expect(style.shadowOpacity).toBeUndefined();
+    // Soft Momentum lifts cards mostly by tone; the shadow is a whisper.
+    expect(style.shadowOpacity).toBeLessThanOrEqual(0.1);
+    expect(style.elevation).toBeLessThanOrEqual(2);
   });
 
   it('merges a caller-provided style override', async () => {
