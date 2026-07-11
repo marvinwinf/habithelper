@@ -90,6 +90,7 @@ const styles = StyleSheet.create({
     height: 64,
   },
   tabItem: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xxs,
     paddingVertical: spacing.xxs,
