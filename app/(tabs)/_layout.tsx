@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import type { ColorValue } from 'react-native';
-import { StyleSheet, Text, View } from 'react-native';
+import type { GestureResponderEvent } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CreateFab } from '../../src/ui/components/CreateFab';
@@ -9,32 +9,59 @@ import { colors, radius, spacing, typography } from '../../src/ui/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
+// Subset of the props React Navigation passes to a custom `tabBarButton`. We
+// only read the interaction handlers and the selected flag (delivered as the
+// `aria-selected` attribute in this version, with `accessibilityState` kept as
+// a fallback for older ones).
+type TabBarButtonProps = {
+  onPress?: ((event: GestureResponderEvent) => void) | null;
+  onLongPress?: ((event: GestureResponderEvent) => void) | null;
+  testID?: string;
+  'aria-label'?: string;
+  'aria-selected'?: boolean;
+  accessibilityState?: { selected?: boolean };
+};
+
 // Usable content height of the bar, above the Android bottom safe-area inset.
-// Must fit the item's icon+label pill (paddingTop 8 + icon 22 + gap 4 + label
-// 16 + paddingBottom 8 = 58) plus the tab button's own 5px top/bottom padding
-// that React Navigation adds around it (= 68), with a little slack. The
-// safe-area inset is ADDED below this (see TabLayout) rather than carved out of
-// it, so the icon+label column is never clipped regardless of the device's
-// gesture-nav inset.
+// Comfortably fits the icon+label pill (paddingTop 8 + icon 22 + gap 4 + label
+// 16 + paddingBottom 8 = 58). The safe-area inset is ADDED below this (see
+// TabLayout) rather than carved out of it, so the column is never clipped
+// regardless of the device's gesture-nav inset.
 const TAB_BAR_CONTENT_HEIGHT = 72;
 
-// Labels render inside the custom tabBarIcon (not the default
-// tabBarShowLabel slot) so the soft pill fill can wrap the icon+label group,
-// per docs/DESIGN_SYSTEM.md's Navigation section.
-function tabIcon(focused: IconName, unfocused: IconName, label: string) {
-  function TabIcon({ focused: isFocused, color }: { focused: boolean; color: ColorValue }) {
+// Regular tabs render as a full custom `tabBarButton` rather than a
+// `tabBarIcon`. React Navigation forces a `tabBarIcon` into a fixed 31x28
+// wrapper (see @react-navigation TabBarIcon), which clips the taller icon+label
+// column; owning the whole button gives it a full-height flex:1 slot so both
+// the icon and the label below it are always fully visible, per
+// docs/DESIGN_SYSTEM.md's Navigation section.
+function tabButton(focused: IconName, unfocused: IconName, label: string) {
+  function TabButton(props: TabBarButtonProps) {
+    const isFocused = props['aria-selected'] ?? props.accessibilityState?.selected ?? false;
+    const color = isFocused ? colors.accent : colors.textSecondary;
     return (
-      <View style={[styles.tabItem, isFocused && styles.tabItemActive]}>
-        <View style={styles.tabIconWrapper}>
-          <Ionicons name={isFocused ? focused : unfocused} color={color} size={22} />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={props['aria-label']}
+        accessibilityState={{ selected: isFocused }}
+        testID={props.testID}
+        onPress={props.onPress}
+        onLongPress={props.onLongPress}
+        android_ripple={{ borderless: true }}
+        style={styles.tabButton}
+      >
+        <View style={[styles.tabItem, isFocused && styles.tabItemActive]}>
+          <View style={styles.tabIconWrapper}>
+            <Ionicons name={isFocused ? focused : unfocused} color={color} size={22} />
+          </View>
+          <Text style={[styles.tabLabel, { color }]} numberOfLines={1}>
+            {label}
+          </Text>
         </View>
-        <Text style={[styles.tabLabel, { color }]} numberOfLines={1}>
-          {label}
-        </Text>
-      </View>
+      </Pressable>
     );
   }
-  return TabIcon;
+  return TabButton;
 }
 
 // The create button lives in the center slot of the bar itself (not a FAB
@@ -72,11 +99,11 @@ export default function TabLayout() {
     >
       <Tabs.Screen
         name="today"
-        options={{ title: 'Heute', tabBarIcon: tabIcon('sunny', 'sunny-outline', 'Heute') }}
+        options={{ title: 'Heute', tabBarButton: tabButton('sunny', 'sunny-outline', 'Heute') }}
       />
       <Tabs.Screen
         name="plan"
-        options={{ title: 'Plan', tabBarIcon: tabIcon('calendar', 'calendar-outline', 'Plan') }}
+        options={{ title: 'Plan', tabBarButton: tabButton('calendar', 'calendar-outline', 'Plan') }}
       />
       <Tabs.Screen
         name="create"
@@ -91,12 +118,12 @@ export default function TabLayout() {
         name="progress"
         options={{
           title: 'Progress',
-          tabBarIcon: tabIcon('stats-chart', 'stats-chart-outline', 'Progress'),
+          tabBarButton: tabButton('stats-chart', 'stats-chart-outline', 'Progress'),
         }}
       />
       <Tabs.Screen
         name="settings"
-        options={{ title: 'Me', tabBarIcon: tabIcon('person-circle', 'person-circle-outline', 'Me') }}
+        options={{ title: 'Me', tabBarButton: tabButton('person-circle', 'person-circle-outline', 'Me') }}
       />
     </Tabs>
   );
@@ -113,8 +140,15 @@ const styles = StyleSheet.create({
     // clipped.
     overflow: 'visible',
   },
-  tabItem: {
+  // The button fills its equal-width slot's full height (flex: 1) and centers
+  // the pill vertically, so every regular item is the same size and never
+  // clipped.
+  tabButton: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabItem: {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
