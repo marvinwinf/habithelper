@@ -104,7 +104,24 @@ Every state keeps a shape/glyph/typographic difference so color is never the onl
 
 ## Navigation
 
-- Bottom tab bar and the Routines Active/Paused control both use soft pill-shaped selected states (`radius.full`, `surfaceMuted`/accent-tinted fill) rather than an underline — selection should look tactile and filled, not just marked.
+- Bottom navigation has four destinations — **Today**, **Plan**, **Progress**, **Me** — plus a floating create button embedded in the center of the bar itself (not a separate FAB floating above it). The active destination uses a soft pill-shaped fill (`radius.full`, `surfaceMuted`/accent-tinted) rather than an underline — selection should look tactile and filled, not just marked.
+- The Routines Active/Paused control uses the same pill-selected treatment.
+
+## Dashboard Color Freedom (Progress screen and Focus of the day)
+
+Soft Momentum's "one accent, category tint stays on its own card" rule governs every list/form screen. The **Progress** dashboard and the **Focus of the day** card are the one deliberate exception: streak rings, the completion-over-time chart, and the habit-breakdown donut may each carry their own color (sage for movement/primary, warm apricot/peach for secondary series, muted plum for a fourth) so the data reads at a glance. This exception is scoped narrowly:
+
+- it applies only to the Progress screen's chart/stat surfaces and the Today screen's Focus-of-the-day card — not to the tab bar, headers, buttons, or any list row elsewhere,
+- every chart still sits on the warm off-white/cream surface tokens, uses the same rounded-card geometry, and keeps text at the standard `textPrimary`/`textSecondary` tokens,
+- category-tinted routine/task rows on Today, Plan, and the Routines list keep the existing one-dominant-color-per-card rule untouched.
+
+## Focus of the Day
+
+A small daily-highlight card on the Today screen, above the routine list: an accent-tinted (sage) card with a short label ("Fokus des Tages") and a one-line prompt, plus a decorative placeholder icon/illustration. Content is a rotating static list keyed by day-of-year in the MVP — no personalization or backend involved.
+
+## Streak Ring
+
+The Progress screen's hero streak uses a circular ring (filled arc, `accent`-colored progress against a `surfaceMuted` track) with the streak number centered inside, rather than the plain bold numeral used elsewhere. The plain numeral treatment on Today/routine detail is unchanged — the ring is specific to the Progress dashboard's hero moment.
 
 ## Icon Style
 

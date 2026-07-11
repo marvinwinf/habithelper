@@ -75,12 +75,21 @@
 - Performance review.
 - Android device testing.
 
+## Phase 12: Today/Plan/Progress Redesign
+
+- Chart primitives (ring, line/area, donut) on `react-native-svg`.
+- Four-destination navigation (Today/Plan/Progress/Me) with an embedded create button.
+- Today header shortcuts + notifications-placeholder icons, and a Focus of the day card.
+- Colorful per-item icon badges on Today's routine/task rows.
+- Plan screen: weekly per-routine completion dot-matrix, entry points to Routines/Tasks management.
+- Progress screen: streak ring, stat tiles, completion-over-time chart, habit-breakdown donut.
+- Settings screen relabeled "Me".
+
 ## Future Phases
 
-- Notifications.
+- Real push notifications (the Phase 12 bell icon stays a visual placeholder).
 - Morning and evening reports.
-- Focus sessions.
-- Statistics dashboard.
+- Focus sessions (distinct from the Phase 12 "Focus of the day" static card).
 - Search.
 - Dark mode.
 - Cloud backup and synchronization.

@@ -804,3 +804,81 @@ Replaces the "Soft Momentum" visual direction implemented through Phase 2 and Ph
 **Manual verification:** Android accessibility scanner / TalkBack spot-check across main screens; manual color-contrast check of gold-on-stone and rose-on-stone pairings.
 **Dependencies:** T081.
 **Commit message:** `fix: address Quiet Atelier accessibility review findings`
+
+---
+
+## Phase 12 — Today/Plan/Progress Redesign
+
+Adopts the Today/Plan/Progress reference mockup shared by the user (see `docs/DESIGN_SYSTEM.md`'s Dashboard Color Freedom / Focus of the Day / Streak Ring sections and `docs/SCREEN_SPECIFICATIONS.md`'s Plan/Progress specs). Builds on top of whatever visual direction (Soft Momentum or Quiet Atelier tokens) is live on `src/ui/theme/colors.ts` at the time this phase starts — the Progress/Focus surfaces carry their own scoped color exception regardless. No schema changes are expected: Plan and Progress read existing `routine`/`routine_event`/`routine_state_cache`/`category` data; the Focus of the day card is a static, non-persisted rotation.
+
+### T083 — Chart primitives on `react-native-svg`
+**Goal:** add `react-native-svg` (the standard, Expo-compatible SVG library) as the one new dependency this phase needs, and build three reusable presentational primitives: `RingProgress` (circular arc + centered value), `AreaChart` (a simple filled line/area chart over an array of `{label, value}` points), and `DonutChart` (segmented ring + external legend).
+**Files/areas:** `package.json`, `src/ui/components/RingProgress.tsx`, `AreaChart.tsx`, `DonutChart.tsx`.
+**Acceptance criteria:** each component is pure/presentational (values passed as props, no data fetching); `RingProgress` clamps its value to 0–1; `DonutChart` segments always sum to the full circle regardless of rounding; all three render on the dev-only preview screen (T019) for visual iteration.
+**Required automated tests:** component tests per primitive (value clamping for `RingProgress`, segment-angle math for `DonutChart`, point-to-path generation for `AreaChart`).
+**Manual verification:** open the dev component preview screen and visually confirm all three render correctly at a few sample values.
+**Dependencies:** none.
+**Commit message:** `feat: add ring, area, and donut chart primitives`
+
+### T084 — Four-destination navigation with embedded create button
+**Goal:** replace the Heute/Routinen/Aufgaben/Einstellungen tab bar and separately-floating `CreateFab` with Heute/Plan/Progress/Me and a create button embedded in the center of the bar itself, per the mockup and `docs/SCREEN_SPECIFICATIONS.md`'s Main Navigation section.
+**Files/areas:** `app/(tabs)/_layout.tsx`, `src/ui/components/CreateFab.tsx` (becomes an in-bar center control, sheet behavior unchanged), relocating `app/(tabs)/routines.tsx` → `app/routines/index.tsx` and `app/(tabs)/tasks.tsx` → `app/tasks/index.tsx` (content unchanged) since they are no longer tabs, new placeholder `app/(tabs)/plan.tsx` and `app/(tabs)/progress.tsx` (filled in by T087/T088), `app/(tabs)/settings.tsx` relabeled "Me" (icon/title only — see T089).
+**Acceptance criteria:** four tabs render (Heute/Plan/Progress/Me) with the create control centered in the bar; tapping it still opens the Routine/Aufgabe sheet and navigates correctly; the relocated Routines/Tasks screens keep every existing behavior and test; nothing on Today changes yet.
+**Required automated tests:** existing `routines.test.tsx`/`tasks.test.tsx` updated only for their new import paths/routes; a smoke test asserting all four tabs render; `CreateFab` tests updated for in-bar positioning if markup changed.
+**Manual verification:** on-device, confirm all four tabs are reachable, the center create button opens the sheet, and both create flows still navigate correctly.
+**Dependencies:** none.
+**Commit message:** `feat: restructure navigation to Today/Plan/Progress/Me with embedded create button`
+
+### T085 — Today header: shortcuts icon, notifications placeholder, Focus of the day
+**Goal:** add the mockup's leading shortcuts icon (opens a sheet linking to Kategorien verwalten and Me) and trailing bell icon (opens a sheet stating notifications aren't available yet — no push infrastructure, per `docs/MVP_SCOPE.md`), a short static subtitle under the greeting, and a Focus of the day card (accent-tinted, static day-of-year-keyed prompt list, placeholder icon) between the header and the routine list.
+**Files/areas:** `app/(tabs)/today.tsx`, `src/domain/focusOfTheDay.ts` (pure function: date → prompt), `src/ui/components/FocusOfTheDayCard.tsx`.
+**Acceptance criteria:** both header icons open their respective sheets and are otherwise inert; the Focus of the day prompt is deterministic for a given date; the card sits above the routine list per the updated Content Order.
+**Required automated tests:** unit test for the date→prompt function (deterministic, cycles through the static list); component test asserting both header sheets open on tap.
+**Manual verification:** on-device, tap both header icons and confirm their sheets, and confirm the Focus of the day card renders above the routine list.
+**Dependencies:** T084.
+**Commit message:** `feat: add Today header shortcuts, notifications placeholder, and Focus of the day card`
+
+### T086 — Colorful per-item icon badges on Today rows
+**Goal:** match the mockup's more saturated, per-item icon badge treatment on `RoutineCard`/`TaskCard` (each item's icon badge uses its full category accent color as the fill, not just a light tint), while keeping Routines and Tasks as separate labeled sections — the mockup's single merged list is a visual-density choice, not an information-architecture requirement, and merging them would conflict with the Tasks screen's own five-section model; this is a deliberate adaptation, not a silent scope cut.
+**Files/areas:** `src/ui/components/IconBadge.tsx` (optional saturated-fill mode), `RoutineCard.tsx`, `TaskCard.tsx`.
+**Acceptance criteria:** icon badges render with a solid category-accent fill and a white/on-accent icon color; existing category-tinted row background, streak line, completion controls, and overflow menus are unchanged; contrast still meets `docs/DESIGN_SYSTEM.md`'s accessibility bar.
+**Required automated tests:** updated `IconBadge`/`RoutineCard`/`TaskCard` component tests for the new fill styling.
+**Manual verification:** on-device with seed data, compare Today's routine/task rows against the mockup's icon treatment.
+**Dependencies:** T084.
+**Commit message:** `feat: restyle Today row icon badges with saturated category fills`
+
+### T087 — Plan screen
+**Goal:** build the new Plan screen: a current-week day-strip (today highlighted) and, per due routine, a row of per-day completion dots across the visible week, plus two links into the relocated Routines/Tasks screens (T084).
+**Files/areas:** `app/(tabs)/plan.tsx`, `src/domain/routines/weekOverview.ts` (pure function: routines + events + week → per-routine per-day dot state), `src/ui/components/WeekDayStrip.tsx`, `src/ui/components/RoutineWeekRow.tsx`.
+**Acceptance criteria:** day-strip shows Mon–Sun of the current week with today highlighted; each due routine shows one dot per day of the week, styled completed/exceeded (filled accent) / missed (muted taupe) / not due or future (hollow); both manage-links navigate correctly.
+**Required automated tests:** unit tests for the week-overview derivation (mixed completed/missed/not-due/future days); component test asserting the manage-links navigate.
+**Manual verification:** on-device with seed data spanning the current week, confirm the dot-matrix matches each routine's actual event history.
+**Dependencies:** T083, T084.
+**Commit message:** `feat: add Plan screen with weekly completion overview`
+
+### T088 — Progress screen
+**Goal:** build the new Progress screen: streak-ring hero, stat tile grid, completion-over-time chart, and habit-breakdown donut, per `docs/SCREEN_SPECIFICATIONS.md`'s Progress Screen section — entirely derived from existing cached/derived data.
+**Files/areas:** `app/(tabs)/progress.tsx`, `src/domain/progress/overview.ts` (pure function: routines + state caches + app streak cache → stat values, weekly completion-rate series, category breakdown), `src/ui/components/StatTile.tsx` (reused/extended from T069 if present, else added here).
+**Acceptance criteria:** streak ring shows the real overall app streak; stat tiles show real completion rate (this week), longest streak across all routines, active routine count, and completions this week; the line chart plots the current week's daily completion rate; the donut groups active routines by category with a legend showing name + percentage.
+**Required automated tests:** unit tests for the stat/series/breakdown derivation functions against fixture data; component test asserting the screen renders all four sections from mocked data.
+**Manual verification:** on-device with seed data, confirm every number matches what's independently visible on Today/Plan/routine detail screens.
+**Dependencies:** T083, T084.
+**Commit message:** `feat: add Progress screen with streak ring, stats, and charts`
+
+### T089 — Rename Settings tab to "Me"
+**Goal:** update the tab's label and icon to "Me" per the mockup; screen content is unchanged.
+**Files/areas:** `app/(tabs)/_layout.tsx` (tab title/icon), `app/(tabs)/settings.tsx` (on-screen title text).
+**Acceptance criteria:** the tab reads "Me" with a person-style icon; the screen itself still shows "Einstellungen" content (display name, category management, backup) unchanged.
+**Required automated tests:** existing `settings.test.tsx` still passes; update any assertion on the tab label if one exists.
+**Manual verification:** on-device, confirm the tab shows "Me" and its content is unchanged.
+**Dependencies:** T084.
+**Commit message:** `feat: relabel Settings tab as Me`
+
+### T090 — Phase 12 visual consistency and accessibility pass
+**Goal:** audit the five touched/added screens (Today, Plan, Progress, relocated Routines/Tasks, Me) against `docs/DESIGN_SYSTEM.md`, including the scoped Dashboard Color Freedom exception, and confirm no drift outside that exception (no stray multi-color usage on list rows, tab bar, or forms).
+**Files/areas:** cross-cutting, primarily the five screens above and the new chart/Plan/Progress components.
+**Acceptance criteria:** per-screen checklist signed off; Progress/Focus surfaces are the only places using the multi-color exception; touch targets and destructive-action confirmations remain compliant per `docs/DESIGN_SYSTEM.md`'s Accessibility section.
+**Required automated tests:** none beyond the existing suite (audit task).
+**Manual verification:** walk the checklist on-device.
+**Dependencies:** T085, T086, T087, T088, T089.
+**Commit message:** `chore: Phase 12 visual consistency and accessibility pass`
