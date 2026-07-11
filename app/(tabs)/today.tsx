@@ -397,10 +397,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
-    // Clears the floating create button (bottom 92 + 56 tall, see
-    // CreateFab.tsx) so the last card's completion control is never
-    // covered by it.
-    paddingBottom: 160,
+    paddingBottom: spacing.xl,
   },
   header: {
     marginBottom: spacing.md,

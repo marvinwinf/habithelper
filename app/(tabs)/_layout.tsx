@@ -23,57 +23,66 @@ function tabIcon(focused: IconName, unfocused: IconName, label: string) {
   return TabIcon;
 }
 
-export default function TabLayout() {
+// The create button lives in the center slot of the bar itself (not a FAB
+// floating above it) per the Phase 12 reference mockup — this replaces the
+// slot's default tab button entirely, so only CreateFab's own Pressable
+// responds to touch; the "create" route itself is never actually navigated
+// to (its tabPress is intercepted below).
+function CreateTabButton() {
   return (
-    <View style={styles.container}>
-      <Tabs
-        screenOptions={{
-          tabBarShowLabel: false,
-          tabBarActiveTintColor: colors.accent,
-          tabBarInactiveTintColor: colors.textSecondary,
-          // Kept in normal layout flow (not absolutely positioned) so screen
-          // content can never hide behind it. A flat, hairline-topped bar —
-          // no floating margin, rounded corners, or shadow — with a gold
-          // underline marking the active tab (T077).
-          tabBarStyle: styles.tabBar,
-        }}
-      >
-        <Tabs.Screen
-          name="today"
-          options={{ title: 'Heute', tabBarIcon: tabIcon('sunny', 'sunny-outline', 'Heute') }}
-        />
-        <Tabs.Screen
-          name="routines"
-          options={{
-            title: 'Routinen',
-            tabBarIcon: tabIcon('repeat', 'repeat-outline', 'Routinen'),
-          }}
-        />
-        <Tabs.Screen
-          name="tasks"
-          options={{
-            title: 'Aufgaben',
-            tabBarIcon: tabIcon('checkbox', 'checkbox-outline', 'Aufgaben'),
-          }}
-        />
-        <Tabs.Screen
-          name="settings"
-          options={{
-            title: 'Einstellungen',
-            tabBarIcon: tabIcon('settings', 'settings-outline', 'Einstellungen'),
-          }}
-        />
-      </Tabs>
+    <View style={styles.createButtonWrapper}>
       <CreateFab />
     </View>
   );
 }
 
+export default function TabLayout() {
+  return (
+    <Tabs
+      screenOptions={{
+        tabBarShowLabel: false,
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.textSecondary,
+        // Kept in normal layout flow (not absolutely positioned) so screen
+        // content can never hide behind it. A flat, hairline-topped bar —
+        // no floating margin, rounded corners, or shadow — with a gold
+        // underline marking the active tab (T077).
+        tabBarStyle: styles.tabBar,
+      }}
+    >
+      <Tabs.Screen
+        name="today"
+        options={{ title: 'Heute', tabBarIcon: tabIcon('sunny', 'sunny-outline', 'Heute') }}
+      />
+      <Tabs.Screen
+        name="plan"
+        options={{ title: 'Plan', tabBarIcon: tabIcon('calendar', 'calendar-outline', 'Plan') }}
+      />
+      <Tabs.Screen
+        name="create"
+        options={{ tabBarButton: CreateTabButton }}
+        listeners={{
+          tabPress: (event) => {
+            event.preventDefault();
+          },
+        }}
+      />
+      <Tabs.Screen
+        name="progress"
+        options={{
+          title: 'Progress',
+          tabBarIcon: tabIcon('stats-chart', 'stats-chart-outline', 'Progress'),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{ title: 'Me', tabBarIcon: tabIcon('person-circle', 'person-circle-outline', 'Me') }}
+      />
+    </Tabs>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   tabBar: {
     backgroundColor: colors.surface,
     borderTopWidth: 1,
@@ -93,5 +102,13 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: typography.caption.fontSize,
     lineHeight: typography.caption.lineHeight,
+  },
+  createButtonWrapper: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Pops the button up so it visually floats out of the bar, per the
+    // mockup, rather than sitting flush with the other tab icons.
+    marginTop: -20,
   },
 });

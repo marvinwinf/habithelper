@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import RoutinesScreen from '../routines';
+import RoutinesScreen from '../index';
 import { listRoutines } from '../../../src/data/repositories/routineRepository';
 
 jest.mock('../../../src/data/db/client', () => ({ db: {} }));
