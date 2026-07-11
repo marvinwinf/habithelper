@@ -28,7 +28,7 @@ import { IconBadge } from '../../src/ui/components/IconBadge';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { ReorderableList } from '../../src/ui/components/ReorderableList';
 import { Sheet } from '../../src/ui/components/Sheet';
-import { colors, pressedOpacity, spacing, typography } from '../../src/ui/theme';
+import { colors, pressedOpacity, radius, spacing, typography } from '../../src/ui/theme';
 
 type RoutinesTab = 'active' | 'paused';
 
@@ -248,16 +248,15 @@ const styles = StyleSheet.create({
     // row's controls are never covered by it.
     paddingBottom: 160,
   },
-  // Gold-underline segmented control, matching the bottom nav (T077) — no
-  // filled pill highlight, per docs/DESIGN_SYSTEM.md's Navigation section.
+  // Soft pill-filled segmented control, matching the bottom nav's tab pill,
+  // per docs/DESIGN_SYSTEM.md's Navigation section.
   tab: {
     paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.xs,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
   },
   tabSelected: {
-    borderBottomColor: colors.accent,
+    backgroundColor: colors.surfaceMuted,
   },
   tabPressed: {
     opacity: pressedOpacity,

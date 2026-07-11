@@ -89,8 +89,8 @@ function ReorderableRow<T>({
     });
 
   // zIndex lifts the dragged row above its siblings; no elevation, since
-  // Quiet Atelier forbids shadows (docs/DESIGN_SYSTEM.md) — the translate and
-  // stacking alone communicate the drag.
+  // Soft Momentum prefers surface contrast over shadows (docs/DESIGN_SYSTEM.md)
+  // — the translate and stacking alone communicate the drag.
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
     zIndex: isDragging.value ? 1 : 0,

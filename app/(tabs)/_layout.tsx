@@ -4,20 +4,19 @@ import type { ColorValue } from 'react-native';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { CreateFab } from '../../src/ui/components/CreateFab';
-import { colors, spacing, typography } from '../../src/ui/theme';
+import { colors, radius, spacing, typography } from '../../src/ui/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
 // Labels render inside the custom tabBarIcon (not the default
-// tabBarShowLabel slot) so a gold underline can sit directly beneath the
-// icon+label group, per docs/DESIGN_SYSTEM.md's Navigation section.
+// tabBarShowLabel slot) so the soft pill fill can wrap the icon+label group,
+// per docs/DESIGN_SYSTEM.md's Navigation section.
 function tabIcon(focused: IconName, unfocused: IconName, label: string) {
   function TabIcon({ focused: isFocused, color }: { focused: boolean; color: ColorValue }) {
     return (
-      <View style={styles.tabItem}>
+      <View style={[styles.tabItem, isFocused && styles.tabItemActive]}>
         <Ionicons name={isFocused ? focused : unfocused} color={color} size={22} />
         <Text style={[styles.tabLabel, { color }]}>{label}</Text>
-        <View style={[styles.tabIndicator, isFocused && styles.tabIndicatorActive]} />
       </View>
     );
   }
@@ -83,18 +82,16 @@ const styles = StyleSheet.create({
   },
   tabItem: {
     alignItems: 'center',
-    gap: spacing.xs / 2,
+    gap: spacing.xxs,
+    paddingVertical: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.full,
+  },
+  tabItemActive: {
+    backgroundColor: colors.surfaceMuted,
   },
   tabLabel: {
     fontSize: typography.caption.fontSize,
     lineHeight: typography.caption.lineHeight,
-  },
-  tabIndicator: {
-    width: 16,
-    height: 2,
-    backgroundColor: 'transparent',
-  },
-  tabIndicatorActive: {
-    backgroundColor: colors.accent,
   },
 });
