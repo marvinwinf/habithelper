@@ -92,6 +92,21 @@ describe('replayRoutineStreak', () => {
       expect(state.jokerInventory).toBe(1);
     });
 
+    it('applies a same-day joker_earned after its completion regardless of array order', () => {
+      // The joker_earned and the completion that produced it share an
+      // occurrenceDate; if the reset were applied first, the next completion
+      // would leave jokerProgress at 1 instead of 0. Feed them "wrong" order.
+      const log: StreakReplayEvent[] = [
+        ...completions(4),
+        { occurrenceDate: '2026-01-05', eventType: 'joker_earned' },
+        { occurrenceDate: '2026-01-05', eventType: 'completed' },
+        { occurrenceDate: '2026-01-06', eventType: 'completed' },
+      ];
+      const state = replayRoutineStreak(log);
+      expect(state.jokerInventory).toBe(1);
+      expect(state.jokerProgress).toBe(1); // only the 2026-01-06 completion after the reset
+    });
+
     it('caps joker inventory at 2', () => {
       const log: StreakReplayEvent[] = [
         { occurrenceDate: '2026-01-01', eventType: 'joker_earned' },

@@ -1,17 +1,10 @@
 import { addDaysToDateString } from '../dates';
 import { classifyOccurrence, type OccurrenceEvent, type OccurrenceState } from './completion';
-import { scheduleFromRoutineRow, type IsoWeekday, type RoutineScheduleRow } from './schedule';
-
-/** ISO weekday (1 = Monday … 7 = Sunday) of a `YYYY-MM-DD` date string. */
-function isoWeekdayOf(dateString: string): IsoWeekday {
-  const [year, month, day] = dateString.split('-').map(Number);
-  const jsDay = new Date(year, month - 1, day).getDay(); // 0 = Sunday … 6 = Saturday
-  return (jsDay === 0 ? 7 : jsDay) as IsoWeekday;
-}
+import { getIsoWeekday, scheduleFromRoutineRow, type RoutineScheduleRow } from './schedule';
 
 /** The Monday–Sunday `YYYY-MM-DD` dates of the week containing `today`. */
 export function currentWeekDates(today: string): string[] {
-  const monday = addDaysToDateString(today, 1 - isoWeekdayOf(today));
+  const monday = addDaysToDateString(today, 1 - getIsoWeekday(today));
   return Array.from({ length: 7 }, (_, index) => addDaysToDateString(monday, index));
 }
 

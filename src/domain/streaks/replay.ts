@@ -48,19 +48,50 @@ const INITIAL_STATE: RoutineStreakState = {
   consecutiveMissedAfter66: 0,
 };
 
+// Intra-day fold precedence: when several events share an `occurrenceDate`,
+// the outcome depends on the order they are applied. The one case that
+// actually matters is a completion day, where `completed`/`exceeded` (which
+// raises jokerProgress) MUST be applied before the `joker_earned` it produced
+// (which resets jokerProgress to 0) — otherwise the reset lands first and the
+// following completion leaves jokerProgress one too high, so the next joker is
+// earned a completion early. The event log gives no reliable within-day
+// ordering to lean on (`recorded_at` is millisecond-precision and can tie for
+// two events written back-to-back, and rows are read without an ORDER BY), so
+// replay imposes this deterministic order itself rather than depending on the
+// order the database happens to return rows in.
+const INTRA_DAY_ORDER: Record<RoutineEventType, number> = {
+  completed: 0,
+  exceeded: 0,
+  missed: 0,
+  skipped: 0,
+  joker_protected: 0,
+  paused: 0,
+  reactivated: 0,
+  moved: 0,
+  joker_consumed: 1,
+  joker_earned: 2,
+  joker_restored: 3,
+  completion_undone: 3,
+};
+
 /**
  * Replays a routine's event log into its current streak/joker/level state,
- * per docs/ROUTINE_RULES.md. Events are folded in `occurrenceDate` order
- * (ties keep their given relative order); superseded events are excluded,
- * since a later retroactive edit replaced their outcome (docs/DATA_MODEL.md).
- * Assumes the log is reconciled up to the query date — see
- * docs/ARCHITECTURE.md's Missed-Occurrence Reconciliation.
+ * per docs/ROUTINE_RULES.md. Events are folded in `occurrenceDate` order, and
+ * within a single date in the causal order defined by `INTRA_DAY_ORDER` above
+ * (so a `joker_earned` never applies before the completion that produced it);
+ * superseded events are excluded, since a later retroactive edit replaced
+ * their outcome (docs/DATA_MODEL.md). Assumes the log is reconciled up to the
+ * query date — see docs/ARCHITECTURE.md's Missed-Occurrence Reconciliation.
  */
 export function replayRoutineStreak(events: readonly StreakReplayEvent[]): RoutineStreakState {
   return events
     .filter((event) => !event.supersededByEventId)
     .slice()
-    .sort((a, b) => a.occurrenceDate.localeCompare(b.occurrenceDate))
+    .sort(
+      (a, b) =>
+        a.occurrenceDate.localeCompare(b.occurrenceDate) ||
+        INTRA_DAY_ORDER[a.eventType] - INTRA_DAY_ORDER[b.eventType],
+    )
     .reduce(applyEvent, INITIAL_STATE);
 }
 
