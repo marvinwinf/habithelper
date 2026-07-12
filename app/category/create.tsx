@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { createCategory } from '../../src/data/repositories/categoryRepository';
 import { db } from '../../src/data/db/client';
 import { CategoryForm, type CategoryFormValues } from '../../src/ui/components/CategoryForm';
+import { ScreenHeader } from '../../src/ui/components/ScreenHeader';
 import { colors, spacing } from '../../src/ui/theme';
 
 export default function CreateCategoryScreen() {
@@ -16,6 +17,7 @@ export default function CreateCategoryScreen() {
 
   return (
     <View style={styles.screen}>
+      <ScreenHeader title="Neue Kategorie" testID="create-category-header" />
       <CategoryForm onSubmit={handleSubmit} submitLabel="Erstellen" testID="create-category-form" />
     </View>
   );

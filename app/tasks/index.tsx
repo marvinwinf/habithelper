@@ -17,6 +17,7 @@ import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
 import { compareByDateThenTime } from '../../src/domain/tasks/ordering';
 import { confirmTaskDeletion } from '../../src/ui/alerts';
 import { EmptyState } from '../../src/ui/components/EmptyState';
+import { ScreenHeader } from '../../src/ui/components/ScreenHeader';
 import { TaskCard } from '../../src/ui/components/TaskCard';
 import { colors, pressedOpacity, spacing, typography } from '../../src/ui/theme';
 
@@ -109,9 +110,7 @@ export default function TasksScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Aufgaben</Text>
-      </View>
+      <ScreenHeader title="Aufgaben" testID="tasks-header" />
 
       {!hasAnyTask ? (
         <EmptyState
@@ -126,14 +125,14 @@ export default function TasksScreen() {
             {sections
               .filter((section) => section.tasks.length > 0)
               .map((section) => (
-                <View key={section.key} testID={`tasks-section-${section.key}`}>
+                <View key={section.key} style={styles.section} testID={`tasks-section-${section.key}`}>
                   <Text style={styles.sectionTitle}>{section.title}</Text>
                   {section.tasks.map((task) => renderTask(task, section.key === 'overdue'))}
                 </View>
               ))}
 
             {completed.length > 0 && (
-              <View testID="tasks-section-completed">
+              <View style={styles.section} testID="tasks-section-completed">
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => setCompletedExpanded((prev) => !prev)}
@@ -160,20 +159,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     padding: spacing.lg,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  title: {
-    fontSize: typography.title.fontSize,
-    lineHeight: typography.title.lineHeight,
-    fontWeight: typography.title.fontWeight,
-    color: colors.textPrimary,
-  },
   list: {
     gap: spacing.md,
+  },
+  section: {
+    gap: spacing.sm,
   },
   listContent: {
     paddingBottom: spacing.xl,

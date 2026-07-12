@@ -27,6 +27,7 @@ import { Card } from '../../src/ui/components/Card';
 import { IconBadge } from '../../src/ui/components/IconBadge';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { ReorderableList } from '../../src/ui/components/ReorderableList';
+import { ScreenHeader } from '../../src/ui/components/ScreenHeader';
 import { Sheet } from '../../src/ui/components/Sheet';
 import { colors, pressedOpacity, radius, spacing, typography } from '../../src/ui/theme';
 
@@ -147,9 +148,7 @@ export default function RoutinesScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Routinen</Text>
-      </View>
+      <ScreenHeader title="Routinen" testID="routines-header" />
 
       <View style={styles.tabRow}>
         <Pressable
@@ -240,18 +239,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     padding: spacing.lg,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  title: {
-    fontSize: typography.title.fontSize,
-    lineHeight: typography.title.lineHeight,
-    fontWeight: typography.title.fontWeight,
-    color: colors.textPrimary,
   },
   tabRow: {
     flexDirection: 'row',

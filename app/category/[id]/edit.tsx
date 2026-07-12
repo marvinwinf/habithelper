@@ -9,6 +9,7 @@ import {
 } from '../../../src/data/repositories/categoryRepository';
 import { db } from '../../../src/data/db/client';
 import { CategoryForm, type CategoryFormValues } from '../../../src/ui/components/CategoryForm';
+import { ScreenHeader } from '../../../src/ui/components/ScreenHeader';
 import { colors, spacing } from '../../../src/ui/theme';
 
 export default function EditCategoryScreen() {
@@ -39,6 +40,7 @@ export default function EditCategoryScreen() {
 
   return (
     <View style={styles.screen}>
+      <ScreenHeader title="Kategorie bearbeiten" testID="edit-category-header" />
       <CategoryForm
         initialName={category.name}
         initialBaseColor={category.baseColor}

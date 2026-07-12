@@ -6,6 +6,7 @@ import { getTask, type Task } from '../../../src/data/repositories/taskRepositor
 import { listCategories, type Category } from '../../../src/data/repositories/categoryRepository';
 import { editTask } from '../../../src/services/taskService';
 import { db } from '../../../src/data/db/client';
+import { ScreenHeader } from '../../../src/ui/components/ScreenHeader';
 import { TaskForm, type TaskFormValues } from '../../../src/ui/components/TaskForm';
 import { colors, spacing } from '../../../src/ui/theme';
 
@@ -50,6 +51,7 @@ export default function EditTaskScreen() {
 
   return (
     <View style={styles.screen}>
+      <ScreenHeader title="Aufgabe bearbeiten" testID="edit-task-header" />
       <TaskForm
         categories={categories}
         initialValues={{

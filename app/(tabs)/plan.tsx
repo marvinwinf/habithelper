@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { db } from '../../src/data/db/client';
@@ -10,7 +10,9 @@ import {
 } from '../../src/data/repositories/routineEventRepository';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
 import { buildRoutineWeekRows, currentWeekDates } from '../../src/domain/routines/weekOverview';
+import { Card } from '../../src/ui/components/Card';
 import { EmptyState } from '../../src/ui/components/EmptyState';
+import { NavRow } from '../../src/ui/components/NavRow';
 import { RoutineWeekRow } from '../../src/ui/components/RoutineWeekRow';
 import { WeekDayStrip } from '../../src/ui/components/WeekDayStrip';
 import { colors, spacing, typography } from '../../src/ui/theme';
@@ -80,14 +82,20 @@ export default function PlanScreen() {
         </View>
       )}
 
-      <View style={styles.links}>
-        <Link href="/routines" style={styles.link} testID="plan-manage-routines-link">
-          Alle Routinen verwalten
-        </Link>
-        <Link href="/tasks" style={styles.link} testID="plan-manage-tasks-link">
-          Alle Aufgaben verwalten
-        </Link>
-      </View>
+      <Card style={styles.links}>
+        <NavRow
+          label="Alle Routinen verwalten"
+          href="/routines"
+          icon="repeat-outline"
+          testID="plan-manage-routines-link"
+        />
+        <NavRow
+          label="Alle Aufgaben verwalten"
+          href="/tasks"
+          icon="checkbox-outline"
+          testID="plan-manage-tasks-link"
+        />
+      </Card>
     </ScrollView>
   );
 }
@@ -112,11 +120,7 @@ const styles = StyleSheet.create({
     gap: spacing.xxs,
   },
   links: {
-    gap: spacing.sm,
+    gap: spacing.xs,
     marginTop: spacing.md,
-  },
-  link: {
-    fontSize: typography.body.fontSize,
-    color: colors.accent,
   },
 });

@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import { createTask } from '../../src/services/taskService';
 import { listCategories, type Category } from '../../src/data/repositories/categoryRepository';
 import { db } from '../../src/data/db/client';
+import { ScreenHeader } from '../../src/ui/components/ScreenHeader';
 import { TaskForm, type TaskFormValues } from '../../src/ui/components/TaskForm';
 import { colors, spacing } from '../../src/ui/theme';
 
@@ -32,6 +33,7 @@ export default function CreateTaskScreen() {
 
   return (
     <View style={styles.screen}>
+      <ScreenHeader title="Neue Aufgabe" testID="create-task-header" />
       <TaskForm
         categories={categories}
         onSubmit={handleSubmit}
