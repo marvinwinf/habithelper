@@ -45,6 +45,8 @@ export interface TaskCardProps {
   onMoveToTomorrow: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  /** Staggered mount-fade delay for list rendering (see mountStaggerDelayMs). */
+  mountDelayMs?: number;
   testID?: string;
 }
 
@@ -76,10 +78,11 @@ export function TaskCard({
   onMoveToTomorrow,
   onEdit,
   onDelete,
+  mountDelayMs = 0,
   testID,
 }: TaskCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const mountAnimation = useMountAnimation();
+  const mountAnimation = useMountAnimation(mountDelayMs);
 
   const subtitle = subtitleFor(task, forLater);
   const variant = category

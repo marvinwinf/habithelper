@@ -75,6 +75,8 @@ export interface RoutineCardProps {
   onEdit: () => void;
   onPause: () => void;
   onDelete: () => void;
+  /** Staggered mount-fade delay for list rendering (see mountStaggerDelayMs). */
+  mountDelayMs?: number;
   testID?: string;
 }
 
@@ -103,11 +105,12 @@ export function RoutineCard({
   onEdit,
   onPause,
   onDelete,
+  mountDelayMs = 0,
   testID,
 }: RoutineCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const levelUpAnimation = useLevelUpAnimation();
-  const mountAnimation = useMountAnimation();
+  const mountAnimation = useMountAnimation(mountDelayMs);
   const isResolved = state !== 'pending';
   const isCompletedOrExceeded = state === 'completed' || state === 'exceeded';
   const isSkipped = state === 'skipped';
