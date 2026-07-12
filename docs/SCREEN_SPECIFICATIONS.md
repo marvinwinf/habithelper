@@ -38,7 +38,7 @@ Sections must not all carry equal visual weight — spacing, type size/weight, a
 - Time-based greeting, for example "Guten Morgen, Marvin", with a short static subtitle line under it.
 - Current date.
 - Subtle overall app streak.
-- Daily routine progress only.
+- Daily routine progress only. Once every due routine is completed, the count label fades into a quiet "Alle erledigt" acknowledgement — the day's one gentle milestone moment (see `docs/DESIGN_SYSTEM.md`'s Gamification).
 
 ### Focus of the Day
 
@@ -69,7 +69,8 @@ Interactions:
 - tap card: open the routine's actions bottom sheet,
 - tap completion button: complete,
 - long press completion button: exceeded,
-- tap completion button again once completed or exceeded: undo (see `docs/ROUTINE_RULES.md`'s Undo Completion).
+- tap completion button again once completed or exceeded: undo (see `docs/ROUTINE_RULES.md`'s Undo Completion),
+- long press + drag the card: reorder, persisting the new order to the routines' `sort_order` (same gesture as the Routines screen; the pending-before-resolved grouping re-applies on top of the stored order).
 
 The actions bottom sheet is the one place a routine's non-completion actions live — the row itself carries only the completion control (see `docs/DESIGN_SYSTEM.md`'s List Row Actions). It contains: **Statistik** (opens the full Routine Detail — streak, level, calendar), **move to tomorrow** and **conscious skip** (today's occurrence, shown only while it is unresolved and, for skip, allowed), **edit**, **pause**, and **delete** (destructive, confirmed).
 
@@ -152,6 +153,8 @@ Collapsed additional settings:
 Tasks may be created without a date.
 
 ## Category Management
+
+Category list rows use the same soft-paper list language as routines and tasks: a tinted card with the category's solid icon badge, its name, and a trailing chevron — no inline row actions (see `docs/DESIGN_SYSTEM.md`'s List Row Actions). Tapping a row opens a bottom sheet carrying **Bearbeiten** and **Löschen**; creation is a primary button below the list.
 
 Category list supports:
 
