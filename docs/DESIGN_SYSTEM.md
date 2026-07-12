@@ -107,9 +107,9 @@ A screen should still show one dominant color at a time — a category's tint ap
 ## Routine and Task Item Design
 
 - Each row is a light, soft-paper card (`radius.lg` or larger, `surface` background, soft low-contrast border, generous internal padding), lightly tinted by its category's `getCategoryColorVariant` background when a category is set. Keep the card feeling light — lean on the tint and gentle rounding, not heavy borders or backgrounds — with at most an extremely subtle shadow.
-- Leading: circular `IconBadge` (now fully round, `radius.full`). Title in the functional weight. Trailing: bold streak numeral for routines (size may grow modestly with streak length) or a date/subtitle for tasks.
+- Leading: circular `IconBadge` (now fully round, `radius.full`). Title in the functional weight, then one compact meta line: for routines the "time · schedule" subtitle plus a small flame-and-count streak, for tasks the date/subtitle (plus the overdue marker when relevant). Rows stay two text lines tall and share a common minimum height (`listCardMinHeight`) so routines and tasks line up as one even rhythm — the bold, prominent streak numeral treatment stays on the Today header and routine detail, not on list rows.
 - No overflow / three-dot menu on the row. The row carries only its title, category treatment, streak/date, and completion control; all other actions live in the routine/task detail screen or a bottom sheet opened by tapping the row (see List Row Actions above).
-- Completion control: a circular tap target that fills with the accent color and shows a checkmark on completion, with a quick, gentle spring (`GENTLE_SPRING`) rather than a plain fade — tactile, not flashy.
+- Completion control: one shared circular control (`CompletionControl`, a compact 36dp visual with hitSlop keeping the touch target ≥44dp) that fills with the accent color and shows a checkmark on completion, with a quick, gentle spring (`GENTLE_SPRING`) rather than a plain fade — tactile, not flashy. Routines and tasks use the same control so completion reads identically everywhere; tasks simply have no exceeded state.
 
 ## Completed / Skipped / Missed / Paused States
 
@@ -155,7 +155,10 @@ The Progress screen's hero streak uses a circular ring (filled arc, `accent`-col
 
 - Fades/timings stay short (`MAX_SHORT_ANIMATION_DURATION_MS`, 400ms ceiling) for mount/dismiss/progress transitions.
 - Completion and milestone moments use `GENTLE_SPRING` (`src/ui/animation/constants.ts`) — a quick, non-bouncy settle (high friction relative to tension), not a plain fade and not an exaggerated bounce.
-- Reduced-motion settings collapse any spring/fade to an instant state change.
+- Bottom sheets animate their two layers independently (`src/ui/components/Sheet.tsx`): the scrim only fades — it never moves — while the panel alone slides up from below with a gentle ease-out, and dismissal plays the reverse before unmounting. Never slide the whole modal subtree (scrim included) as one pane. Follow-up navigation waits for the sheet's exit (its `onDismissed`) instead of racing it.
+- List cards fade in with a small capped stagger (`mountStaggerDelayMs`) so a screen builds up gently; rows that re-sort after a completion/undo glide to their new position after a short hold (`animateListSettle`) so the completion pop reads first.
+- Screen-level transitions are deliberate and consistent: tabs cross-fade, pushed stack screens slide in from the right.
+- Reduced-motion settings collapse any spring/fade/slide to an instant state change.
 
 ## Gamification
 

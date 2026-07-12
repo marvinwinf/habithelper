@@ -1,4 +1,5 @@
 import { Alert } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import TodayScreen from '../today';
@@ -87,6 +88,17 @@ jest.mock('expo-router', () => ({
 
 const TODAY = todayDateString();
 
+// The routines section's ReorderableList uses a GestureDetector, which
+// requires a GestureHandlerRootView ancestor (mirrors the Routines screen's
+// test setup).
+function renderToday() {
+  return render(
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <TodayScreen />
+    </GestureHandlerRootView>,
+  );
+}
+
 const dailyRoutine = {
   id: 'routine-daily',
   name: 'Laufen',
@@ -162,7 +174,7 @@ describe('TodayScreen', () => {
       recalculatedAt: TODAY,
     });
 
-    await render(<TodayScreen />);
+    await renderToday();
 
     expect(await screen.findByTestId('today-app-streak')).toHaveTextContent('5');
     expect(screen.getByText('Gesamt-Streak')).toBeTruthy();
@@ -171,7 +183,7 @@ describe('TodayScreen', () => {
   it('shows a zero streak when the cache has never been computed', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([]);
 
-    await render(<TodayScreen />);
+    await renderToday();
 
     expect(await screen.findByTestId('today-app-streak')).toHaveTextContent('0');
   });
@@ -180,12 +192,46 @@ describe('TodayScreen', () => {
     (listRoutines as jest.Mock).mockResolvedValue([]);
     jest.spyOn(Date.prototype, 'getHours').mockReturnValue(8);
 
-    await render(<TodayScreen />);
+    await renderToday();
 
     expect(await screen.findByTestId('today-greeting')).toHaveTextContent('Guten Morgen, Marvin');
   });
 
-  it('shows the daily routine progress as completed/total with a filled progress bar', async () => {
+  it('shows the daily routine progress as completed/total with a partly filled progress bar', async () => {
+    const secondRoutine = { ...dailyRoutine, id: 'routine-daily-2', name: 'Lesen', sortOrder: 1 };
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine, secondRoutine]);
+    (listRoutineEventsInRange as jest.Mock).mockImplementation((_db, routineId: string) =>
+      Promise.resolve(
+        routineId === dailyRoutine.id
+          ? [
+              {
+                id: 'event-1',
+                routineId: dailyRoutine.id,
+                occurrenceDate: TODAY,
+                eventType: 'completed',
+                recordedAt: TODAY,
+                movedToDate: null,
+                skipReason: null,
+                supersededByEventId: null,
+              },
+            ]
+          : [],
+      ),
+    );
+
+    await renderToday();
+
+    expect(await screen.findByTestId('today-routine-progress')).toHaveTextContent(
+      '1 von 2 erledigt',
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('today-routine-progress-bar').props.accessibilityValue.now,
+      ).toBe(50),
+    );
+  });
+
+  it('acknowledges the day once every due routine is completed', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
     (listRoutineEventsInRange as jest.Mock).mockResolvedValue([
       {
@@ -200,10 +246,10 @@ describe('TodayScreen', () => {
       },
     ]);
 
-    await render(<TodayScreen />);
+    await renderToday();
 
     expect(await screen.findByTestId('today-routine-progress')).toHaveTextContent(
-      '1 von 1 erledigt',
+      'Alle erledigt ✓',
     );
     expect(
       screen.getByTestId('today-routine-progress-bar').props.accessibilityValue.now,
@@ -213,7 +259,7 @@ describe('TodayScreen', () => {
   it('shows a pending due routine and excludes a paused one', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine, pausedRoutine]);
 
-    await render(<TodayScreen />);
+    await renderToday();
 
     expect(await screen.findByText('Laufen')).toBeTruthy();
     expect(screen.queryByText('Meditieren')).toBeNull();
@@ -236,7 +282,7 @@ describe('TodayScreen', () => {
       },
     ]);
 
-    await render(<TodayScreen />);
+    await renderToday();
 
     expect(
       await screen.findByTestId(`routine-card-${dailyRoutine.id}-streak`),
@@ -246,7 +292,7 @@ describe('TodayScreen', () => {
   it('shows an empty state when nothing is due', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([]);
 
-    await render(<TodayScreen />);
+    await renderToday();
 
     expect(await screen.findByText('Für heute nichts geplant')).toBeTruthy();
   });
@@ -266,7 +312,7 @@ describe('TodayScreen', () => {
       },
     ]);
 
-    await render(<TodayScreen />);
+    await renderToday();
 
     const control = await screen.findByTestId(`routine-card-${dailyRoutine.id}-complete`);
     expect(control.props.accessibilityState.disabled).toBe(false);
@@ -282,7 +328,7 @@ describe('TodayScreen', () => {
   it('completes a routine via its card, calling the service with today\'s date', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
 
-    await render(<TodayScreen />);
+    await renderToday();
     const control = await screen.findByTestId(`routine-card-${dailyRoutine.id}-complete`);
 
     await fireEvent(control, 'pressIn');
@@ -294,7 +340,7 @@ describe('TodayScreen', () => {
   it('moves a routine to tomorrow from the actions sheet', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
 
-    await render(<TodayScreen />);
+    await renderToday();
     await fireEvent.press(await screen.findByTestId(`routine-card-${dailyRoutine.id}`));
     await fireEvent.press(screen.getByTestId(`routine-card-${dailyRoutine.id}-menu-move`));
 
@@ -309,7 +355,7 @@ describe('TodayScreen', () => {
   it('deletes a routine from the actions sheet only after confirmation', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
 
-    await render(<TodayScreen />);
+    await renderToday();
     await fireEvent.press(await screen.findByTestId(`routine-card-${dailyRoutine.id}`));
     await fireEvent.press(screen.getByTestId(`routine-card-${dailyRoutine.id}-menu-delete`));
 
@@ -327,7 +373,7 @@ describe('TodayScreen', () => {
     (listTasksForToday as jest.Mock).mockResolvedValue([makeTask({ id: 'today-task', date: TODAY })]);
     (listUndatedTasks as jest.Mock).mockResolvedValue([makeTask({ id: 'later-task' })]);
 
-    await render(<TodayScreen />);
+    await renderToday();
     await screen.findByTestId('today-section-routines');
 
     const sectionOrder = ['today-section-routines', 'today-section-tasks', 'today-section-later'];
@@ -345,7 +391,7 @@ describe('TodayScreen', () => {
       makeTask({ id: 'undated-1', title: 'Später erledigen' }),
     ]);
 
-    await render(<TodayScreen />);
+    await renderToday();
 
     const tasksSection = await screen.findByTestId('today-section-tasks');
     expect(tasksSection).toBeTruthy();
@@ -371,7 +417,7 @@ describe('TodayScreen', () => {
       }),
     ]);
 
-    await render(<TodayScreen />);
+    await renderToday();
     await screen.findByTestId('today-section-tasks');
 
     const toggles = await screen.findAllByRole('checkbox');
@@ -385,8 +431,11 @@ describe('TodayScreen', () => {
     (listRoutines as jest.Mock).mockResolvedValue([]);
     (listTasksForToday as jest.Mock).mockResolvedValue([makeTask({ id: 'task-1', date: TODAY })]);
 
-    await render(<TodayScreen />);
-    await fireEvent.press(await screen.findByTestId('today-task-task-1-toggle'));
+    await renderToday();
+    // The shared CompletionControl decides tap vs. long-press on pressOut.
+    const toggle = await screen.findByTestId('today-task-task-1-toggle');
+    await fireEvent(toggle, 'pressIn');
+    await fireEvent(toggle, 'pressOut');
 
     expect(toggleTaskCompletion).toHaveBeenCalledWith({}, 'task-1');
   });
@@ -395,7 +444,7 @@ describe('TodayScreen', () => {
     (listRoutines as jest.Mock).mockResolvedValue([]);
     (listTasksForToday as jest.Mock).mockResolvedValue([makeTask({ id: 'task-1', date: TODAY })]);
 
-    await render(<TodayScreen />);
+    await renderToday();
     await fireEvent.press(await screen.findByTestId('today-task-task-1'));
     await fireEvent.press(screen.getByTestId('today-task-task-1-menu-move'));
 
@@ -442,7 +491,7 @@ describe('TodayScreen', () => {
       return Promise.resolve({ event: undefined, leveledUp: false });
     });
 
-    await render(<TodayScreen />);
+    await renderToday();
 
     await fireEvent(await screen.findByTestId(`routine-card-${routineA.id}-complete`), 'pressIn');
     await fireEvent(screen.getByTestId(`routine-card-${routineA.id}-complete`), 'pressOut');
@@ -468,7 +517,7 @@ describe('TodayScreen', () => {
   it('shows the Focus of the day card with the prompt for today', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([]);
 
-    await render(<TodayScreen />);
+    await renderToday();
 
     expect(await screen.findByTestId('today-focus-of-the-day')).toBeTruthy();
     expect(screen.getByText('Fokus des Tages')).toBeTruthy();
@@ -478,7 +527,7 @@ describe('TodayScreen', () => {
   it('opens the shortcuts sheet from the header icon and closes it again', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([]);
 
-    await render(<TodayScreen />);
+    await renderToday();
 
     expect(screen.queryByTestId('today-shortcuts-categories')).toBeNull();
 
@@ -487,13 +536,14 @@ describe('TodayScreen', () => {
     expect(screen.getByTestId('today-shortcuts-me')).toBeTruthy();
 
     await fireEvent.press(screen.getByTestId('today-shortcuts-categories'));
-    expect(screen.queryByTestId('today-shortcuts-categories')).toBeNull();
+    // The sheet plays its exit animation before unmounting.
+    await waitFor(() => expect(screen.queryByTestId('today-shortcuts-categories')).toBeNull());
   });
 
   it('opens the notifications placeholder sheet from the header icon', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([]);
 
-    await render(<TodayScreen />);
+    await renderToday();
 
     await fireEvent.press(await screen.findByTestId('today-notifications-button'));
 

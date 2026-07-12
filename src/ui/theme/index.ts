@@ -7,3 +7,4 @@ export * from './categoryVariant';
 export * from './iconSizes';
 export * from './interaction';
 export * from './chartColors';
+export * from './layout';

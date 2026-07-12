@@ -6,6 +6,7 @@ import { db } from '../../src/data/db/client';
 import { ensureProfile, updateDisplayName } from '../../src/data/repositories/profileRepository';
 import { Button } from '../../src/ui/components/Button';
 import { Card } from '../../src/ui/components/Card';
+import { NavRow } from '../../src/ui/components/NavRow';
 import { colors, radius, spacing, typography } from '../../src/ui/theme';
 
 export default function SettingsScreen() {
@@ -62,9 +63,12 @@ export default function SettingsScreen() {
 
       <Card style={styles.section}>
         <Text style={styles.label}>Kategorien</Text>
-        <Link href="/category" style={styles.link} testID="settings-category-management-link">
-          Kategorien verwalten
-        </Link>
+        <NavRow
+          label="Kategorien verwalten"
+          href="/category"
+          icon="pricetags-outline"
+          testID="settings-category-management-link"
+        />
       </Card>
 
       <Card style={styles.section}>
@@ -108,10 +112,6 @@ const styles = StyleSheet.create({
     fontSize: typography.body.fontSize,
     lineHeight: typography.body.lineHeight,
     color: colors.textSecondary,
-  },
-  link: {
-    fontSize: typography.body.fontSize,
-    color: colors.accent,
   },
   input: {
     borderWidth: 1,

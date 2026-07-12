@@ -26,17 +26,20 @@ async function renderCard(overrides: Partial<React.ComponentProps<typeof TaskCar
 }
 
 describe('TaskCard', () => {
-  it('toggles completion via the checkbox control', async () => {
+  it('toggles completion via the completion control', async () => {
     const { callbacks } = await renderCard();
+    const toggle = screen.getByTestId('task-card-toggle');
 
-    await fireEvent.press(screen.getByTestId('task-card-toggle'));
+    // The shared CompletionControl decides tap vs. long-press on pressOut.
+    await fireEvent(toggle, 'pressIn');
+    await fireEvent(toggle, 'pressOut');
 
     expect(callbacks.onToggleComplete).toHaveBeenCalledTimes(1);
   });
 
   it('extends the compact toggle to a >=44dp touch target via hitSlop (T082)', async () => {
     await renderCard();
-    // 28dp glyph + 8dp hitSlop on each side = 44dp effective target.
+    // 36dp control + 8dp hitSlop on each side = 52dp effective target.
     expect(screen.getByTestId('task-card-toggle').props.hitSlop).toBeGreaterThanOrEqual(8);
   });
 

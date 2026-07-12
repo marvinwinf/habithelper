@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+// gesture-handler's ScrollView cooperates with the routine rows' long-press
+// drag gesture (same pairing as the Routines screen).
+import { ScrollView } from 'react-native-gesture-handler';
 
 import { db } from '../../src/data/db/client';
 import { listCategories, type Category } from '../../src/data/repositories/categoryRepository';
-import { listRoutines, softDeleteRoutine, type Routine } from '../../src/data/repositories/routineRepository';
+import {
+  listRoutines,
+  softDeleteRoutine,
+  updateRoutine,
+  type Routine,
+} from '../../src/data/repositories/routineRepository';
 import {
   listRoutineEventsInRange,
   type RoutineEvent,
@@ -46,11 +54,15 @@ import { isDueTodayOrEarlier } from '../../src/domain/tasks/section';
 import { focusOfTheDay } from '../../src/domain/focusOfTheDay';
 import { confirmRoutineDeletion, confirmTaskDeletion } from '../../src/ui/alerts';
 import { triggerFirstCompletionOfDayHaptic } from '../../src/ui/animation/haptics';
+import { animateListSettle } from '../../src/ui/animation/listTransitions';
+import { mountStaggerDelayMs } from '../../src/ui/animation/useMountAnimation';
+import { useReducedMotion } from '../../src/ui/animation/useReducedMotion';
 import { useStreakBurst } from '../../src/ui/animation/useStreakBurst';
 import { Button } from '../../src/ui/components/Button';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { FocusOfTheDayCard } from '../../src/ui/components/FocusOfTheDayCard';
 import { ProgressBar } from '../../src/ui/components/ProgressBar';
+import { ReorderableList } from '../../src/ui/components/ReorderableList';
 import { RoutineCard, type RoutineCardOccurrenceState } from '../../src/ui/components/RoutineCard';
 import { Sheet } from '../../src/ui/components/Sheet';
 import { TaskCard } from '../../src/ui/components/TaskCard';
@@ -88,6 +100,8 @@ export default function TodayScreen() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const streakBurst = useStreakBurst();
+  const reducedMotion = useReducedMotion();
+  const [allDoneOpacity] = useState(() => new Animated.Value(0));
 
   const loadData = useCallback(() => {
     const today = todayDateString();
@@ -179,6 +193,30 @@ export default function TodayScreen() {
 
   const overdueTaskIds = useMemo(() => new Set(overdueTasks.map((t) => t.id)), [overdueTasks]);
 
+  // Queues the gentle glide for rows that re-sort (completed/undone items
+  // moving between the pending and resolved groups) before reloading.
+  const reloadWithListSettle = useCallback(() => {
+    animateListSettle(reducedMotion);
+    loadData();
+  }, [loadData, reducedMotion]);
+
+  // Long-press drag on a routine card persists the new order. The visible
+  // order is written back as each routine's sortOrder; the pending/resolved
+  // grouping re-applies on top of it, matching the Routines screen's
+  // semantics.
+  async function handleReorderRoutines(newOrder: DueRoutine[]) {
+    const sortById = new Map(newOrder.map((entry, index) => [entry.routine.id, index]));
+    setRoutines((prev) =>
+      prev.map((r) => {
+        const sortOrder = sortById.get(r.id);
+        return sortOrder === undefined ? r : { ...r, sortOrder };
+      }),
+    );
+    await Promise.all(
+      newOrder.map((entry, index) => updateRoutine(db, entry.routine.id, { sortOrder: index })),
+    );
+  }
+
   function handleDelete(routine: Routine) {
     confirmRoutineDeletion(routine.name, async () => {
       await softDeleteRoutine(db, routine.id);
@@ -188,12 +226,12 @@ export default function TodayScreen() {
 
   async function handleToggleTaskComplete(taskItem: Task) {
     await toggleTaskCompletion(db, taskItem.id);
-    loadData();
+    reloadWithListSettle();
   }
 
   async function handleMoveTaskToTomorrow(taskItem: Task) {
     await moveTask(db, taskItem.id, addDaysToDateString(todayDateString(), 1));
-    loadData();
+    reloadWithListSettle();
   }
 
   function handleDeleteTask(taskItem: Task) {
@@ -227,10 +265,26 @@ export default function TodayScreen() {
   const completedRoutineCount = dueRoutines.filter(
     ({ state }) => state === 'completed' || state === 'exceeded',
   ).length;
+  // The day's quiet milestone: every due routine done. The count label
+  // cross-fades into a gentle acknowledgement — fade-only, no confetti, per
+  // docs/DESIGN_SYSTEM.md's Gamification and Motion sections.
+  const allRoutinesDone = dueRoutines.length > 0 && completedRoutineCount === dueRoutines.length;
   const greeting = getGreeting(new Date().getHours(), displayName);
   const formattedDate = DATE_FORMATTER.format(new Date());
 
   const focusPrompt = focusOfTheDay(todayDateString());
+
+  useEffect(() => {
+    if (allRoutinesDone) {
+      Animated.timing(allDoneOpacity, {
+        toValue: 1,
+        duration: reducedMotion ? 0 : 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      allDoneOpacity.setValue(0);
+    }
+  }, [allRoutinesDone, allDoneOpacity, reducedMotion]);
 
   return (
     <>
@@ -274,21 +328,34 @@ export default function TodayScreen() {
               Streak and Progress Visualization section. */}
           <View style={styles.streakBlock}>
             <Text style={styles.streakLabel}>Gesamt-Streak</Text>
-            <Text style={styles.streakValue} testID="today-app-streak">
-              {appStreak?.currentStreak ?? 0}
-            </Text>
-            <Animated.View
-              style={[styles.streakUnderline, { transform: [{ scaleX: streakUnderlineScale }] }]}
-            />
+            {/* The wrap shrinks to the numeral, so the gold underline draws
+                in exactly beneath the number — not the whole label block. */}
+            <View style={styles.streakValueWrap}>
+              <Text style={styles.streakValue} testID="today-app-streak">
+                {appStreak?.currentStreak ?? 0}
+              </Text>
+              <Animated.View
+                style={[styles.streakUnderline, { transform: [{ scaleX: streakUnderlineScale }] }]}
+              />
+            </View>
           </View>
         </View>
 
         <View style={styles.progressBlock}>
           <View style={styles.progressHeaderRow}>
             <Text style={styles.progressTitle}>Heutige Routinen</Text>
-            <Text style={styles.progressCount} testID="today-routine-progress">
-              {completedRoutineCount} von {dueRoutines.length} erledigt
-            </Text>
+            {allRoutinesDone ? (
+              <Animated.Text
+                style={[styles.progressCount, styles.progressAllDone, { opacity: allDoneOpacity }]}
+                testID="today-routine-progress"
+              >
+                Alle erledigt ✓
+              </Animated.Text>
+            ) : (
+              <Text style={styles.progressCount} testID="today-routine-progress">
+                {completedRoutineCount} von {dueRoutines.length} erledigt
+              </Text>
+            )}
           </View>
           <ProgressBar
             value={dueRoutines.length === 0 ? 0 : completedRoutineCount / dueRoutines.length}
@@ -309,62 +376,79 @@ export default function TodayScreen() {
           {dueRoutines.length > 0 && (
             <View testID="today-section-routines">
               <Text style={styles.sectionTitle}>Routinen</Text>
-              <View style={styles.list}>
-                {dueRoutines.map(({ routine, state }) => {
+              {/* Long-press a card to drag it into a new order (the same
+                  gesture as the Routines screen); a plain tap still opens
+                  the actions sheet. */}
+              <ReorderableList
+                data={dueRoutines}
+                keyExtractor={(entry) => entry.routine.id}
+                onReorder={handleReorderRoutines}
+                testID="today-routines-list"
+                renderItem={(entry) => {
+                  const { routine, state } = entry;
+                  const index = dueRoutines.indexOf(entry);
                   const category = routine.categoryId
                     ? categoryById.get(routine.categoryId)
                     : undefined;
                   return (
-                    <RoutineCard
-                      key={routine.id}
-                      testID={`routine-card-${routine.id}`}
-                      routine={routine}
-                      category={category}
-                      streak={routineStreaks[routine.id]?.currentStreak ?? 0}
-                      state={state}
-                      onComplete={async () => {
-                        maybeStartFirstCompletionOfDayBurst(todayDateString());
-                        const result = await completeRoutineOccurrence(
-                          db,
-                          routine.id,
-                          todayDateString(),
-                        );
-                        loadData();
-                        return result.leveledUp;
-                      }}
-                      onExceed={async () => {
-                        maybeStartFirstCompletionOfDayBurst(todayDateString());
-                        const result = await exceedRoutineOccurrence(
-                          db,
-                          routine.id,
-                          todayDateString(),
-                        );
-                        loadData();
-                        return result.leveledUp;
-                      }}
-                      onUndo={() =>
-                        undoRoutineCompletion(db, routine.id, todayDateString()).then(loadData)
-                      }
-                      onOpenDetail={() => router.push(`/routine/${routine.id}`)}
-                      onMoveToTomorrow={() => {
-                        const today = todayDateString();
-                        return moveRoutineOccurrence(
-                          db,
-                          routine.id,
-                          today,
-                          addDaysToDateString(today, 1),
-                        ).then(loadData);
-                      }}
-                      onSkip={() =>
-                        skipRoutineOccurrence(db, routine.id, todayDateString()).then(loadData)
-                      }
-                      onEdit={() => router.push(`/routine/${routine.id}/edit`)}
-                      onPause={() => pauseRoutine(db, routine.id, todayDateString()).then(loadData)}
-                      onDelete={() => handleDelete(routine)}
-                    />
+                    <View style={index > 0 && styles.reorderRowSpacing}>
+                      <RoutineCard
+                        testID={`routine-card-${routine.id}`}
+                        routine={routine}
+                        category={category}
+                        streak={routineStreaks[routine.id]?.currentStreak ?? 0}
+                        state={state}
+                        mountDelayMs={mountStaggerDelayMs(index)}
+                        onComplete={async () => {
+                          maybeStartFirstCompletionOfDayBurst(todayDateString());
+                          const result = await completeRoutineOccurrence(
+                            db,
+                            routine.id,
+                            todayDateString(),
+                          );
+                          reloadWithListSettle();
+                          return result.leveledUp;
+                        }}
+                        onExceed={async () => {
+                          maybeStartFirstCompletionOfDayBurst(todayDateString());
+                          const result = await exceedRoutineOccurrence(
+                            db,
+                            routine.id,
+                            todayDateString(),
+                          );
+                          reloadWithListSettle();
+                          return result.leveledUp;
+                        }}
+                        onUndo={() =>
+                          undoRoutineCompletion(db, routine.id, todayDateString()).then(
+                            reloadWithListSettle,
+                          )
+                        }
+                        onOpenDetail={() => router.push(`/routine/${routine.id}`)}
+                        onMoveToTomorrow={() => {
+                          const today = todayDateString();
+                          return moveRoutineOccurrence(
+                            db,
+                            routine.id,
+                            today,
+                            addDaysToDateString(today, 1),
+                          ).then(reloadWithListSettle);
+                        }}
+                        onSkip={() =>
+                          skipRoutineOccurrence(db, routine.id, todayDateString()).then(
+                            reloadWithListSettle,
+                          )
+                        }
+                        onEdit={() => router.push(`/routine/${routine.id}/edit`)}
+                        onPause={() =>
+                          pauseRoutine(db, routine.id, todayDateString()).then(loadData)
+                        }
+                        onDelete={() => handleDelete(routine)}
+                      />
+                    </View>
                   );
-                })}
-              </View>
+                }}
+              />
             </View>
           )}
 
@@ -372,7 +456,7 @@ export default function TodayScreen() {
             <View testID="today-section-tasks">
               <Text style={styles.sectionTitle}>Aufgaben</Text>
               <View style={styles.list}>
-                {todayTasks.map((taskItem) => {
+                {todayTasks.map((taskItem, index) => {
                   const category = taskItem.categoryId
                     ? categoryById.get(taskItem.categoryId)
                     : undefined;
@@ -382,6 +466,7 @@ export default function TodayScreen() {
                       testID={`today-task-${taskItem.id}`}
                       task={taskItem}
                       category={category}
+                      mountDelayMs={mountStaggerDelayMs(index)}
                       isOverdue={overdueTaskIds.has(taskItem.id)}
                       onToggleComplete={() => handleToggleTaskComplete(taskItem)}
                       onMoveToTomorrow={() => handleMoveTaskToTomorrow(taskItem)}
@@ -398,7 +483,7 @@ export default function TodayScreen() {
             <View testID="today-section-later">
               <Text style={styles.sectionTitle}>Für später</Text>
               <View style={styles.list}>
-                {laterTasks.map((taskItem) => {
+                {laterTasks.map((taskItem, index) => {
                   const category = taskItem.categoryId
                     ? categoryById.get(taskItem.categoryId)
                     : undefined;
@@ -408,6 +493,7 @@ export default function TodayScreen() {
                       testID={`today-task-${taskItem.id}`}
                       task={taskItem}
                       category={category}
+                      mountDelayMs={mountStaggerDelayMs(index)}
                       isOverdue={false}
                       forLater
                       onToggleComplete={() => handleToggleTaskComplete(taskItem)}
@@ -516,6 +602,9 @@ const styles = StyleSheet.create({
   streakBlock: {
     alignItems: 'flex-end',
   },
+  streakValueWrap: {
+    alignItems: 'center',
+  },
   streakLabel: {
     fontSize: typography.caption.fontSize,
     lineHeight: typography.caption.lineHeight,
@@ -553,6 +642,10 @@ const styles = StyleSheet.create({
     fontSize: typography.bodySmall.fontSize,
     color: colors.textSecondary,
   },
+  progressAllDone: {
+    color: colors.accent,
+    fontWeight: typography.label.fontWeight,
+  },
   sections: {
     gap: spacing.lg,
   },
@@ -563,6 +656,12 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: spacing.md,
+  },
+  // ReorderableList lays rows out itself (no gap support), so every row
+  // after the first carries the list rhythm as a top margin — part of the
+  // constant row pitch its drag math measures.
+  reorderRowSpacing: {
+    marginTop: spacing.md,
   },
   menu: {
     gap: spacing.sm,

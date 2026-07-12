@@ -1,9 +1,17 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
 import { Sheet } from '../Sheet';
 
 describe('Sheet', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('renders nothing when not visible', async () => {
     await render(
       <Sheet visible={false} onClose={jest.fn()} testID="sheet">
@@ -34,5 +42,49 @@ describe('Sheet', () => {
     await fireEvent.press(screen.getByTestId('sheet-backdrop'));
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the panel mounted through the exit animation, then unmounts and fires onDismissed', async () => {
+    const onDismissed = jest.fn();
+    const view = await render(
+      <Sheet visible onClose={jest.fn()} onDismissed={onDismissed} testID="sheet">
+        <Text>Sheet content</Text>
+      </Sheet>
+    );
+    await act(async () => {
+      jest.runOnlyPendingTimers();
+    });
+
+    await view.rerender(
+      <Sheet visible={false} onClose={jest.fn()} onDismissed={onDismissed} testID="sheet">
+        <Text>Sheet content</Text>
+      </Sheet>
+    );
+
+    // Still up: the exit animation is playing, nothing snaps away.
+    expect(screen.getByText('Sheet content')).toBeTruthy();
+    expect(onDismissed).not.toHaveBeenCalled();
+
+    await act(async () => {
+      jest.advanceTimersByTime(500);
+    });
+
+    expect(screen.queryByText('Sheet content')).toBeNull();
+    expect(onDismissed).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not fire onDismissed for a sheet that never opened', async () => {
+    const onDismissed = jest.fn();
+    await render(
+      <Sheet visible={false} onClose={jest.fn()} onDismissed={onDismissed} testID="sheet">
+        <Text>Sheet content</Text>
+      </Sheet>
+    );
+
+    await act(async () => {
+      jest.advanceTimersByTime(500);
+    });
+
+    expect(onDismissed).not.toHaveBeenCalled();
   });
 });

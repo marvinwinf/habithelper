@@ -85,6 +85,9 @@ export default function TabLayout() {
         tabBarShowLabel: false,
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textSecondary,
+        // Tabs cross-fade instead of hard-switching, per the design
+        // system's fade-only Motion rule for mount/dismiss.
+        animation: 'fade',
         // Kept in normal layout flow (not absolutely positioned) so screen
         // content can never hide behind it. A flat, hairline-topped bar with
         // a soft pill fill marking the active tab, per docs/DESIGN_SYSTEM.md's

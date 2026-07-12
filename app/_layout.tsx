@@ -43,7 +43,10 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false }} />
+      {/* One deliberate, consistent push transition for every stack screen
+          (create/edit/detail) instead of the platform default — hierarchical
+          navigation reads as "going into" the item. */}
+      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }} />
     </GestureHandlerRootView>
   );
 }
