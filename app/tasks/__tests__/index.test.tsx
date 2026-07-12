@@ -135,7 +135,10 @@ describe('TasksScreen', () => {
     (listTasksForToday as jest.Mock).mockResolvedValue([task]);
 
     await render(<TasksScreen />);
-    await fireEvent.press(await screen.findByTestId('task-row-task-1-toggle'));
+    // The shared CompletionControl decides tap vs. long-press on pressOut.
+    const toggle = await screen.findByTestId('task-row-task-1-toggle');
+    await fireEvent(toggle, 'pressIn');
+    await fireEvent(toggle, 'pressOut');
 
     expect(toggleTaskCompletion).toHaveBeenCalledWith({}, 'task-1');
   });

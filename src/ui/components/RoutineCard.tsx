@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from './Button';
@@ -12,7 +13,15 @@ import {
 } from '../animation/haptics';
 import { useLevelUpAnimation } from '../animation/useLevelUpAnimation';
 import { useMountAnimation } from '../animation/useMountAnimation';
-import { colors, pressedOpacity, radius, softShadow, spacing, typography } from '../theme';
+import {
+  colors,
+  listCardMinHeight,
+  pressedOpacity,
+  radius,
+  softShadow,
+  spacing,
+  typography,
+} from '../theme';
 import { getCategoryColorVariant, getCategorySolidFill } from '../theme/categoryVariant';
 import { categoryIconName } from '../categoryIcons';
 import { scheduleFromRoutineRow } from '../../domain/routines/schedule';
@@ -72,8 +81,9 @@ export interface RoutineCardProps {
 /**
  * A single routine's Today-screen row, per docs/DESIGN_SYSTEM.md's Routine
  * and Task Item Design: a light soft-paper card lightly tinted by its
- * category's color variant, a "time · schedule" subtitle, and a bold streak
- * numeral. The row itself carries only the completion control — per the
+ * category's color variant, with one compact meta line carrying the
+ * "time · schedule" subtitle and the streak. The row itself carries only the
+ * completion control — per the
  * design system's List Row Actions rule there is no inline overflow menu;
  * tapping the row opens an actions bottom sheet (Statistik/detail plus
  * docs/ROUTINE_RULES.md's per-occurrence actions), so the list stays focused
@@ -167,11 +177,24 @@ export function RoutineCard({
               iconColor={solidFill?.iconColor}
             />
             <View style={styles.main}>
-              <Text style={[styles.name, isSkipped && styles.nameSkipped]}>{routine.name}</Text>
-              {subtitle.length > 0 && <Text style={styles.subtitle}>{subtitle}</Text>}
-              <View style={styles.streakRow} testID={testID ? `${testID}-streak` : undefined}>
-                <Text style={styles.streakLabel}>Streak </Text>
-                <Text style={styles.streakValue}>{streak}</Text>
+              <Text style={[styles.name, isSkipped && styles.nameSkipped]} numberOfLines={1}>
+                {routine.name}
+              </Text>
+              {/* One compact meta line — subtitle and streak share it so every
+                  card stays two lines tall and all list cards line up at the
+                  shared minimum height. */}
+              <View style={styles.metaRow}>
+                {subtitle.length > 0 && (
+                  <Text style={styles.subtitle} numberOfLines={1}>
+                    {subtitle}
+                  </Text>
+                )}
+                <View style={styles.streakRow}>
+                  <Ionicons name="flame" size={typography.caption.fontSize} color={colors.accent} />
+                  <Text style={styles.streakLabel} testID={testID ? `${testID}-streak` : undefined}>
+                    Streak {streak}
+                  </Text>
+                </View>
               </View>
             </View>
             <View style={styles.actions}>
@@ -252,9 +275,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.sm,
-    // Generous internal padding so the card breathes — soft paper, not a
-    // tight container (docs/DESIGN_SYSTEM.md's Whitespace and Rhythm).
-    padding: spacing.md,
+    // Breathing room horizontally, compact vertically: every list card sits
+    // at the same shared minimum height so routines and tasks line up as one
+    // calm, even rhythm (docs/DESIGN_SYSTEM.md's Whitespace and Rhythm).
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    minHeight: listCardMinHeight,
     borderRadius: radius.lg,
     // Soft hairline + subtle shadow instead of a full 1px stroke: the card
     // lifts by tone and shadow, not by a hard border.
@@ -265,7 +291,7 @@ const styles = StyleSheet.create({
   },
   main: {
     flex: 1,
-    gap: spacing.xs,
+    gap: spacing.xxs,
   },
   name: {
     fontFamily: typography.body.fontFamily,
@@ -276,25 +302,27 @@ const styles = StyleSheet.create({
   nameSkipped: {
     color: colors.textSecondary,
   },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   subtitle: {
+    flexShrink: 1,
     fontFamily: typography.caption.fontFamily,
     fontSize: typography.caption.fontSize,
     color: colors.textSecondary,
   },
   streakRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
+    gap: spacing.xxs,
   },
   streakLabel: {
     fontFamily: typography.caption.fontFamily,
     fontSize: typography.caption.fontSize,
+    fontWeight: typography.label.fontWeight,
     color: colors.textSecondary,
-  },
-  streakValue: {
-    fontFamily: typography.title.fontFamily,
-    fontWeight: typography.title.fontWeight,
-    fontSize: 20,
-    color: colors.textPrimary,
   },
   actions: {
     flexDirection: 'row',

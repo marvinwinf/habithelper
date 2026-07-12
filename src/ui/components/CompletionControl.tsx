@@ -16,6 +16,8 @@ export interface CompletionControlProps {
   completed?: boolean;
   exceeded?: boolean;
   disabled?: boolean;
+  /** Semantic role of the control: routines read as a button, task toggles as a checkbox. */
+  accessibilityRole?: 'button' | 'checkbox';
   /** Category accent tinting the control (T065): pending border and done fill. Defaults to the app accent. */
   accentColor?: string;
   longPressThresholdMs?: number;
@@ -25,6 +27,10 @@ export interface CompletionControlProps {
 // Platform-standard long-press duration; not a design token (it's an
 // interaction timing constant, not a visual style value).
 const DEFAULT_LONG_PRESS_THRESHOLD_MS = 500;
+
+// Compact 36dp visual circle shared by routine and task rows; hitSlop grows
+// the touch target past the 44dp minimum (T082) without enlarging the visual.
+const CONTROL_SIZE = 36;
 
 /**
  * Tap-to-complete / long-press-to-exceed control. A short tap fires
@@ -45,6 +51,7 @@ export function CompletionControl({
   completed = false,
   exceeded = false,
   disabled = false,
+  accessibilityRole = 'button',
   accentColor = colors.accent,
   longPressThresholdMs = DEFAULT_LONG_PRESS_THRESHOLD_MS,
   testID,
@@ -110,11 +117,12 @@ export function CompletionControl({
 
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityRole={accessibilityRole}
       accessibilityState={{ disabled, checked: isDone }}
       disabled={disabled}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
+      hitSlop={spacing.xs}
       testID={testID}
       style={({ pressed }) => [
         styles.control,
@@ -153,8 +161,8 @@ export function CompletionControl({
 
 const styles = StyleSheet.create({
   control: {
-    width: spacing.xl,
-    height: spacing.xl,
+    width: CONTROL_SIZE,
+    height: CONTROL_SIZE,
     borderRadius: radius.full,
     borderWidth: 1,
     borderColor: colors.border,
