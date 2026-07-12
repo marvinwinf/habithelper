@@ -487,7 +487,8 @@ describe('TodayScreen', () => {
     expect(screen.getByTestId('today-shortcuts-me')).toBeTruthy();
 
     await fireEvent.press(screen.getByTestId('today-shortcuts-categories'));
-    expect(screen.queryByTestId('today-shortcuts-categories')).toBeNull();
+    // The sheet plays its exit animation before unmounting.
+    await waitFor(() => expect(screen.queryByTestId('today-shortcuts-categories')).toBeNull());
   });
 
   it('opens the notifications placeholder sheet from the header icon', async () => {
