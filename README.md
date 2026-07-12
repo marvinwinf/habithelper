@@ -1,6 +1,6 @@
 # HabitHelper
 
-An Android-first personal routines and todo app built with React Native, Expo, and TypeScript. See `docs/PRODUCT_VISION.md` and `docs/MVP_SCOPE.md` for what it is (and isn't), and `TASKS.md` for the implementation plan.
+An Android-first personal routines and todo app built with React Native, Expo, and TypeScript. See `docs/PRODUCT_VISION.md` and `docs/MVP_SCOPE.md` for what it is (and isn't), `TASKS.md` for how work is organized, and `docs/TASKS_ARCHIVE.md` for the full MVP implementation plan.
 
 ## Releases
 

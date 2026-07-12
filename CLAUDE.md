@@ -8,22 +8,37 @@ The app must remain technically compatible with future iOS development, but the 
 
 ## Required Reading
 
-Before changing code, read:
+Read the small core below before any change. Then read only the docs for the
+area you are actually touching — do not read all of `docs/` for every task.
+Source files already cite their governing doc inline (e.g. `per
+docs/ROUTINE_RULES.md`); follow those citations rather than pre-reading
+everything.
 
-- `docs/PRODUCT_VISION.md`
-- `docs/MVP_SCOPE.md`
-- `docs/PROJECT_PRINCIPLES.md`
-- `docs/USER_MODEL.md`
-- `docs/DATA_PERSISTENCE.md`
-- `docs/ROUTINE_RULES.md`
-- `docs/SCREEN_SPECIFICATIONS.md`
-- `docs/DESIGN_SYSTEM.md`
-- `docs/TEST_STRATEGY.md`
-- `docs/ROADMAP.md`
-- `docs/ARCHITECTURE.md`
-- `docs/DATA_MODEL.md`
-- `docs/IMPLEMENTATION_PLAN.md`
-- `TASKS.md`
+**Always read first (the core):**
+
+- `docs/PROJECT_PRINCIPLES.md` — non-negotiable rules
+- `docs/MVP_SCOPE.md` — what is in and out of scope
+
+**Then read by area — only what your change touches:**
+
+| You are changing… | Read first |
+| --- | --- |
+| Routine / streak / joker / level / reconciliation logic | `docs/ROUTINE_RULES.md`, then `docs/DATA_MODEL.md` (event shapes) |
+| DB schema, migrations, or repositories | `docs/DATA_MODEL.md`, `docs/ARCHITECTURE.md` (Migration Strategy) |
+| Persistence guarantees | `docs/DATA_PERSISTENCE.md` |
+| Screens, navigation, or user-facing copy | `docs/SCREEN_SPECIFICATIONS.md` |
+| Any visual / component / styling work | `docs/DESIGN_SYSTEM.md` (and `docs/ACCESSIBILITY.md`) |
+| Tests or test setup | `docs/TEST_STRATEGY.md` |
+| Cross-cutting / architectural decisions | `docs/ARCHITECTURE.md` |
+| Product intent or user model | `docs/PRODUCT_VISION.md`, `docs/USER_MODEL.md` |
+| Phase planning or sequencing | `docs/IMPLEMENTATION_PLAN.md`, `docs/ROADMAP.md` |
+| Publishing an APK release | `docs/RELEASE_PROCESS.md` |
+
+`TASKS.md` holds the global task rules and current open work — read it when
+picking up or defining a task. `docs/TASKS_ARCHIVE.md` is the historical
+spec of the completed MVP (T001–T090): reference-only, consult a single phase
+when you touch the area it built. `docs/design_reference.png` is a 1.3 MB
+image — open it only for pixel-level design work, never as routine reading.
 
 ## Working Rules
 
