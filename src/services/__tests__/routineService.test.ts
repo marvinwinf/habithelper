@@ -578,4 +578,125 @@ describe('routineService', () => {
       sqlite.close();
     });
   });
+
+  describe('idempotent completion', () => {
+    it('completing the same occurrence twice writes only one event and counts once', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      const first = await completeRoutineOccurrence(db, created.id, '2026-07-01');
+      const second = await completeRoutineOccurrence(db, created.id, '2026-07-01');
+
+      // The second call is a no-op that returns the completion already on
+      // record — same event id, never a spurious level-up.
+      expect(second.event.id).toBe(first.event.id);
+      expect(second.leveledUp).toBe(false);
+
+      const events = await listRoutineEvents(db, created.id);
+      expect(events.filter((e) => e.eventType === 'completed')).toHaveLength(1);
+
+      const cache = await getRoutineStateCache(db, created.id);
+      expect(cache).toMatchObject({ currentStreak: 1, totalCompletions: 1, jokerProgress: 1 });
+
+      sqlite.close();
+    });
+
+    it('exceeding an already-completed occurrence is a no-op (single effective completion per day)', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      await completeRoutineOccurrence(db, created.id, '2026-07-01');
+      await exceedRoutineOccurrence(db, created.id, '2026-07-01');
+
+      const events = await listRoutineEvents(db, created.id);
+      expect(events.filter((e) => e.eventType === 'completed' || e.eventType === 'exceeded')).toHaveLength(1);
+
+      const cache = await getRoutineStateCache(db, created.id);
+      expect(cache).toMatchObject({ currentStreak: 1, totalCompletions: 1 });
+
+      sqlite.close();
+    });
+
+    it('complete, undo, then complete again leaves exactly one active completion', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      await completeRoutineOccurrence(db, created.id, '2026-07-01');
+      await undoRoutineCompletion(db, created.id, '2026-07-01');
+      await completeRoutineOccurrence(db, created.id, '2026-07-01');
+
+      const events = await listRoutineEvents(db, created.id);
+      const activeCompletions = events.filter(
+        (e) => !e.supersededByEventId && e.eventType === 'completed',
+      );
+      expect(activeCompletions).toHaveLength(1);
+
+      const cache = await getRoutineStateCache(db, created.id);
+      expect(cache).toMatchObject({ currentStreak: 1, totalCompletions: 1 });
+
+      sqlite.close();
+    });
+
+    it('repeated taps do not earn a joker early', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      // Four distinct days, each "double-tapped" — jokerProgress must land on
+      // exactly 4, not race past the 5-completion earn threshold.
+      for (let i = 1; i <= 4; i++) {
+        const date = `2026-07-0${i}`;
+        await completeRoutineOccurrence(db, created.id, date);
+        await completeRoutineOccurrence(db, created.id, date);
+      }
+
+      const events = await listRoutineEvents(db, created.id);
+      expect(events.filter((e) => e.eventType === 'joker_earned')).toHaveLength(0);
+
+      const cache = await getRoutineStateCache(db, created.id);
+      expect(cache).toMatchObject({ totalCompletions: 4, jokerProgress: 4, jokerInventory: 0 });
+
+      sqlite.close();
+    });
+
+    it('undo clears legacy duplicate completions from a single day, fully reverting the streak', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      await completeRoutineOccurrence(db, created.id, '2026-07-01');
+      // Simulate history a pre-idempotency build could have written: a second
+      // active `completed` event for the same day. Replay double-counts it.
+      await appendRoutineEvent(db, {
+        routineId: created.id,
+        occurrenceDate: '2026-07-01',
+        eventType: 'completed',
+      });
+      await recomputeRoutineCache(db, created.id);
+      expect(await getRoutineStateCache(db, created.id)).toMatchObject({ currentStreak: 2, totalCompletions: 2 });
+
+      await undoRoutineCompletion(db, created.id, '2026-07-01');
+
+      const events = await listRoutineEvents(db, created.id);
+      expect(events.filter((e) => !e.supersededByEventId && e.eventType === 'completed')).toHaveLength(0);
+
+      const cache = await getRoutineStateCache(db, created.id);
+      expect(cache).toMatchObject({ currentStreak: 0, totalCompletions: 0 });
+
+      sqlite.close();
+    });
+
+    it('two timestamps on the same local calendar day count as one successful day', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      // Both taps resolve to the same occurrence_date (YYYY-MM-DD), the unit
+      // streaks are measured in — so the second cannot count as a new day.
+      await completeRoutineOccurrence(db, created.id, '2026-07-01');
+      await completeRoutineOccurrence(db, created.id, '2026-07-01');
+
+      const cache = await getRoutineStateCache(db, created.id);
+      expect(cache).toMatchObject({ currentStreak: 1, totalCompletions: 1 });
+
+      sqlite.close();
+    });
+  });
 });

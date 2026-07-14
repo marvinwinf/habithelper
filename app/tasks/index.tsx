@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -12,7 +12,7 @@ import {
   listUpcomingTasks,
   type Task,
 } from '../../src/data/repositories/taskRepository';
-import { deleteTask, moveTask, toggleTaskCompletion } from '../../src/services/taskService';
+import { deleteTask, moveTask, setTaskCompletion } from '../../src/services/taskService';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
 import { compareByDateThenTime } from '../../src/domain/tasks/ordering';
 import { confirmTaskDeletion } from '../../src/ui/alerts';
@@ -37,15 +37,31 @@ export default function TasksScreen() {
   const [completed, setCompleted] = useState<Task[]>([]);
   const [completedExpanded, setCompletedExpanded] = useState(false);
 
+  // Monotonic reload token: two overlapping reloads (e.g. from completing
+  // several tasks quickly) could otherwise resolve their independent per-
+  // section queries out of order and leave a task listed as both open and
+  // completed. A query only applies its result while its reload is the latest.
+  const loadSeq = useRef(0);
+
   const loadData = useCallback(() => {
+    const seq = (loadSeq.current += 1);
+    const guard =
+      <T,>(setter: (value: T) => void) =>
+      (value: T) => {
+        if (seq === loadSeq.current) {
+          setter(value);
+        }
+      };
     const today = todayDateString();
-    listCategories(db).then(setCategories);
-    listOverdueTasks(db, today).then((rows) => setOverdue([...rows].sort(compareByDateThenTime)));
-    listTasksForToday(db, today).then((rows) => setDueToday([...rows].sort(compareByDateThenTime)));
-    listUpcomingTasks(db, today).then((rows) => setUpcoming([...rows].sort(compareByDateThenTime)));
-    listUndatedTasks(db).then((rows) => setUndated([...rows].sort(compareByDateThenTime)));
-    listCompletedTasks(db).then((rows) =>
-      setCompleted([...rows].sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))),
+    listCategories(db).then(guard(setCategories));
+    listOverdueTasks(db, today).then(guard((rows: Task[]) => setOverdue([...rows].sort(compareByDateThenTime))));
+    listTasksForToday(db, today).then(guard((rows: Task[]) => setDueToday([...rows].sort(compareByDateThenTime))));
+    listUpcomingTasks(db, today).then(guard((rows: Task[]) => setUpcoming([...rows].sort(compareByDateThenTime))));
+    listUndatedTasks(db).then(guard((rows: Task[]) => setUndated([...rows].sort(compareByDateThenTime))));
+    listCompletedTasks(db).then(
+      guard((rows: Task[]) =>
+        setCompleted([...rows].sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))),
+      ),
     );
   }, []);
 
@@ -69,7 +85,9 @@ export default function TasksScreen() {
   const allTasks = [...overdue, ...dueToday, ...upcoming, ...undated, ...completed];
 
   async function handleToggleComplete(task: Task) {
-    await toggleTaskCompletion(db, task.id);
+    // Explicit target from the rendered row (not a DB re-read), so a repeated
+    // tap can't flip a just-checked task back off.
+    await setTaskCompletion(db, task.id, !task.isCompleted);
     loadData();
   }
 

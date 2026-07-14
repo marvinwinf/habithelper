@@ -11,7 +11,7 @@ import {
   listUndatedTasks,
   listUpcomingTasks,
 } from '../../../src/data/repositories/taskRepository';
-import { deleteTask, moveTask, toggleTaskCompletion } from '../../../src/services/taskService';
+import { deleteTask, moveTask, setTaskCompletion } from '../../../src/services/taskService';
 
 jest.mock('../../../src/data/db/client', () => ({ db: {} }));
 jest.mock('../../../src/data/repositories/categoryRepository', () => ({
@@ -25,7 +25,7 @@ jest.mock('../../../src/data/repositories/taskRepository', () => ({
   listCompletedTasks: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('../../../src/services/taskService', () => ({
-  toggleTaskCompletion: jest.fn().mockResolvedValue(undefined),
+  setTaskCompletion: jest.fn().mockResolvedValue(undefined),
   moveTask: jest.fn().mockResolvedValue(undefined),
   deleteTask: jest.fn().mockResolvedValue(undefined),
 }));
@@ -140,7 +140,8 @@ describe('TasksScreen', () => {
     await fireEvent(toggle, 'pressIn');
     await fireEvent(toggle, 'pressOut');
 
-    expect(toggleTaskCompletion).toHaveBeenCalledWith({}, 'task-1');
+    // Explicit target: the pending row asks to become completed (true).
+    expect(setTaskCompletion).toHaveBeenCalledWith({}, 'task-1', true);
   });
 
   it('moves a task to tomorrow from the actions sheet', async () => {

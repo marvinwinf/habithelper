@@ -26,7 +26,7 @@ import {
   moveRoutineOccurrence,
   undoRoutineCompletion,
 } from '../../../src/services/routineService';
-import { deleteTask, moveTask, toggleTaskCompletion } from '../../../src/services/taskService';
+import { deleteTask, moveTask, setTaskCompletion } from '../../../src/services/taskService';
 import { triggerFirstCompletionOfDayHaptic } from '../../../src/ui/animation/haptics';
 
 jest.mock('../../../src/data/db/client', () => ({ db: {} }));
@@ -65,7 +65,7 @@ jest.mock('../../../src/services/routineService', () => ({
   undoRoutineCompletion: jest.fn().mockResolvedValue({ writtenEvents: [] }),
 }));
 jest.mock('../../../src/services/taskService', () => ({
-  toggleTaskCompletion: jest.fn().mockResolvedValue(undefined),
+  setTaskCompletion: jest.fn().mockResolvedValue(undefined),
   moveTask: jest.fn().mockResolvedValue(undefined),
   deleteTask: jest.fn().mockResolvedValue(undefined),
 }));
@@ -437,7 +437,8 @@ describe('TodayScreen', () => {
     await fireEvent(toggle, 'pressIn');
     await fireEvent(toggle, 'pressOut');
 
-    expect(toggleTaskCompletion).toHaveBeenCalledWith({}, 'task-1');
+    // Explicit target: the pending card asks to become completed (true).
+    expect(setTaskCompletion).toHaveBeenCalledWith({}, 'task-1', true);
   });
 
   it('moves and deletes a task from the Today screen actions sheet', async () => {
