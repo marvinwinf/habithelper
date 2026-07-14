@@ -40,6 +40,43 @@ describe('routineRepository', () => {
     sqlite.close();
   });
 
+  it('persists the optional plan fields on create, defaulting missing ones to null', async () => {
+    const { db, sqlite } = await createDrizzleTestDb();
+
+    const created = await createRoutine(db, {
+      ...baseInput,
+      cue: 'Nach dem Aufstehen',
+      reward: 'Danach ein Kaffee',
+    });
+
+    expect(created.cue).toBe('Nach dem Aufstehen');
+    expect(created.reward).toBe('Danach ein Kaffee');
+    // Not supplied → stored as NULL, so old routines and untouched fields stay clean.
+    expect(created.pairing).toBeNull();
+
+    const reread = await getRoutine(db, created.id);
+    expect(reread).toMatchObject({
+      cue: 'Nach dem Aufstehen',
+      pairing: null,
+      reward: 'Danach ein Kaffee',
+    });
+
+    sqlite.close();
+  });
+
+  it('updates the plan fields, including clearing one back to null', async () => {
+    const { db, sqlite } = await createDrizzleTestDb();
+    const created = await createRoutine(db, { ...baseInput, cue: 'Alt', pairing: 'Bleibt' });
+
+    const updated = await updateRoutine(db, created.id, { cue: null, reward: 'Neu' });
+
+    expect(updated.cue).toBeNull();
+    expect(updated.pairing).toBe('Bleibt');
+    expect(updated.reward).toBe('Neu');
+
+    sqlite.close();
+  });
+
   it('reads a routine by id, and undefined for an unknown id', async () => {
     const { db, sqlite } = await createDrizzleTestDb();
     const created = await createRoutine(db, baseInput);

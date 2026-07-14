@@ -63,6 +63,19 @@ const WEEKDAY_LABELS: { day: IsoWeekday; label: string }[] = [
   { day: 7, label: 'So' },
 ];
 
+// "Dein Plan" rows (docs/DATA_MODEL.md's routine plan fields), in habit-loop
+// order. Purely informational on the statistics screen — each row renders
+// only when its value is set; the whole card hides when all three are empty.
+const PLAN_ROWS: {
+  key: 'cue' | 'pairing' | 'reward';
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { key: 'cue', label: 'Auslöser', icon: 'arrow-forward-outline' },
+  { key: 'pairing', label: 'Verknüpfung', icon: 'link-outline' },
+  { key: 'reward', label: 'Belohnung', icon: 'gift-outline' },
+];
+
 const MONTH_NAMES = [
   'Januar',
   'Februar',
@@ -85,7 +98,6 @@ export default function RoutineDetailScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [events, setEvents] = useState<RoutineEvent[]>([]);
   const [cache, setCache] = useState<RoutineStateCache | undefined>(undefined);
-  const [reasonExpanded, setReasonExpanded] = useState(false);
   const levelUpAnimation = useLevelUpAnimation();
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const [year, month] = todayDateString().split('-').map(Number);
@@ -181,6 +193,8 @@ export default function RoutineDetailScreen() {
   if (!routine) {
     return <View style={styles.screen} testID="routine-detail-loading" />;
   }
+
+  const planRows = PLAN_ROWS.filter(({ key }) => routine[key]);
 
   const totalCompletions = cache?.totalCompletions ?? 0;
   const levelRank = cache?.levelRank ?? 0;
@@ -347,23 +361,18 @@ export default function RoutineDetailScreen() {
         </Card>
       )}
 
-      {routine.reason && (
-        <Card style={styles.reasonCard}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setReasonExpanded((prev) => !prev)}
-            testID="routine-detail-reason-toggle"
-            style={({ pressed }) => pressed && styles.pressed}
-          >
-            <Text style={styles.reasonToggle}>
-              {reasonExpanded ? '▾' : '▸'} Persönlicher Grund
-            </Text>
-          </Pressable>
-          {reasonExpanded && (
-            <Text style={styles.reasonText} testID="routine-detail-reason-text">
-              {routine.reason}
-            </Text>
-          )}
+      {planRows.length > 0 && (
+        <Card style={styles.planCard} testID="routine-detail-plan">
+          <Text style={styles.planCardTitle}>Dein Plan</Text>
+          {planRows.map(({ key, label, icon }) => (
+            <View key={key} style={styles.planRow} testID={`routine-detail-plan-${key}`}>
+              <Ionicons name={icon} size={typography.body.fontSize} color={colors.accent} />
+              <View style={styles.planRowText}>
+                <Text style={styles.planRowLabel}>{label}</Text>
+                <Text style={styles.planRowValue}>{routine[key]}</Text>
+              </View>
+            </View>
+          ))}
         </Card>
       )}
 
@@ -535,15 +544,28 @@ const styles = StyleSheet.create({
   weekdayCircleSelected: {
     borderColor: colors.accent,
   },
-  reasonCard: {
-    gap: spacing.xs,
+  planCard: {
+    gap: spacing.sm,
   },
-  reasonToggle: {
+  planCardTitle: {
     fontSize: typography.bodySmall.fontSize,
     fontWeight: typography.bodySmall.fontWeight,
+    color: colors.textPrimary,
+  },
+  planRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  planRowText: {
+    flex: 1,
+    gap: spacing.xxs,
+  },
+  planRowLabel: {
+    fontSize: typography.caption.fontSize,
     color: colors.textSecondary,
   },
-  reasonText: {
+  planRowValue: {
     fontSize: typography.body.fontSize,
     lineHeight: typography.body.lineHeight,
     color: colors.textPrimary,

@@ -64,6 +64,13 @@ export const routine = sqliteTable('routine', {
   weeklyTargetCount: integer('weekly_target_count'),
   timeOfDay: text('time_of_day'),
   reason: text('reason'),
+  // Optional "Atomic Habits" planning aids (added by migration 0002,
+  // routine plan). Free text only, purely a thinking/planning prompt — never
+  // read by streak/joker/progress/completion logic, so they need no domain
+  // wiring. cue = Auslöser, pairing = Verknüpfung, reward = Belohnung.
+  cue: text('cue'),
+  pairing: text('pairing'),
+  reward: text('reward'),
   allowConsciousSkip: integer('allow_conscious_skip', { mode: 'boolean' }).notNull(),
   isPaused: integer('is_paused', { mode: 'boolean' }).notNull(),
   sortOrder: real('sort_order').notNull(),

@@ -90,6 +90,9 @@ interface RoutineSeed {
   scheduleType: schema.ScheduleType;
   scheduledWeekdays?: number[] | null;
   weeklyTargetCount?: number | null;
+  cue?: string | null;
+  pairing?: string | null;
+  reward?: string | null;
   isPaused?: boolean;
   createdAt: string;
 }
@@ -105,6 +108,9 @@ function insertRoutine(db: SeedDb, seed: RoutineSeed): typeof schema.routine.$in
     weeklyTargetCount: seed.weeklyTargetCount ?? null,
     timeOfDay: null,
     reason: null,
+    cue: seed.cue ?? null,
+    pairing: seed.pairing ?? null,
+    reward: seed.reward ?? null,
     allowConsciousSkip: true,
     isPaused: seed.isPaused ?? false,
     sortOrder: 0,
@@ -268,6 +274,11 @@ async function main(): Promise<void> {
     scheduleType: 'weekly_target',
     scheduledWeekdays: generateSuggestedWeeklyTargetWeekdays(weeklyTargetCount),
     weeklyTargetCount,
+    // Example "Dein Plan" content so the statistics screen's plan card is
+    // exercised in the dev seed.
+    cue: 'Nach dem Abendessen',
+    pairing: 'Dabei mache ich mir einen Tee',
+    reward: 'Danach eine Folge meiner Lieblingsserie',
     createdAt: nowIso(),
   });
   insertRoutine(db, {

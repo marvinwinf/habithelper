@@ -49,7 +49,10 @@ Note: `docs/DATA_PERSISTENCE.md` lists "settings" as its own persistent-data cat
 | `scheduled_weekdays` | TEXT NULL | JSON array of ISO weekday ints (1–7); used for `weekdays`, and stores the *current* (possibly user-adjusted) suggested days for `weekly_target` |
 | `weekly_target_count` | INTEGER NULL | only for `weekly_target` |
 | `time_of_day` | TEXT NULL | `HH:mm`, optional, sort-only per `ROUTINE_RULES.md` (never required for completion) |
-| `reason` | TEXT NULL | personal reason, optional |
+| `reason` | TEXT NULL | personal reason, optional (no longer surfaced in the UI as of migration `0002`; column retained, not dropped) |
+| `cue` | TEXT NULL | optional "Atomic Habits" planning aid — Auslöser (added by migration `0002_routine_plan`) |
+| `pairing` | TEXT NULL | optional planning aid — Verknüpfung (`0002`) |
+| `reward` | TEXT NULL | optional planning aid — Belohnung (`0002`) |
 | `allow_conscious_skip` | INTEGER (bool) | default true or false per creation flow |
 | `is_paused` | INTEGER (bool) | see Pause below |
 | `sort_order` | REAL | for manual drag-and-drop reorder on the Routines screen; independent of `id`, safe to rewrite freely |
@@ -57,6 +60,8 @@ Note: `docs/DATA_PERSISTENCE.md` lists "settings" as its own persistent-data cat
 | `created_at` | TEXT | routine "starts immediately when created" — no separate start_date needed, `created_at` date is the start |
 | `updated_at` | TEXT | |
 | `deleted_at` | TEXT NULL | soft delete, preserves history for any prior events referencing this routine |
+
+Note: `cue`, `pairing`, and `reward` are optional free-text planning prompts (per "Die 1%-Methode" / *Atomic Habits*). They are purely a thinking/planning aid: never read by streak, joker, level, progress, reconciliation, or completion logic, and never surfaced on the Today screen, routines list, or routine card — only in the routine's create/edit form ("Weitere Einstellungen" → "Routine leichter machen") and on its statistics screen ("Dein Plan", filled fields only). Existing routines predating `0002` keep `NULL` and behave unchanged. When export/import lands (T055), they travel with the routine like any other column.
 
 Note: `scheduled_weekdays` for `weekly_target` is *derived-then-persisted* — the app computes a suggestion, but once created (or edited), the stored value is authoritative until the user changes it again. This is a persisted value, not recomputed on every read (see Derived vs Persisted).
 

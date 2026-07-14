@@ -100,23 +100,38 @@ describe('RoutineForm', () => {
       scheduledWeekdays: null,
       weeklyTargetCount: null,
       timeOfDay: null,
-      reason: null,
+      cue: null,
+      pairing: null,
+      reward: null,
       allowConsciousSkip: false,
     });
   });
 
-  it('includes the personal reason and conscious-skip toggle from the advanced section', async () => {
+  it('includes the plan fields and conscious-skip toggle from the advanced section', async () => {
     const onSubmit = jest.fn();
     await render(<RoutineForm categories={categories} onSubmit={onSubmit} />);
     await fireEvent.changeText(screen.getByTestId('routine-form-name-input'), 'Laufen');
 
     await fireEvent.press(screen.getByTestId('routine-form-advanced-toggle'));
-    await fireEvent.changeText(screen.getByTestId('routine-form-reason-input'), 'Fitness halten');
+    await fireEvent.changeText(
+      screen.getByTestId('routine-form-cue-input'),
+      '  Nach dem Aufstehen  ',
+    );
+    await fireEvent.changeText(
+      screen.getByTestId('routine-form-pairing-input'),
+      'Dabei höre ich einen Podcast',
+    );
+    await fireEvent.changeText(screen.getByTestId('routine-form-reward-input'), 'Danach ein Kaffee');
     await fireEvent(screen.getByTestId('routine-form-allow-skip-switch'), 'valueChange', true);
     await fireEvent.press(screen.getByTestId('routine-form-save'));
 
     expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ reason: 'Fitness halten', allowConsciousSkip: true }),
+      expect.objectContaining({
+        cue: 'Nach dem Aufstehen',
+        pairing: 'Dabei höre ich einen Podcast',
+        reward: 'Danach ein Kaffee',
+        allowConsciousSkip: true,
+      }),
     );
   });
 
