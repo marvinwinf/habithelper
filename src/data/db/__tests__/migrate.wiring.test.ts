@@ -35,6 +35,8 @@ describe('runMigrations startup wiring', () => {
     const [firstStatement] = realSql.split('--> statement-breakpoint');
     expect(mockDb.execAsync).toHaveBeenCalledWith(firstStatement.trim());
     expect(mockDb.execAsync).toHaveBeenCalledWith(migrations.migrations.m0001.trim());
+    const [firstPlanStatement] = migrations.migrations.m0002.split('--> statement-breakpoint');
+    expect(mockDb.execAsync).toHaveBeenCalledWith(firstPlanStatement.trim());
     expect(mockDb.runAsync).toHaveBeenCalledWith(
       'INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)',
       [0, expect.any(String)],
@@ -43,7 +45,11 @@ describe('runMigrations startup wiring', () => {
       'INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)',
       [1, expect.any(String)],
     );
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      'INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)',
+      [2, expect.any(String)],
+    );
     // One transaction per migration (see migrationRunner.ts).
-    expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(2);
+    expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(3);
   });
 });

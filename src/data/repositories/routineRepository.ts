@@ -20,6 +20,11 @@ export interface RoutineInput {
   weeklyTargetCount?: number | null;
   timeOfDay?: string | null;
   reason?: string | null;
+  // Optional "Atomic Habits" planning aids — free text, no effect on
+  // streak/joker/progress/completion (docs/DATA_MODEL.md's routine table).
+  cue?: string | null;
+  pairing?: string | null;
+  reward?: string | null;
   allowConsciousSkip: boolean;
   sortOrder: number;
   colorVariantSeed: number;
@@ -46,6 +51,9 @@ export async function createRoutine(db: RoutineDb, input: RoutineInput): Promise
     weeklyTargetCount: input.weeklyTargetCount ?? null,
     timeOfDay: input.timeOfDay ?? null,
     reason: input.reason ?? null,
+    cue: input.cue ?? null,
+    pairing: input.pairing ?? null,
+    reward: input.reward ?? null,
     allowConsciousSkip: input.allowConsciousSkip,
     isPaused: false,
     sortOrder: input.sortOrder,

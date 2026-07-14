@@ -1,5 +1,5 @@
 import { Alert } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 
 import RoutineDetailScreen from '../index';
 import { todayDateString } from '../../../../src/domain/dates';
@@ -78,7 +78,10 @@ const routine = {
   scheduledWeekdays: null,
   weeklyTargetCount: null,
   timeOfDay: null,
-  reason: 'Gesund bleiben',
+  reason: null,
+  cue: 'Nach dem Aufstehen',
+  pairing: null,
+  reward: 'Danach ein Kaffee',
   allowConsciousSkip: false,
   isPaused: false,
   sortOrder: 0,
@@ -251,15 +254,30 @@ describe('RoutineDetailScreen', () => {
     expect(await screen.findByTestId(`calendar-day-${TODAY}-completed`)).toBeTruthy();
   });
 
-  it('collapses the personal reason by default and reveals it on toggle', async () => {
+  it('shows the "Dein Plan" card with only the filled plan fields', async () => {
     await render(<RoutineDetailScreen />);
     await screen.findByText('Laufen');
 
-    expect(screen.queryByTestId('routine-detail-reason-text')).toBeNull();
+    // cue and reward are set on the mock routine; pairing is null.
+    const cueRow = screen.getByTestId('routine-detail-plan-cue');
+    expect(cueRow).toBeTruthy();
+    expect(within(cueRow).getByText('Nach dem Aufstehen')).toBeTruthy();
+    expect(screen.getByTestId('routine-detail-plan-reward')).toBeTruthy();
+    expect(screen.queryByTestId('routine-detail-plan-pairing')).toBeNull();
+  });
 
-    await fireEvent.press(screen.getByTestId('routine-detail-reason-toggle'));
+  it('hides the whole "Dein Plan" card when no plan field is filled', async () => {
+    (getRoutine as jest.Mock).mockResolvedValue({
+      ...routine,
+      cue: null,
+      pairing: null,
+      reward: null,
+    });
 
-    expect(screen.getByTestId('routine-detail-reason-text').props.children).toBe('Gesund bleiben');
+    await render(<RoutineDetailScreen />);
+    await screen.findByText('Laufen');
+
+    expect(screen.queryByTestId('routine-detail-plan')).toBeNull();
   });
 
   it('retroactively completes a past missed day after confirmation, then refreshes', async () => {

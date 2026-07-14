@@ -25,7 +25,11 @@ export interface RoutineFormValues {
   scheduledWeekdays: IsoWeekday[] | null;
   weeklyTargetCount: number | null;
   timeOfDay: string | null;
-  reason: string | null;
+  // Optional "Atomic Habits" planning aids ("Routine leichter machen"), free
+  // text only, no effect on streak/progress/completion — see docs/DATA_MODEL.md.
+  cue: string | null;
+  pairing: string | null;
+  reward: string | null;
   allowConsciousSkip: boolean;
 }
 
@@ -59,6 +63,27 @@ const MIN_TARGET_COUNT = 1;
 const MAX_TARGET_COUNT = 7;
 const DEFAULT_TARGET_COUNT = 3;
 
+// Free-text planning notes, not essays — a generous cap that protects the
+// "Dein Plan" card layout on the statistics screen without feeling limiting.
+const PLAN_FIELD_MAX_LENGTH = 140;
+
+// The three "Routine leichter machen" fields, in habit-loop order
+// (before / during / after). Kept in one list so the form and its labels
+// stay in sync and the block is trivial to reorder.
+const PLAN_FIELDS: {
+  key: 'cue' | 'pairing' | 'reward';
+  label: string;
+  placeholder: string;
+}[] = [
+  { key: 'cue', label: 'Auslöser', placeholder: 'z. B. Nach dem Zähneputzen' },
+  {
+    key: 'pairing',
+    label: 'Verknüpfung',
+    placeholder: 'z. B. Dabei höre ich meinen Lieblingspodcast.',
+  },
+  { key: 'reward', label: 'Belohnung', placeholder: 'z. B. Danach trinke ich entspannt einen Kaffee.' },
+];
+
 /** Shared create/edit form for routines, per docs/SCREEN_SPECIFICATIONS.md's Create Routine Screen. */
 export function RoutineForm({
   categories,
@@ -79,7 +104,9 @@ export function RoutineForm({
     initialValues?.weeklyTargetCount ?? DEFAULT_TARGET_COUNT,
   );
   const [timeOfDay, setTimeOfDay] = useState(initialValues?.timeOfDay ?? '');
-  const [reason, setReason] = useState(initialValues?.reason ?? '');
+  const [cue, setCue] = useState(initialValues?.cue ?? '');
+  const [pairing, setPairing] = useState(initialValues?.pairing ?? '');
+  const [reward, setReward] = useState(initialValues?.reward ?? '');
   const [allowConsciousSkip, setAllowConsciousSkip] = useState(
     initialValues?.allowConsciousSkip ?? false,
   );
@@ -111,9 +138,20 @@ export function RoutineForm({
   const scheduleValid = !needsWeekdaySelection || scheduledWeekdays.length > 0;
   const canSave = trimmedName.length > 0 && scheduleValid;
 
+  const planValues: Record<'cue' | 'pairing' | 'reward', string> = { cue, pairing, reward };
+  const planSetters: Record<'cue' | 'pairing' | 'reward', (value: string) => void> = {
+    cue: setCue,
+    pairing: setPairing,
+    reward: setReward,
+  };
+
+  function nullIfEmpty(value: string): string | null {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
   function handleSubmit() {
     const trimmedTime = timeOfDay.trim();
-    const trimmedReason = reason.trim();
     onSubmit({
       name: trimmedName,
       categoryId,
@@ -121,7 +159,9 @@ export function RoutineForm({
       scheduledWeekdays: needsWeekdaySelection ? scheduledWeekdays : null,
       weeklyTargetCount: scheduleType === 'weekly_target' ? weeklyTargetCount : null,
       timeOfDay: trimmedTime.length > 0 ? trimmedTime : null,
-      reason: trimmedReason.length > 0 ? trimmedReason : null,
+      cue: nullIfEmpty(cue),
+      pairing: nullIfEmpty(pairing),
+      reward: nullIfEmpty(reward),
       allowConsciousSkip,
     });
   }
@@ -302,15 +342,6 @@ export function RoutineForm({
 
       {advancedExpanded && (
         <View testID="routine-form-advanced-section" style={styles.advancedSection}>
-          <Text style={styles.label}>Persönlicher Grund</Text>
-          <TextInput
-            value={reason}
-            onChangeText={setReason}
-            placeholder="Optional"
-            style={styles.input}
-            testID="routine-form-reason-input"
-          />
-
           <View style={styles.switchRow}>
             <Text style={styles.label}>Bewusstes Auslassen erlauben</Text>
             <Switch
@@ -319,6 +350,31 @@ export function RoutineForm({
               testID="routine-form-allow-skip-switch"
             />
           </View>
+
+          {/* "Atomic Habits" planning aids, per docs/DATA_MODEL.md — optional
+              free text, purely a thinking prompt. Never affects streaks,
+              progress, jokers or completion. Shown only here and on the
+              routine's statistics screen ("Dein Plan"). */}
+          <View style={styles.planHeader}>
+            <Text style={styles.planTitle}>Routine leichter machen</Text>
+            <Text style={styles.planIntro}>Kleine Anker helfen dir dranzubleiben.</Text>
+          </View>
+          {PLAN_FIELDS.map(({ key, label, placeholder }) => (
+            <View key={key} style={styles.planField}>
+              <Text style={styles.label}>{label}</Text>
+              <TextInput
+                value={planValues[key]}
+                onChangeText={planSetters[key]}
+                placeholder={placeholder}
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                maxLength={PLAN_FIELD_MAX_LENGTH}
+                accessibilityLabel={label}
+                style={styles.planInput}
+                testID={`routine-form-${key}-input`}
+              />
+            </View>
+          ))}
         </View>
       )}
 
@@ -343,15 +399,6 @@ const styles = StyleSheet.create({
   label: {
     ...typography.label,
     color: colors.textSecondary,
-  },
-  // Underlined, not boxed — per docs/DESIGN_SYSTEM.md's Buttons and
-  // Interaction direction applied to inputs generally.
-  input: {
-    borderBottomWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing.sm,
-    fontSize: typography.body.fontSize,
-    color: colors.textPrimary,
   },
   inputRow: {
     flexDirection: 'row',
@@ -493,5 +540,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: spacing.xs,
+  },
+  planHeader: {
+    gap: spacing.xxs,
+    marginTop: spacing.xs,
+  },
+  planTitle: {
+    ...typography.label,
+    color: colors.textPrimary,
+  },
+  planIntro: {
+    fontSize: typography.caption.fontSize,
+    color: colors.textSecondary,
+  },
+  planField: {
+    gap: spacing.xxs,
+  },
+  // Multiline free text — a soft-bordered rounded box (roomier than the
+  // hairline underline inputs) so a 2-3 line note reads comfortably, per
+  // docs/DESIGN_SYSTEM.md's soft-paper inputs.
+  planInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    minHeight: 56,
+    fontSize: typography.body.fontSize,
+    color: colors.textPrimary,
+    textAlignVertical: 'top',
   },
 });

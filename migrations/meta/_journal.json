@@ -15,6 +15,13 @@
       "when": 1783275494622,
       "tag": "0001_category_icon",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784061596036,
+      "tag": "0002_routine_plan",
+      "breakpoints": true
     }
   ]
 }
