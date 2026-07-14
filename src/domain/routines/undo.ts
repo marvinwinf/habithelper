@@ -52,14 +52,21 @@ export function planUndoCompletion(
     (event) => !event.supersededByEventId && event.occurrenceDate === occurrenceDate,
   );
 
-  const completionEvent = activePriorEvents.find(
+  // Supersede *every* active completion for the day, not just the first.
+  // Idempotent completion (src/services/routineService.ts) prevents new
+  // duplicates, but a single undo must still fully clear the occurrence —
+  // including any duplicate `completed`/`exceeded` (and their `joker_earned`)
+  // events an earlier build's non-idempotent double-tap may have left in a
+  // user's local history — so replay sees no active completion for the date
+  // and recomputes the streak from the ordered log with the day removed.
+  const completionEvents = activePriorEvents.filter(
     (event) => event.eventType === 'completed' || event.eventType === 'exceeded',
   );
-  if (!completionEvent) {
+  if (completionEvents.length === 0) {
     throw new NoCompletionToUndoError(occurrenceDate);
   }
 
-  const jokerEarnedEvent = activePriorEvents.find((event) => event.eventType === 'joker_earned');
+  const jokerEarnedEvents = activePriorEvents.filter((event) => event.eventType === 'joker_earned');
 
   return {
     occurrenceDate,
@@ -67,9 +74,10 @@ export function planUndoCompletion(
       {
         eventType: 'completion_undone',
         occurrenceDate,
-        supersedesEventIds: jokerEarnedEvent
-          ? [completionEvent.id, jokerEarnedEvent.id]
-          : [completionEvent.id],
+        supersedesEventIds: [
+          ...completionEvents.map((event) => event.id),
+          ...jokerEarnedEvents.map((event) => event.id),
+        ],
       },
     ],
     requiresFullRecalculation: true,

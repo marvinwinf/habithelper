@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -43,7 +43,7 @@ import {
   skipRoutineOccurrence,
   undoRoutineCompletion,
 } from '../../src/services/routineService';
-import { deleteTask, moveTask, toggleTaskCompletion } from '../../src/services/taskService';
+import { deleteTask, moveTask, setTaskCompletion } from '../../src/services/taskService';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
 import { getGreeting } from '../../src/domain/greeting';
 import { classifyOccurrence, type OccurrenceState } from '../../src/domain/routines/completion';
@@ -102,21 +102,39 @@ export default function TodayScreen() {
   const streakBurst = useStreakBurst();
   const reducedMotion = useReducedMotion();
   const [allDoneOpacity] = useState(() => new Animated.Value(0));
+  // Monotonic reload token. `loadData` fires many independent queries that
+  // each set their own slice of state; two overlapping reloads (e.g. from
+  // completing several items quickly) could otherwise resolve per-slice out
+  // of order and leave inconsistent state — a task listed as both open and
+  // completed. Each reload captures the token; a query only applies its
+  // result while its reload is still the latest, so a superseded reload's
+  // stale results are dropped.
+  const loadSeq = useRef(0);
 
   const loadData = useCallback(() => {
+    const seq = (loadSeq.current += 1);
+    const guard =
+      <T,>(setter: (value: T) => void) =>
+      (value: T) => {
+        if (seq === loadSeq.current) {
+          setter(value);
+        }
+      };
     const today = todayDateString();
-    listRoutines(db).then((allRoutines) => setRoutines(allRoutines.filter((r) => !r.isPaused)));
-    listCategories(db).then(setCategories);
-    getAppStreakCache(db).then(setAppStreak);
-    listRoutineStateCaches(db).then((rows) =>
-      setRoutineStreaks(Object.fromEntries(rows.map((row) => [row.routineId, row]))),
+    listRoutines(db).then(guard((allRoutines: Routine[]) => setRoutines(allRoutines.filter((r) => !r.isPaused))));
+    listCategories(db).then(guard(setCategories));
+    getAppStreakCache(db).then(guard(setAppStreak));
+    listRoutineStateCaches(db).then(
+      guard((rows: RoutineStateCache[]) =>
+        setRoutineStreaks(Object.fromEntries(rows.map((row) => [row.routineId, row]))),
+      ),
     );
-    ensureProfile(db).then((profile) => setDisplayName(profile.displayName));
-    listOverdueTasks(db, today).then(setOverdueTasks);
-    listTasksForToday(db, today).then(setTasksDueToday);
-    listUpcomingTasks(db, today).then(setUpcomingTasks);
-    listUndatedTasks(db).then(setUndatedTasks);
-    listCompletedTasks(db).then(setCompletedTasks);
+    ensureProfile(db).then(guard((profile) => setDisplayName(profile.displayName)));
+    listOverdueTasks(db, today).then(guard(setOverdueTasks));
+    listTasksForToday(db, today).then(guard(setTasksDueToday));
+    listUpcomingTasks(db, today).then(guard(setUpcomingTasks));
+    listUndatedTasks(db).then(guard(setUndatedTasks));
+    listCompletedTasks(db).then(guard(setCompletedTasks));
   }, []);
 
   // Reload on every focus, not just on mount: this tab stays mounted while
@@ -136,13 +154,22 @@ export default function TodayScreen() {
   // other relevant event carries today's occurrence_date — so the query
   // stays bounded no matter how much history a routine accumulates.
   useEffect(() => {
+    // `cancelled` drops any in-flight event fetch from a superseded run of
+    // this effect, so a stale result can't overwrite a routine's events after
+    // a newer reload (the same out-of-order hazard `loadData` guards against).
+    let cancelled = false;
     const today = todayDateString();
     const yesterday = addDaysToDateString(today, -1);
     routines.forEach((r) => {
       listRoutineEventsInRange(db, r.id, yesterday, today).then((events) => {
-        setEventsByRoutineId((prev) => ({ ...prev, [r.id]: events }));
+        if (!cancelled) {
+          setEventsByRoutineId((prev) => ({ ...prev, [r.id]: events }));
+        }
       });
     });
+    return () => {
+      cancelled = true;
+    };
   }, [routines]);
 
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
@@ -225,7 +252,10 @@ export default function TodayScreen() {
   }
 
   async function handleToggleTaskComplete(taskItem: Task) {
-    await toggleTaskCompletion(db, taskItem.id);
+    // Explicit target from the rendered row, not a re-read of the DB: setting
+    // the completion this card already shows is a no-op, so a repeated tap
+    // can never flip a just-checked task back off.
+    await setTaskCompletion(db, taskItem.id, !taskItem.isCompleted);
     reloadWithListSettle();
   }
 

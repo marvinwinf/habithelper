@@ -129,6 +129,27 @@ function recomputeAppStreakCacheOnCompletionTx(tx: RoutineServiceTx, occurrenceD
   tx.update(appStreakCache).set(cache).where(eq(appStreakCache.id, APP_STREAK_CACHE_ID)).run();
 }
 
+/**
+ * The active (non-superseded) `completed`/`exceeded` event for this routine's
+ * occurrence on `occurrenceDate`, if one exists. A routine occurrence has at
+ * most one effective completion per local calendar day
+ * (docs/ROUTINE_RULES.md), so this is what makes the completion write
+ * idempotent — see `writeCompletionEventTx`.
+ */
+function findActiveCompletionEventTx(
+  tx: RoutineServiceTx,
+  routineId: string,
+  occurrenceDate: string,
+): RoutineEvent | undefined {
+  const events = tx.select().from(routineEvent).where(eq(routineEvent.routineId, routineId)).all();
+  return events.find(
+    (event) =>
+      !event.supersededByEventId &&
+      event.occurrenceDate === occurrenceDate &&
+      (event.eventType === 'completed' || event.eventType === 'exceeded'),
+  );
+}
+
 /** Whether any non-deleted routine has an active (non-superseded) completed/exceeded event on `date`. */
 function hasAnyActiveCompletionOnDateTx(tx: RoutineServiceTx, date: string): boolean {
   const routines = tx.select().from(routine).where(isNull(routine.deletedAt)).all();
@@ -281,6 +302,19 @@ function writeCompletionEventTx(
   eventType: 'completed' | 'exceeded',
 ): CompletionResult {
   return db.transaction((tx) => {
+    // Idempotent by design: if this occurrence already has an active
+    // completion, a repeated tap — or a rapid double-tap racing the Today
+    // screen's async reload, where the card is still rendered as pending —
+    // must not write a second `completed`/`exceeded` event. Replay would
+    // otherwise fold both (docs/DATA_MODEL.md's Streak and Joker Source
+    // Data), double-counting the streak, level progress, and joker-earning
+    // for a single calendar day. No new event, no cache change: return the
+    // completion already on record, and never a spurious `leveledUp`.
+    const existingCompletion = findActiveCompletionEventTx(tx, routineId, occurrenceDate);
+    if (existingCompletion) {
+      return { event: existingCompletion, leveledUp: false };
+    }
+
     const [previousCache] = tx
       .select()
       .from(routineStateCache)

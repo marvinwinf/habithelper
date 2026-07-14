@@ -41,11 +41,36 @@ export async function editTask(db: TaskServiceDb, id: string, input: TaskUpdateI
 }
 
 /**
- * Completes an incomplete task, or undoes an already-completed one — the
- * completion control also serves as undo (docs/SCREEN_SPECIFICATIONS.md),
- * so this decides which based on current state rather than the caller
- * having to track it. Completing sets `is_completed`/`completed_at`;
- * undoing clears both.
+ * Sets a task's completion to an explicit target state, idempotently. The
+ * caller passes the target it wants (typically `!task.isCompleted` derived
+ * from the row it just rendered), so no stale DB read decides the outcome and
+ * calling it repeatedly with the same target is a harmless no-op. This is what
+ * keeps a repeated tap — or one racing the screen's async reload, where the
+ * card still shows the pre-tap state — from flipping a just-checked task back
+ * off. Completing sets `is_completed`/`completed_at`; un-completing clears both.
+ */
+export async function setTaskCompletion(
+  db: TaskServiceDb,
+  id: string,
+  isCompleted: boolean,
+  now: string = new Date().toISOString(),
+): Promise<Task> {
+  const existing = await getTask(db, id);
+  if (!existing) {
+    throw new TaskNotFoundError(id);
+  }
+  if (existing.isCompleted === isCompleted) {
+    return existing;
+  }
+  return isCompleted ? completeTask(db, id, now) : undoTaskCompletion(db, id);
+}
+
+/**
+ * Toggles a task's completion off its current persisted state — the
+ * completion control also serves as undo (docs/SCREEN_SPECIFICATIONS.md).
+ * Prefer `setTaskCompletion` from UI handlers, which pass an explicit target
+ * and so avoid the read-then-flip race; this remains for callers that
+ * genuinely want "flip whatever it is now".
  */
 export async function toggleTaskCompletion(
   db: TaskServiceDb,
@@ -56,7 +81,7 @@ export async function toggleTaskCompletion(
   if (!existing) {
     throw new TaskNotFoundError(id);
   }
-  return existing.isCompleted ? undoTaskCompletion(db, id) : completeTask(db, id, now);
+  return setTaskCompletion(db, id, !existing.isCompleted, now);
 }
 
 /**
