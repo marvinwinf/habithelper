@@ -57,12 +57,14 @@ import { triggerFirstCompletionOfDayHaptic } from '../../src/ui/animation/haptic
 import { animateListSettle } from '../../src/ui/animation/listTransitions';
 import { mountStaggerDelayMs } from '../../src/ui/animation/useMountAnimation';
 import { useReducedMotion } from '../../src/ui/animation/useReducedMotion';
+import { useRewardToast } from '../../src/ui/animation/useRewardToast';
 import { useStreakBurst } from '../../src/ui/animation/useStreakBurst';
 import { Button } from '../../src/ui/components/Button';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { FocusOfTheDayCard } from '../../src/ui/components/FocusOfTheDayCard';
 import { ProgressBar } from '../../src/ui/components/ProgressBar';
 import { ReorderableList } from '../../src/ui/components/ReorderableList';
+import { RewardToast } from '../../src/ui/components/RewardToast';
 import { RoutineCard, type RoutineCardOccurrenceState } from '../../src/ui/components/RoutineCard';
 import { Sheet } from '../../src/ui/components/Sheet';
 import { TaskCard } from '../../src/ui/components/TaskCard';
@@ -101,6 +103,7 @@ export default function TodayScreen() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const streakBurst = useStreakBurst();
   const reducedMotion = useReducedMotion();
+  const rewardToast = useRewardToast(reducedMotion);
   const [allDoneOpacity] = useState(() => new Animated.Value(0));
   // Monotonic reload token. `loadData` fires many independent queries that
   // each set their own slice of state; two overlapping reloads (e.g. from
@@ -283,6 +286,17 @@ export default function TodayScreen() {
     }
   }
 
+  // "Make it satisfying" — briefly surfaces the routine's own reward
+  // ("Belohnung") when it is actually completed (complete or exceed, never
+  // undo/skip). Purely a gentle acknowledgement: it never blocks, confirms,
+  // or measures whether the reward happened (docs/DATA_MODEL.md's routine
+  // plan fields). Only routines that set a reward show anything.
+  function maybeShowReward(completedRoutine: Routine) {
+    if (completedRoutine.reward) {
+      rewardToast.showReward(completedRoutine.reward);
+    }
+  }
+
   // The first-completion-of-day flourish (T041) is a gold underline drawing
   // in and back out beneath the streak numeral, not a scale burst — matching
   // CompletionControl's underline draw-in (docs/DESIGN_SYSTEM.md's Motion
@@ -436,6 +450,7 @@ export default function TodayScreen() {
                             routine.id,
                             todayDateString(),
                           );
+                          maybeShowReward(routine);
                           reloadWithListSettle();
                           return result.leveledUp;
                         }}
@@ -446,6 +461,7 @@ export default function TodayScreen() {
                             routine.id,
                             todayDateString(),
                           );
+                          maybeShowReward(routine);
                           reloadWithListSettle();
                           return result.leveledUp;
                         }}
@@ -576,6 +592,12 @@ export default function TodayScreen() {
         <Button label="Schließen" onPress={() => setNotificationsOpen(false)} />
       </View>
     </Sheet>
+
+    <RewardToast
+      message={rewardToast.message}
+      opacity={rewardToast.opacity}
+      testID="today-reward-toast"
+    />
     </>
   );
 }

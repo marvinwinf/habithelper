@@ -122,6 +122,13 @@ const dailyRoutine = {
 
 const pausedRoutine = { ...dailyRoutine, id: 'routine-paused', name: 'Meditieren', isPaused: true };
 
+const rewardRoutine = {
+  ...dailyRoutine,
+  id: 'routine-reward',
+  name: 'Lesen',
+  reward: 'Danach ein Kaffee',
+};
+
 function makeTask(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: 'task-1',
@@ -338,6 +345,32 @@ describe('TodayScreen', () => {
     await fireEvent(control, 'pressOut');
 
     expect(completeRoutineOccurrence).toHaveBeenCalledWith({}, dailyRoutine.id, TODAY);
+  });
+
+  it('shows the reward toast when completing a routine that has a reward set', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([rewardRoutine]);
+
+    await renderToday();
+    const control = await screen.findByTestId(`routine-card-${rewardRoutine.id}-complete`);
+
+    await fireEvent(control, 'pressIn');
+    await fireEvent(control, 'pressOut');
+
+    const toastText = await screen.findByTestId('today-reward-toast-text');
+    expect(toastText.props.children).toBe('Danach ein Kaffee');
+  });
+
+  it('shows no reward toast when the completed routine has no reward', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
+
+    await renderToday();
+    const control = await screen.findByTestId(`routine-card-${dailyRoutine.id}-complete`);
+
+    await fireEvent(control, 'pressIn');
+    await fireEvent(control, 'pressOut');
+
+    expect(completeRoutineOccurrence).toHaveBeenCalledWith({}, dailyRoutine.id, TODAY);
+    expect(screen.queryByTestId('today-reward-toast')).toBeNull();
   });
 
   it('moves a routine to tomorrow from the actions sheet', async () => {
