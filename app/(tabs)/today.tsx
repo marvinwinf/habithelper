@@ -46,6 +46,7 @@ import {
 import { deleteTask, moveTask, setTaskCompletion } from '../../src/services/taskService';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
 import { getGreeting } from '../../src/domain/greeting';
+import { greetingSubtitle } from '../../src/domain/greetingSubtitle';
 import { classifyOccurrence, type OccurrenceState } from '../../src/domain/routines/completion';
 import { scheduleFromRoutineRow } from '../../src/domain/routines/schedule';
 import { isFirstCompletionOfDay } from '../../src/domain/streaks/appStreak';
@@ -53,9 +54,14 @@ import { compareByDateThenTime } from '../../src/domain/tasks/ordering';
 import { isDueTodayOrEarlier } from '../../src/domain/tasks/section';
 import { focusOfTheDay } from '../../src/domain/focusOfTheDay';
 import { confirmRoutineDeletion, confirmTaskDeletion } from '../../src/ui/alerts';
-import { triggerFirstCompletionOfDayHaptic } from '../../src/ui/animation/haptics';
+import { POP_EASING } from '../../src/ui/animation/constants';
+import {
+  triggerAllRoutinesDoneHaptic,
+  triggerFirstCompletionOfDayHaptic,
+} from '../../src/ui/animation/haptics';
 import { animateListSettle } from '../../src/ui/animation/listTransitions';
 import { mountStaggerDelayMs } from '../../src/ui/animation/useMountAnimation';
+import { useAnimatedNumber } from '../../src/ui/animation/useAnimatedNumber';
 import { useReducedMotion } from '../../src/ui/animation/useReducedMotion';
 import { useRewardToast } from '../../src/ui/animation/useRewardToast';
 import { useStreakBurst } from '../../src/ui/animation/useStreakBurst';
@@ -108,7 +114,12 @@ export default function TodayScreen() {
   const streakBurst = useStreakBurst();
   const reducedMotion = useReducedMotion();
   const rewardToast = useRewardToast(reducedMotion);
-  const [allDoneOpacity] = useState(() => new Animated.Value(0));
+  const [allDoneProgress] = useState(() => new Animated.Value(0));
+  // True only between a completion the user just performed and the next
+  // all-done evaluation: gates the all-done haptic so it fires when a
+  // completion actually finishes the day, never when the screen merely
+  // loads with everything already done.
+  const completionJustHappened = useRef(false);
   // Scroll offset of the content below the pinned header. Only feeds the
   // header divider's opacity — the header itself never moves or collapses
   // (docs/SCREEN_SPECIFICATIONS.md's Today Header: the block up to and
@@ -315,14 +326,24 @@ export default function TodayScreen() {
     outputRange: [0, 1, 0],
   });
 
+  // The streak numeral rolls to its value instead of snapping: counts up
+  // from 0 when the cache loads on open, ticks over when the day's first
+  // completion advances it, and rolls back on an undo.
+  const displayedAppStreak = useAnimatedNumber(appStreak?.currentStreak ?? 0, reducedMotion);
+
   const completedRoutineCount = dueRoutines.filter(
     ({ state }) => state === 'completed' || state === 'exceeded',
   ).length;
-  // The day's quiet milestone: every due routine done. The count label
-  // cross-fades into a gentle acknowledgement — fade-only, no confetti, per
-  // docs/DESIGN_SYSTEM.md's Gamification and Motion sections.
+  // The day's quiet milestone: every due routine done. The count label gives
+  // way to a gentle acknowledgement (fade + subtle settle, see the all-done
+  // effect below) — no confetti, per docs/DESIGN_SYSTEM.md's Gamification
+  // and Motion sections.
   const allRoutinesDone = dueRoutines.length > 0 && completedRoutineCount === dueRoutines.length;
-  const greeting = getGreeting(new Date().getHours(), displayName);
+  const currentHour = new Date().getHours();
+  const greeting = getGreeting(currentHour, displayName);
+  // Rotates daily within the greeting's own time-of-day pool, so opening the
+  // app doesn't read the exact same two lines every single day.
+  const subtitle = greetingSubtitle(todayDateString(), currentHour);
   const formattedDate = DATE_FORMATTER.format(new Date());
 
   const focusPrompt = focusOfTheDay(todayDateString());
@@ -338,17 +359,27 @@ export default function TodayScreen() {
     extrapolate: 'clamp',
   });
 
+  // The acknowledgement arrives with the shared gentle pop (fade + a small
+  // overshoot-and-settle scale, POP_EASING — the same subtle-spring signature
+  // as completion), and a soft Success haptic when a user completion just
+  // finished the day. Loading the screen with everything already done plays
+  // only the visual, never the haptic.
   useEffect(() => {
     if (allRoutinesDone) {
-      Animated.timing(allDoneOpacity, {
+      Animated.timing(allDoneProgress, {
         toValue: 1,
         duration: reducedMotion ? 0 : 300,
+        easing: POP_EASING,
         useNativeDriver: true,
       }).start();
+      if (completionJustHappened.current) {
+        triggerAllRoutinesDoneHaptic();
+      }
     } else {
-      allDoneOpacity.setValue(0);
+      allDoneProgress.setValue(0);
     }
-  }, [allRoutinesDone, allDoneOpacity, reducedMotion]);
+    completionJustHappened.current = false;
+  }, [allRoutinesDone, allDoneProgress, reducedMotion]);
 
   return (
     <View style={styles.screen}>
@@ -385,7 +416,9 @@ export default function TodayScreen() {
             <Text style={styles.greeting} testID="today-greeting">
               {greeting}
             </Text>
-            <Text style={styles.greetingSubtitle}>Kleine Schritte, sanfter Schwung.</Text>
+            <Text style={styles.greetingSubtitle} testID="today-greeting-subtitle">
+              {subtitle}
+            </Text>
             <Text style={styles.date} testID="today-date">
               {formattedDate}
             </Text>
@@ -399,7 +432,7 @@ export default function TodayScreen() {
                 in exactly beneath the number — not the whole label block. */}
             <View style={styles.streakValueWrap}>
               <Text style={styles.streakValue} testID="today-app-streak">
-                {appStreak?.currentStreak ?? 0}
+                {displayedAppStreak}
               </Text>
               <Animated.View
                 style={[styles.streakUnderline, { transform: [{ scaleX: streakUnderlineScale }] }]}
@@ -413,7 +446,21 @@ export default function TodayScreen() {
             <Text style={styles.progressTitle}>Heutige Routinen</Text>
             {allRoutinesDone ? (
               <Animated.Text
-                style={[styles.progressCount, styles.progressAllDone, { opacity: allDoneOpacity }]}
+                style={[
+                  styles.progressCount,
+                  styles.progressAllDone,
+                  {
+                    opacity: allDoneProgress,
+                    transform: [
+                      {
+                        scale: allDoneProgress.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.9, 1],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
                 testID="today-routine-progress"
               >
                 Alle erledigt ✓
@@ -487,6 +534,7 @@ export default function TodayScreen() {
                             routine.id,
                             todayDateString(),
                           );
+                          completionJustHappened.current = true;
                           maybeShowReward(routine);
                           reloadWithListSettle();
                           return result.leveledUp;
@@ -498,6 +546,7 @@ export default function TodayScreen() {
                             routine.id,
                             todayDateString(),
                           );
+                          completionJustHappened.current = true;
                           maybeShowReward(routine);
                           reloadWithListSettle();
                           return result.leveledUp;

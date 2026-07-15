@@ -22,3 +22,11 @@ export function triggerFirstCompletionOfDayHaptic(): Promise<void> {
 export function triggerLevelMilestoneHaptic(): Promise<void> {
   return Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 }
+
+// The day's quiet milestone: every due routine done. Uses the celebratory
+// Success notification (like first-of-day) — fired only when a completion
+// the user just performed finished the day, never when the Today screen
+// merely loads in an already-finished state.
+export function triggerAllRoutinesDoneHaptic(): Promise<void> {
+  return Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+}

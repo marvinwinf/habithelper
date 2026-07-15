@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from './Button';
+import { CardSheen } from './CardSheen';
 import { CompletionControl } from './CompletionControl';
 import { IconBadge } from './IconBadge';
 import { Sheet } from './Sheet';
@@ -108,6 +109,9 @@ export function TaskCard({
           ]}
           testID={testID}
         >
+          {/* Soft light-gradient over the category tint so the card reads as
+              gently lit paper rather than a flat color block. */}
+          {variant && <CardSheen testID={testID ? `${testID}-sheen` : undefined} />}
           <IconBadge
             name={categoryIconName(category?.icon)}
             backgroundColor={solidFill?.background}

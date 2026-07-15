@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react-native';
+import { act, render, screen } from '@testing-library/react-native';
 
 import { ProgressBar } from '../ProgressBar';
 import { colors } from '../../theme';
@@ -55,5 +55,27 @@ describe('ProgressBar', () => {
       : fill.props.style;
 
     expect(style.backgroundColor).toBe(colors.destructive);
+  });
+
+  it('draws the fill in from zero on mount rather than starting pre-filled', async () => {
+    await render(<ProgressBar value={0.5} testID="progress" />);
+
+    // The width is either an already-resolved '<n>%' string or a live
+    // AnimatedInterpolation, depending on how the renderer applied it.
+    const widthAt = () => {
+      const fill = screen.getByTestId('progress-fill');
+      const style = Array.isArray(fill.props.style)
+        ? Object.assign({}, ...fill.props.style.filter(Boolean))
+        : fill.props.style;
+      return typeof style.width === 'string' ? style.width : style.width.__getValue();
+    };
+
+    expect(widthAt()).toBe('0%');
+
+    await act(() => {
+      jest.advanceTimersByTime(400);
+    });
+
+    expect(widthAt()).toBe('50%');
   });
 });

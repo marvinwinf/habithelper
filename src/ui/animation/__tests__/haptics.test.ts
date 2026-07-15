@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 
 import {
+  triggerAllRoutinesDoneHaptic,
   triggerExceededCompletionHaptic,
   triggerFirstCompletionOfDayHaptic,
   triggerLevelMilestoneHaptic,
@@ -31,6 +32,13 @@ describe('haptics', () => {
 
   it('triggers a success notification for the first completion of the day', () => {
     triggerFirstCompletionOfDayHaptic();
+    expect(Haptics.notificationAsync).toHaveBeenCalledWith(
+      Haptics.NotificationFeedbackType.Success
+    );
+  });
+
+  it('triggers a success notification for the all-routines-done milestone', () => {
+    triggerAllRoutinesDoneHaptic();
     expect(Haptics.notificationAsync).toHaveBeenCalledWith(
       Haptics.NotificationFeedbackType.Success
     );

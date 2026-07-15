@@ -1,5 +1,6 @@
 import { colors, colorsDark } from '../index';
-import { categoryPalette, getCategorySolidFill } from '../categoryVariant';
+import { categoryPalette, getCategoryColorVariant, getCategorySolidFill } from '../categoryVariant';
+import { CARD_SHEEN_MAX_OPACITY } from '../../components/CardSheen';
 
 // WCAG 2.1 relative luminance + contrast ratio, so the documented token
 // pairings (docs/ACCESSIBILITY.md) stay regression-proof: a future tweak to a
@@ -95,6 +96,42 @@ describe('token contrast (WCAG AA)', () => {
   it('keeps the destructive terracotta above AA for small text on every light surface', () => {
     for (const surface of ['background', 'surface', 'surfaceMuted'] as const) {
       expect(contrastRatio(colors.destructive, colors[surface])).toBeGreaterThanOrEqual(NORMAL);
+    }
+  });
+
+  // The card sheen (CardSheen) lays `surface` over a category tint at up to
+  // CARD_SHEEN_MAX_OPACITY. Because it only ever lightens the light pastel
+  // tints, every text/glyph token rendered on a tinted card must keep at
+  // least the contrast it has on the flat tint — this pins that invariant so
+  // a future sheen color/opacity change can't quietly cost readability.
+  it('never lowers text contrast on any category tint under the card sheen', () => {
+    const blendOver = (fg: string, alpha: number, bg: string): string => {
+      const parse = (hex: string) => {
+        const v = hex.replace('#', '');
+        return [
+          parseInt(v.slice(0, 2), 16),
+          parseInt(v.slice(2, 4), 16),
+          parseInt(v.slice(4, 6), 16),
+        ];
+      };
+      const [f, b] = [parse(fg), parse(bg)];
+      return `#${f
+        .map((c, i) => Math.round(c * alpha + b[i] * (1 - alpha)).toString(16).padStart(2, '0'))
+        .join('')}`;
+    };
+    const renderedTokens = ['textPrimary', 'textSecondary', 'destructive', 'accent'] as const;
+
+    for (const family of Object.keys(categoryPalette) as (keyof typeof categoryPalette)[]) {
+      // Seeds 0–3 cover every variant recipe.
+      for (let seed = 0; seed < 4; seed += 1) {
+        const tint = getCategoryColorVariant(categoryPalette[family].base, seed).background;
+        const underSheen = blendOver(colors.surface, CARD_SHEEN_MAX_OPACITY, tint);
+        for (const token of renderedTokens) {
+          expect(contrastRatio(colors[token], underSheen)).toBeGreaterThanOrEqual(
+            contrastRatio(colors[token], tint),
+          );
+        }
+      }
     }
   });
 

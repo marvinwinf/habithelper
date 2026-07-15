@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { TaskCard } from '../TaskCard';
 import { todayDateString } from '../../../domain/dates';
+import { categoryPalette } from '../../theme/categoryVariant';
 
 const task = {
   id: 'task-1',
@@ -47,6 +48,18 @@ describe('TaskCard', () => {
     await renderCard({ task: { ...task, isCompleted: true } });
 
     expect(screen.getByTestId('task-card-toggle').props.accessibilityState.checked).toBe(true);
+  });
+
+  it('lays the light sheen over a category-tinted card, and omits it without a category', async () => {
+    await renderCard({
+      category: { name: 'Haushalt', baseColor: categoryPalette.apricot.base },
+    });
+    expect(screen.getByTestId('task-card-sheen')).toBeTruthy();
+  });
+
+  it('renders no sheen on an untinted card', async () => {
+    await renderCard();
+    expect(screen.queryByTestId('task-card-sheen')).toBeNull();
   });
 
   it('shows an overdue label when marked overdue', async () => {

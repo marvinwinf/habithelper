@@ -6,6 +6,7 @@ import {
   triggerLevelMilestoneHaptic,
   triggerRoutineCompletionHaptic,
 } from '../../animation/haptics';
+import { categoryPalette } from '../../theme/categoryVariant';
 
 jest.mock('../../animation/haptics', () => ({
   triggerRoutineCompletionHaptic: jest.fn(),
@@ -57,6 +58,18 @@ describe('RoutineCard', () => {
 
   afterEach(() => {
     jest.useRealTimers();
+  });
+
+  it('lays the light sheen over a category-tinted card, and omits it without a category', async () => {
+    await renderCard({
+      category: { name: 'Gesundheit', baseColor: categoryPalette.mint.base },
+    });
+    expect(screen.getByTestId('routine-card-sheen')).toBeTruthy();
+  });
+
+  it('renders no sheen on an untinted card', async () => {
+    await renderCard();
+    expect(screen.queryByTestId('routine-card-sheen')).toBeNull();
   });
 
   it('completes on a tap and exceeds on a long press, exactly once each', async () => {

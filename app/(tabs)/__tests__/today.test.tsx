@@ -5,6 +5,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import TodayScreen from '../today';
 import { todayDateString } from '../../../src/domain/dates';
 import { focusOfTheDay } from '../../../src/domain/focusOfTheDay';
+import { greetingSubtitle } from '../../../src/domain/greetingSubtitle';
 import { listCategories } from '../../../src/data/repositories/categoryRepository';
 import { listRoutines, softDeleteRoutine } from '../../../src/data/repositories/routineRepository';
 import { listRoutineEventsInRange } from '../../../src/data/repositories/routineEventRepository';
@@ -27,7 +28,10 @@ import {
   undoRoutineCompletion,
 } from '../../../src/services/routineService';
 import { deleteTask, moveTask, setTaskCompletion } from '../../../src/services/taskService';
-import { triggerFirstCompletionOfDayHaptic } from '../../../src/ui/animation/haptics';
+import {
+  triggerAllRoutinesDoneHaptic,
+  triggerFirstCompletionOfDayHaptic,
+} from '../../../src/ui/animation/haptics';
 
 jest.mock('../../../src/data/db/client', () => ({ db: {} }));
 jest.mock('../../../src/data/repositories/categoryRepository', () => ({
@@ -74,6 +78,7 @@ jest.mock('../../../src/ui/animation/haptics', () => ({
   triggerExceededCompletionHaptic: jest.fn(),
   triggerFirstCompletionOfDayHaptic: jest.fn(),
   triggerLevelMilestoneHaptic: jest.fn(),
+  triggerAllRoutinesDoneHaptic: jest.fn(),
 }));
 jest.mock('../../../src/domain/dates', () => {
   const actual = jest.requireActual('../../../src/domain/dates');
@@ -186,7 +191,11 @@ describe('TodayScreen', () => {
 
     await renderToday();
 
-    expect(await screen.findByTestId('today-app-streak')).toHaveTextContent('5');
+    // The numeral counts up to the cached value instead of snapping, so wait
+    // for the roll to land on it.
+    await waitFor(() =>
+      expect(screen.getByTestId('today-app-streak')).toHaveTextContent('5'),
+    );
     expect(screen.getByText('Gesamt-Streak')).toBeTruthy();
   });
 
@@ -205,6 +214,17 @@ describe('TodayScreen', () => {
     await renderToday();
 
     expect(await screen.findByTestId('today-greeting')).toHaveTextContent('Guten Morgen, Marvin');
+  });
+
+  it("shows the rotating subtitle line for today's date and time of day", async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([]);
+    jest.spyOn(Date.prototype, 'getHours').mockReturnValue(8);
+
+    await renderToday();
+
+    expect(screen.getByTestId('today-greeting-subtitle')).toHaveTextContent(
+      greetingSubtitle(TODAY, 8),
+    );
   });
 
   it('shows the daily routine progress as completed/total with a partly filled progress bar', async () => {
@@ -264,6 +284,45 @@ describe('TodayScreen', () => {
     expect(
       screen.getByTestId('today-routine-progress-bar').props.accessibilityValue.now,
     ).toBe(100);
+    // Loading into an already-finished day plays only the visual
+    // acknowledgement — the haptic is reserved for the completion that
+    // actually finishes the day.
+    expect(triggerAllRoutinesDoneHaptic).not.toHaveBeenCalled();
+  });
+
+  it('fires the all-done haptic when a completion finishes the last due routine', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
+    let completed = false;
+    (completeRoutineOccurrence as jest.Mock).mockImplementation(() => {
+      completed = true;
+      return Promise.resolve({ event: undefined, leveledUp: false });
+    });
+    (listRoutineEventsInRange as jest.Mock).mockImplementation(() =>
+      Promise.resolve(
+        completed
+          ? [
+              {
+                id: 'event-1',
+                routineId: dailyRoutine.id,
+                occurrenceDate: TODAY,
+                eventType: 'completed',
+                recordedAt: TODAY,
+                movedToDate: null,
+                skipReason: null,
+                supersededByEventId: null,
+              },
+            ]
+          : [],
+      ),
+    );
+
+    await renderToday();
+    const control = await screen.findByTestId(`routine-card-${dailyRoutine.id}-complete`);
+    await fireEvent(control, 'pressIn');
+    await fireEvent(control, 'pressOut');
+
+    await screen.findByText('Alle erledigt ✓');
+    expect(triggerAllRoutinesDoneHaptic).toHaveBeenCalledTimes(1);
   });
 
   it('shows a pending due routine and excludes a paused one', async () => {

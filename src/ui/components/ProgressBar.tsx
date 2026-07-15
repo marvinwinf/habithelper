@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 
+import { useReducedMotion } from '../animation/useReducedMotion';
 import { colors, radius, spacing } from '../theme';
 
 export interface ProgressBarProps {
@@ -28,15 +29,21 @@ export function ProgressBar({
   testID,
 }: ProgressBarProps) {
   const clampedValue = clamp01(value);
-  const [widthAnim] = useState(() => new Animated.Value(clampedValue));
+  const reducedMotion = useReducedMotion();
+  // Starts at 0 so the fill draws in to its value on mount — the bar arrives
+  // alive rather than pre-filled — and every later value change animates the
+  // same way. Reduced motion collapses both to an instant jump (the Motion
+  // section's rule); accessibilityValue below always reports the target
+  // value, never the animated one.
+  const [widthAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.timing(widthAnim, {
       toValue: clampedValue,
-      duration: FILL_ANIMATION_DURATION_MS,
+      duration: reducedMotion ? 0 : FILL_ANIMATION_DURATION_MS,
       useNativeDriver: false, // width is a layout property
     }).start();
-  }, [clampedValue, widthAnim]);
+  }, [clampedValue, widthAnim, reducedMotion]);
 
   return (
     <View
