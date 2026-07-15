@@ -1,6 +1,6 @@
 import { Alert } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 import TodayScreen from '../today';
 import { todayDateString } from '../../../src/domain/dates';
@@ -549,6 +549,27 @@ describe('TodayScreen', () => {
     await fireEvent(screen.getByTestId(`routine-card-${routineA.id}-complete`), 'pressIn');
     await fireEvent(screen.getByTestId(`routine-card-${routineA.id}-complete`), 'pressOut');
     await waitFor(() => expect(triggerFirstCompletionOfDayHaptic).toHaveBeenCalledTimes(2));
+  });
+
+  it('pins the header (greeting, streak, daily progress) above the scrolling content', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
+
+    await renderToday();
+
+    // Everything up to and including "Heutige Routinen" lives in the pinned
+    // block, outside the ScrollView…
+    const header = await screen.findByTestId('today-sticky-header');
+    expect(within(header).getByTestId('today-greeting')).toBeTruthy();
+    expect(within(header).getByTestId('today-app-streak')).toBeTruthy();
+    expect(within(header).getByTestId('today-routine-progress')).toBeTruthy();
+    expect(within(header).getByTestId('today-routine-progress-bar')).toBeTruthy();
+    expect(within(header).getByTestId('today-header-divider')).toBeTruthy();
+
+    // …while the Focus card and the routine list scroll underneath it.
+    const scroll = screen.getByTestId('today-scroll');
+    expect(within(scroll).queryByTestId('today-routine-progress')).toBeNull();
+    expect(within(scroll).getByTestId('today-focus-of-the-day')).toBeTruthy();
+    expect(within(scroll).getByTestId('today-section-routines')).toBeTruthy();
   });
 
   it('shows the Focus of the day card with the prompt for today', async () => {

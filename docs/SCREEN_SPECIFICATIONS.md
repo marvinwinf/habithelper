@@ -34,6 +34,7 @@ Sections must not all carry equal visual weight — spacing, type size/weight, a
 
 ### Header
 
+- The whole header block — everything up to and including the "Heutige Routinen" daily-progress row — stays pinned above the scrolling content; the Focus card, routines, and tasks scroll underneath it. The header never moves or collapses. At rest it sits flush on the background with no visible edge; a soft, low-contrast full-width divider fades in (scroll-linked, not timed) only while content is actually beneath it.
 - Leading shortcuts icon (opens a small sheet linking to Kategorien verwalten and Me); trailing bell icon (placeholder only — opens a small sheet noting notifications aren't available yet; carries no push-notification functionality, per `docs/MVP_SCOPE.md`).
 - Time-based greeting, for example "Guten Morgen, Marvin", with a short static subtitle line under it.
 - Current date.

@@ -77,6 +77,10 @@ const DATE_FORMATTER = new Intl.DateTimeFormat('de-DE', {
   year: 'numeric',
 });
 
+// Animated wrapper so the pinned header's divider can track the scroll
+// offset natively (see headerDividerOpacity below).
+const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
+
 interface DueRoutine {
   routine: Routine;
   state: RoutineCardOccurrenceState;
@@ -105,6 +109,11 @@ export default function TodayScreen() {
   const reducedMotion = useReducedMotion();
   const rewardToast = useRewardToast(reducedMotion);
   const [allDoneOpacity] = useState(() => new Animated.Value(0));
+  // Scroll offset of the content below the pinned header. Only feeds the
+  // header divider's opacity — the header itself never moves or collapses
+  // (docs/SCREEN_SPECIFICATIONS.md's Today Header: the block up to and
+  // including "Heutige Routinen" stays pinned above the scrolling content).
+  const [scrollY] = useState(() => new Animated.Value(0));
   // Monotonic reload token. `loadData` fires many independent queries that
   // each set their own slice of state; two overlapping reloads (e.g. from
   // completing several items quickly) could otherwise resolve per-slice out
@@ -318,6 +327,17 @@ export default function TodayScreen() {
 
   const focusPrompt = focusOfTheDay(todayDateString());
 
+  // The pinned header sits flush on the same background as the content, so
+  // at rest nothing marks it off — the reading order is carried by
+  // whitespace as before. Only once content actually slides underneath does
+  // a soft, low-contrast divider fade in to separate the layers. Scroll-
+  // linked (not timed), so it needs no reduced-motion branch.
+  const headerDividerOpacity = scrollY.interpolate({
+    inputRange: [0, spacing.md],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
   useEffect(() => {
     if (allRoutinesDone) {
       Animated.timing(allDoneOpacity, {
@@ -331,8 +351,11 @@ export default function TodayScreen() {
   }, [allRoutinesDone, allDoneOpacity, reducedMotion]);
 
   return (
-    <>
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <View style={styles.screen}>
+    {/* Pinned above the scrolling content: everything up to and including
+        the "Heutige Routinen" progress block stays visible while routines
+        and tasks scroll underneath. */}
+    <View style={styles.stickyHeader} testID="today-sticky-header">
       <View style={styles.header}>
         <View style={styles.iconRow}>
           <Pressable
@@ -407,7 +430,21 @@ export default function TodayScreen() {
           />
         </View>
       </View>
+      <Animated.View
+        style={[styles.headerDivider, { opacity: headerDividerOpacity }]}
+        testID="today-header-divider"
+      />
+    </View>
 
+    <AnimatedScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.content}
+      onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+        useNativeDriver: true,
+      })}
+      scrollEventThrottle={16}
+      testID="today-scroll"
+    >
       <FocusOfTheDayCard prompt={focusPrompt} testID="today-focus-of-the-day" />
 
       {dueRoutines.length === 0 && todayTasks.length === 0 && laterTasks.length === 0 ? (
@@ -554,7 +591,7 @@ export default function TodayScreen() {
           )}
         </View>
       )}
-    </ScrollView>
+    </AnimatedScrollView>
 
     <Sheet
       visible={shortcutsOpen}
@@ -598,7 +635,7 @@ export default function TodayScreen() {
       opacity={rewardToast.opacity}
       testID="today-reward-toast"
     />
-    </>
+    </View>
   );
 }
 
@@ -607,13 +644,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  // The pinned block and the scroll content split the old lg section gap
+  // (sm + md = lg) so the rest state looks exactly as before the header was
+  // pinned — the reading order (greeting → progress → focus → routines →
+  // tasks) is still carried by whitespace, not dividers
+  // (docs/DESIGN_SYSTEM.md's Whitespace and Rhythm).
+  stickyHeader: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.background,
+  },
+  // Full-bleed soft edge under the pinned header; invisible at rest and
+  // faded in by scroll offset only while content is actually underneath.
+  headerDivider: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  scroll: {
+    flex: 1,
+  },
   content: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
     paddingBottom: spacing.xl,
-    // Even, generous rhythm between the header, the Focus card, and the
-    // section list so each reads as its own calm block — the reading order
-    // (greeting → progress → focus → routines → tasks) is carried by
-    // whitespace, not dividers (docs/DESIGN_SYSTEM.md's Whitespace and Rhythm).
     gap: spacing.lg,
   },
   header: {
