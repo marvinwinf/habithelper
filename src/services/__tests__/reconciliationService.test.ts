@@ -28,7 +28,10 @@ async function completeConsecutiveDays(
 ): Promise<string> {
   let date = startDate;
   for (let i = 0; i < count; i++) {
-    await completeRoutineOccurrence(db, routineId, date);
+    // Each completion is recorded as if that day were "today", so the app
+    // streak replay treats it as an in-progress completion rather than a
+    // long-elapsed one.
+    await completeRoutineOccurrence(db, routineId, date, date);
     date = addDaysToDateString(date, 1);
   }
   return date;
@@ -104,7 +107,7 @@ describe('reconciliationService', () => {
     const { db, sqlite } = await createDrizzleTestDb();
     const created = await createRoutine(db, baseInput);
 
-    await completeRoutineOccurrence(db, created.id, '2026-07-01');
+    await completeRoutineOccurrence(db, created.id, '2026-07-01', '2026-07-01');
     expect(await getAppStreakCache(db)).toMatchObject({ currentStreak: 1 });
     // 2026-07-02 is left uncompleted for this daily routine.
 

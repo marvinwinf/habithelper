@@ -21,8 +21,9 @@ import { APP_STREAK_CACHE_ID, buildAppStreakCache } from '../data/repositories/a
 import { addDaysToDateString, todayDateString } from '../domain/dates';
 import { requestConsciousSkip } from '../domain/routines/completion';
 import { planRetroactiveCompletion } from '../domain/routines/retroactive';
+import { scheduleFromRoutineRow } from '../domain/routines/schedule';
 import { planUndoCompletion } from '../domain/routines/undo';
-import { isFirstCompletionOfDay } from '../domain/streaks/appStreak';
+import { computeAppStreak } from '../domain/streaks/appStreak';
 import { JOKER_EARN_THRESHOLD, replayRoutineStreak } from '../domain/streaks/replay';
 
 // Accepts any sync-dialect SQLite drizzle database (both the real
@@ -98,35 +99,57 @@ export function recomputeRoutineCacheTx(
 }
 
 /**
- * Recomputes the singleton app streak cache after an actual completion
- * (`completed`/`exceeded` only — docs/ROUTINE_RULES.md excludes skips and
- * joker-protected occurrences), per the same atomicity requirement as
- * `recomputeRoutineCacheTx`. Only ever extends the streak for a *new*, later
- * day's first completion: an already-accounted-for date, or one older than
- * the current watermark (a backdated/retroactive completion), is a no-op
- * here — correctly bridging a reconciliation-aware gap is the reconciliation
- * service's job (T038; see docs/IMPLEMENTATION_PLAN.md's Open Product
- * Questions), not a direct user action's.
+ * Recomputes and persists the singleton app streak cache from scratch by
+ * replaying every non-deleted routine's full event log across all calendar
+ * days (docs/DATA_MODEL.md: `app_streak_cache` "must always be re-derivable
+ * from routine_event by replay"). Called from inside the same transaction as
+ * every event write that can change the global streak — a direct completion,
+ * an undo, a retroactive calendar edit, and startup reconciliation — so the
+ * cache is always consistent with the events, per docs/ARCHITECTURE.md's
+ * Event and Cache Write Atomicity.
+ *
+ * This replaces the earlier incremental (+1 per new completion day) approach,
+ * which silently ignored backdated completions: a routine streak built by
+ * filling past gaps in the calendar would climb while the global streak stood
+ * still. A full replay counts each day exactly as the event log dictates, so
+ * backdated completions lift the streak and missed days break it.
+ *
+ * The cache row is discarded entirely when no completion has ever been
+ * recorded (nothing to show), matching the "cache created only once a
+ * completion exists" convention.
  */
-function recomputeAppStreakCacheOnCompletionTx(tx: RoutineServiceTx, occurrenceDate: string): void {
+export function recomputeAppStreakCacheTx(tx: RoutineServiceTx, today: string): void {
+  const routines = tx.select().from(routine).where(isNull(routine.deletedAt)).all();
+  const contexts = routines.map((r) => ({
+    schedule: scheduleFromRoutineRow(r),
+    events: tx.select().from(routineEvent).where(eq(routineEvent.routineId, r.id)).all(),
+  }));
+
+  const state = computeAppStreak(contexts, today);
+
   const [existing] = tx
     .select()
     .from(appStreakCache)
     .where(eq(appStreakCache.id, APP_STREAK_CACHE_ID))
     .all();
 
-  if (!existing) {
-    const cache = buildAppStreakCache(1, occurrenceDate, addDaysToDateString(occurrenceDate, -1));
+  if (state.lastIncrementedDate === null) {
+    if (existing) {
+      tx.delete(appStreakCache).where(eq(appStreakCache.id, APP_STREAK_CACHE_ID)).run();
+    }
+    return;
+  }
+
+  const cache = buildAppStreakCache(
+    state.currentStreak,
+    state.lastIncrementedDate,
+    addDaysToDateString(today, -1),
+  );
+  if (existing) {
+    tx.update(appStreakCache).set(cache).where(eq(appStreakCache.id, APP_STREAK_CACHE_ID)).run();
+  } else {
     tx.insert(appStreakCache).values(cache).run();
-    return;
   }
-
-  if (!isFirstCompletionOfDay(existing.lastIncrementedDate, occurrenceDate)) {
-    return;
-  }
-
-  const cache = buildAppStreakCache(existing.currentStreak + 1, occurrenceDate, existing.reconciledThroughDate);
-  tx.update(appStreakCache).set(cache).where(eq(appStreakCache.id, APP_STREAK_CACHE_ID)).run();
 }
 
 /**
@@ -148,80 +171,6 @@ function findActiveCompletionEventTx(
       event.occurrenceDate === occurrenceDate &&
       (event.eventType === 'completed' || event.eventType === 'exceeded'),
   );
-}
-
-/** Whether any non-deleted routine has an active (non-superseded) completed/exceeded event on `date`. */
-function hasAnyActiveCompletionOnDateTx(tx: RoutineServiceTx, date: string): boolean {
-  const routines = tx.select().from(routine).where(isNull(routine.deletedAt)).all();
-  return routines.some((r) => {
-    const events = tx.select().from(routineEvent).where(eq(routineEvent.routineId, r.id)).all();
-    return events.some(
-      (event) =>
-        !event.supersededByEventId &&
-        event.occurrenceDate === date &&
-        (event.eventType === 'completed' || event.eventType === 'exceeded'),
-    );
-  });
-}
-
-/** The latest date strictly before `beforeDate` with any non-deleted routine's active completed/exceeded event, or null if none. */
-function findLatestActiveCompletionDateBeforeTx(tx: RoutineServiceTx, beforeDate: string): string | null {
-  const routines = tx.select().from(routine).where(isNull(routine.deletedAt)).all();
-  let latest: string | null = null;
-  for (const r of routines) {
-    const events = tx.select().from(routineEvent).where(eq(routineEvent.routineId, r.id)).all();
-    for (const event of events) {
-      if (
-        !event.supersededByEventId &&
-        event.occurrenceDate < beforeDate &&
-        (event.eventType === 'completed' || event.eventType === 'exceeded') &&
-        (latest === null || event.occurrenceDate > latest)
-      ) {
-        latest = event.occurrenceDate;
-      }
-    }
-  }
-  return latest;
-}
-
-/**
- * Reverts the app streak cache's effect of undoing a completion on
- * `occurrenceDate`, per the same atomicity requirement as
- * `recomputeRoutineCacheTx`. A no-op unless this exact date is what most
- * recently advanced the cache (`lastIncrementedDate === occurrenceDate`) —
- * an undo of a day the cache has already moved past, or one that never
- * advanced it, changes nothing here. When it is, and no other routine still
- * has an active completion on that date, the increment is rolled back:
- * `currentStreak` drops by one and `lastIncrementedDate` reverts to the
- * latest earlier date with an actual completion (or the cache row is
- * discarded entirely if there is none — back to "never yet completed").
- */
-function recomputeAppStreakCacheOnUndoTx(tx: RoutineServiceTx, occurrenceDate: string): void {
-  const [existing] = tx
-    .select()
-    .from(appStreakCache)
-    .where(eq(appStreakCache.id, APP_STREAK_CACHE_ID))
-    .all();
-
-  if (!existing || existing.lastIncrementedDate !== occurrenceDate) {
-    return;
-  }
-  if (hasAnyActiveCompletionOnDateTx(tx, occurrenceDate)) {
-    return;
-  }
-
-  const priorDate = findLatestActiveCompletionDateBeforeTx(tx, occurrenceDate);
-  if (priorDate === null) {
-    tx.delete(appStreakCache).where(eq(appStreakCache.id, APP_STREAK_CACHE_ID)).run();
-    return;
-  }
-
-  const cache = buildAppStreakCache(
-    Math.max(existing.currentStreak - 1, 0),
-    priorDate,
-    existing.reconciledThroughDate,
-  );
-  tx.update(appStreakCache).set(cache).where(eq(appStreakCache.id, APP_STREAK_CACHE_ID)).run();
 }
 
 /**
@@ -300,6 +249,7 @@ function writeCompletionEventTx(
   routineId: string,
   occurrenceDate: string,
   eventType: 'completed' | 'exceeded',
+  today: string,
 ): CompletionResult {
   return db.transaction((tx) => {
     // Idempotent by design: if this occurrence already has an active
@@ -325,19 +275,25 @@ function writeCompletionEventTx(
     tx.insert(routineEvent).values(event).run();
     maybeWriteJokerEarnedEventTx(tx, routineId, occurrenceDate);
     const newCache = recomputeRoutineCacheTx(tx, routineId);
-    recomputeAppStreakCacheOnCompletionTx(tx, occurrenceDate);
+    recomputeAppStreakCacheTx(tx, today);
 
     return { event, leveledUp: newCache.levelRank > (previousCache?.levelRank ?? 0) };
   });
 }
 
-/** Normal completion: counts as one successful completion (docs/ROUTINE_RULES.md). */
+/**
+ * Normal completion: counts as one successful completion (docs/ROUTINE_RULES.md).
+ * `today` (defaulting to the real current date) is the reference point the app
+ * streak replay uses to tell an in-progress today from an elapsed missed day;
+ * the Today screen always completes today, so it never needs to override it.
+ */
 export async function completeRoutineOccurrence(
   db: RoutineServiceDb,
   routineId: string,
   occurrenceDate: string,
+  today: string = todayDateString(),
 ): Promise<CompletionResult> {
-  return writeCompletionEventTx(db, routineId, occurrenceDate, 'completed');
+  return writeCompletionEventTx(db, routineId, occurrenceDate, 'completed', today);
 }
 
 /** Exceeded completion: also counts as one successful completion, but with stronger feedback only — no extra streak/level progress. */
@@ -345,8 +301,9 @@ export async function exceedRoutineOccurrence(
   db: RoutineServiceDb,
   routineId: string,
   occurrenceDate: string,
+  today: string = todayDateString(),
 ): Promise<CompletionResult> {
-  return writeCompletionEventTx(db, routineId, occurrenceDate, 'exceeded');
+  return writeCompletionEventTx(db, routineId, occurrenceDate, 'exceeded', today);
 }
 
 /**
@@ -480,6 +437,7 @@ export async function retroactivelyCompleteOccurrence(
   db: RoutineServiceDb,
   routineId: string,
   occurrenceDate: string,
+  today: string = todayDateString(),
 ): Promise<RetroactiveCompletionResult> {
   const priorEvents = await listRoutineEvents(db, routineId);
   const plan = planRetroactiveCompletion(occurrenceDate, priorEvents);
@@ -512,10 +470,12 @@ export async function retroactivelyCompleteOccurrence(
 
     const newCache = recomputeRoutineCacheTx(tx, routineId);
     leveledUp = newCache.levelRank > (previousCache?.levelRank ?? 0);
-    // planRetroactiveCompletion always writes a 'completed' event for
-    // occurrenceDate, so this occurrence is now (or remains) an actual
-    // completion for the app streak's purposes.
-    recomputeAppStreakCacheOnCompletionTx(tx, occurrenceDate);
+    // A retroactive completion fills a past gap, so the app streak must be
+    // fully re-derived: unlike the old incremental update, the replay sees
+    // the backdated day and lifts the global streak accordingly
+    // (docs/ROUTINE_RULES.md's Retroactive Completion — "full recalculation
+    // of streaks").
+    recomputeAppStreakCacheTx(tx, today);
   });
 
   return {
@@ -534,15 +494,17 @@ export interface UndoCompletionResult {
  * Undoes a misclicked completion (`completed` or `exceeded`) on
  * `occurrenceDate`: supersedes it (and any `joker_earned` event it produced)
  * via T027's supersede pattern, then recomputes both the routine cache — a
- * full replay naturally reflects the completion no longer counting — and,
- * if this was the day's only actual completion, the app streak cache. All
- * in one transaction, per docs/ARCHITECTURE.md's Event and Cache Write
- * Atomicity.
+ * full replay naturally reflects the completion no longer counting — and the
+ * app streak cache, which is likewise fully re-derived from the event log so
+ * the global streak drops exactly when the undone day was the last one
+ * holding it up. All in one transaction, per docs/ARCHITECTURE.md's Event and
+ * Cache Write Atomicity.
  */
 export async function undoRoutineCompletion(
   db: RoutineServiceDb,
   routineId: string,
   occurrenceDate: string,
+  today: string = todayDateString(),
 ): Promise<UndoCompletionResult> {
   const priorEvents = await listRoutineEvents(db, routineId);
   const plan = planUndoCompletion(occurrenceDate, priorEvents);
@@ -567,7 +529,7 @@ export async function undoRoutineCompletion(
     }
 
     recomputeRoutineCacheTx(tx, routineId);
-    recomputeAppStreakCacheOnUndoTx(tx, occurrenceDate);
+    recomputeAppStreakCacheTx(tx, today);
   });
 
   return { writtenEvents };
