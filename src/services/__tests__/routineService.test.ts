@@ -269,21 +269,46 @@ describe('routineService', () => {
       sqlite.close();
     });
 
-    it('recomputes the app streak cache only on the first completion of a new day', async () => {
+    it('counts each completed calendar day once, extending the app streak on a new day', async () => {
       const { db, sqlite } = await createDrizzleTestDb();
       const first = await createRoutine(db, baseInput);
       const second = await createRoutine(db, { ...baseInput, name: 'Lesen' });
 
-      await completeRoutineOccurrence(db, first.id, '2026-07-01');
+      await completeRoutineOccurrence(db, first.id, '2026-07-01', '2026-07-01');
       expect(await getAppStreakCache(db)).toMatchObject({ currentStreak: 1, lastIncrementedDate: '2026-07-01' });
 
-      // A second routine completed the same day does not double-increment.
-      await completeRoutineOccurrence(db, second.id, '2026-07-01');
+      // A second routine completed the same day does not double-count it.
+      await completeRoutineOccurrence(db, second.id, '2026-07-01', '2026-07-01');
       expect(await getAppStreakCache(db)).toMatchObject({ currentStreak: 1, lastIncrementedDate: '2026-07-01' });
 
-      // A completion on a new day extends the streak by one.
-      await exceedRoutineOccurrence(db, first.id, '2026-07-02');
+      // A completion on the next day extends the streak by one.
+      await exceedRoutineOccurrence(db, first.id, '2026-07-02', '2026-07-02');
       expect(await getAppStreakCache(db)).toMatchObject({ currentStreak: 2, lastIncrementedDate: '2026-07-02' });
+
+      sqlite.close();
+    });
+
+    it('lifts the app streak when a past gap is filled by a retroactive completion', async () => {
+      // The exact regression this change fixes: a routine streak built up by
+      // retroactively completing earlier days used to leave the global streak
+      // behind, because the incremental update ignored backdated completions.
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      // Today is 2026-07-05. The daily routine's 07-03 and 07-04 elapsed
+      // missed; only today is completed live, so the global streak is 1.
+      await completeRoutineOccurrence(db, created.id, '2026-07-05', '2026-07-05');
+      expect(await getAppStreakCache(db)).toMatchObject({ currentStreak: 1 });
+
+      // Filling in the two missed days retroactively makes 07-03..07-05 a
+      // consecutive run — the global streak must climb to 3.
+      await retroactivelyCompleteOccurrence(db, created.id, '2026-07-04', '2026-07-05');
+      await retroactivelyCompleteOccurrence(db, created.id, '2026-07-03', '2026-07-05');
+
+      expect(await getAppStreakCache(db)).toMatchObject({
+        currentStreak: 3,
+        lastIncrementedDate: '2026-07-05',
+      });
 
       sqlite.close();
     });
@@ -514,14 +539,14 @@ describe('routineService', () => {
     it('reverts the app streak cache when undoing the day\'s sole completion', async () => {
       const { db, sqlite } = await createDrizzleTestDb();
       const created = await createRoutine(db, baseInput);
-      await completeRoutineOccurrence(db, created.id, '2026-07-01');
-      await completeRoutineOccurrence(db, created.id, '2026-07-02');
+      await completeRoutineOccurrence(db, created.id, '2026-07-01', '2026-07-01');
+      await completeRoutineOccurrence(db, created.id, '2026-07-02', '2026-07-02');
       expect(await getAppStreakCache(db)).toMatchObject({
         currentStreak: 2,
         lastIncrementedDate: '2026-07-02',
       });
 
-      await undoRoutineCompletion(db, created.id, '2026-07-02');
+      await undoRoutineCompletion(db, created.id, '2026-07-02', '2026-07-02');
 
       expect(await getAppStreakCache(db)).toMatchObject({
         currentStreak: 1,
@@ -534,9 +559,9 @@ describe('routineService', () => {
     it('discards the app streak cache entirely when undoing the very first completion', async () => {
       const { db, sqlite } = await createDrizzleTestDb();
       const created = await createRoutine(db, baseInput);
-      await completeRoutineOccurrence(db, created.id, '2026-07-01');
+      await completeRoutineOccurrence(db, created.id, '2026-07-01', '2026-07-01');
 
-      await undoRoutineCompletion(db, created.id, '2026-07-01');
+      await undoRoutineCompletion(db, created.id, '2026-07-01', '2026-07-01');
 
       expect(await getAppStreakCache(db)).toBeUndefined();
 
@@ -547,10 +572,10 @@ describe('routineService', () => {
       const { db, sqlite } = await createDrizzleTestDb();
       const first = await createRoutine(db, baseInput);
       const second = await createRoutine(db, { ...baseInput, name: 'Lesen' });
-      await completeRoutineOccurrence(db, first.id, '2026-07-01');
-      await completeRoutineOccurrence(db, second.id, '2026-07-01');
+      await completeRoutineOccurrence(db, first.id, '2026-07-01', '2026-07-01');
+      await completeRoutineOccurrence(db, second.id, '2026-07-01', '2026-07-01');
 
-      await undoRoutineCompletion(db, first.id, '2026-07-01');
+      await undoRoutineCompletion(db, first.id, '2026-07-01', '2026-07-01');
 
       expect(await getAppStreakCache(db)).toMatchObject({
         currentStreak: 1,
@@ -560,18 +585,21 @@ describe('routineService', () => {
       sqlite.close();
     });
 
-    it('leaves the app streak cache untouched when undoing a day the streak has already moved past', async () => {
+    it('breaks the app streak when undoing a past completion the streak was built on', async () => {
+      // Undo is a current-day action in the UI (docs/ROUTINE_RULES.md), but
+      // the service still recomputes correctly if a past day is undone: that
+      // day becomes missed, which breaks the run. Replaying the whole log is
+      // what makes this fall out for free — the old incremental undo left the
+      // streak wrongly intact at 2.
       const { db, sqlite } = await createDrizzleTestDb();
       const created = await createRoutine(db, baseInput);
-      await completeRoutineOccurrence(db, created.id, '2026-07-01');
-      await completeRoutineOccurrence(db, created.id, '2026-07-02');
+      await completeRoutineOccurrence(db, created.id, '2026-07-01', '2026-07-01');
+      await completeRoutineOccurrence(db, created.id, '2026-07-02', '2026-07-02');
 
-      // 07-01 is no longer the date that most recently advanced the app
-      // streak (07-02 is) — undoing it should leave the cache alone.
-      await undoRoutineCompletion(db, created.id, '2026-07-01');
+      await undoRoutineCompletion(db, created.id, '2026-07-01', '2026-07-02');
 
       expect(await getAppStreakCache(db)).toMatchObject({
-        currentStreak: 2,
+        currentStreak: 1,
         lastIncrementedDate: '2026-07-02',
       });
 
