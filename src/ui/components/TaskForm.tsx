@@ -6,7 +6,7 @@ import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 
 import { Button } from './Button';
 import { toLocalDateString } from '../../domain/dates';
-import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
+import { colors, pressedFeedback, radius, spacing, typography } from '../theme';
 
 const DATE_DISPLAY_FORMATTER = new Intl.DateTimeFormat('de-DE', {
   day: '2-digit',
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   pressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   label: {
     ...typography.label,

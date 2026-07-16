@@ -5,7 +5,7 @@ import {
   type GestureResponderEvent,
 } from 'react-native';
 
-import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
+import { colors, pressedFeedback, radius, spacing, typography } from '../theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'destructive';
 
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   pressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   label: {
     ...typography.label,

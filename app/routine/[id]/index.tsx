@@ -43,7 +43,7 @@ import { IconBadge } from '../../../src/ui/components/IconBadge';
 import { ProgressBar } from '../../../src/ui/components/ProgressBar';
 import { RoutineCalendar, type CalendarDay } from '../../../src/ui/components/RoutineCalendar';
 import { ScreenHeader } from '../../../src/ui/components/ScreenHeader';
-import { colors, pressedOpacity, radius, spacing, typography } from '../../../src/ui/theme';
+import { colors, pressedFeedback, radius, spacing, typography } from '../../../src/ui/theme';
 import { getCategoryColorVariant } from '../../../src/ui/theme/categoryVariant';
 import { categoryIconName } from '../../../src/ui/categoryIcons';
 
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   pressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   heroCard: {
     gap: spacing.xs,

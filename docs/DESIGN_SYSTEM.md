@@ -157,6 +157,9 @@ The Progress screen's hero streak uses a circular ring (filled arc, `accent`-col
 - Completion and milestone moments use `GENTLE_SPRING` (`src/ui/animation/constants.ts`) — a quick, non-bouncy settle (high friction relative to tension), not a plain fade and not an exaggerated bounce.
 - Bottom sheets animate their two layers independently (`src/ui/components/Sheet.tsx`): the scrim only fades — it never moves — while the panel alone slides up from below with a gentle ease-out, and dismissal plays the reverse before unmounting. Never slide the whole modal subtree (scrim included) as one pane. Follow-up navigation waits for the sheet's exit (its `onDismissed`) instead of racing it.
 - List cards fade in with a small capped stagger (`mountStaggerDelayMs`) so a screen builds up gently; rows that re-sort after a completion/undo glide to their new position after a short hold (`animateListSettle`) so the completion pop reads first.
+- Data surfaces draw in rather than pop: the Progress screen's streak ring and category donut sweep to their values (`useAnimatedProgress`, `useDrawIn`), the completion chart reveals left-to-right, and stat-tile numbers count up to their value (`useCountUpText`) — all with the shared no-overshoot `FILL_EASING`, replaying only when the shown data actually changes. The routine calendar fades the grid in when paging months.
+- Completing the day's last routine gives the Today progress block one gentle swell-and-settle (`useMilestonePulse`) alongside the "Alle erledigt" cross-fade — only on the completing interaction, never when an already-done day merely loads.
+- Every pressed control applies the shared `pressedFeedback` style (`src/ui/theme/interaction.ts`): the opacity dip plus the small scale-down, together.
 - Screen-level transitions are deliberate and consistent: tabs cross-fade, pushed stack screens slide in from the right.
 - Reduced-motion settings collapse any spring/fade/slide to an instant state change.
 

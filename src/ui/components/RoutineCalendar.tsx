@@ -1,9 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
+import { useDrawIn } from '../animation/useDrawIn';
+import { useReducedMotion } from '../animation/useReducedMotion';
+import { colors, pressedFeedback, radius, spacing, typography } from '../theme';
 import type { CalendarDayState } from '../../domain/routines/calendar';
 import { getIsoWeekday } from '../../domain/routines/schedule';
+
+// Paging to another month fades the new grid in briefly — a mount-style fade,
+// not a slide, per docs/DESIGN_SYSTEM.md's Motion section.
+export const MONTH_FADE_DURATION_MS = 200;
 
 export interface CalendarDay {
   date: string;
@@ -124,6 +130,10 @@ export function RoutineCalendar({
 }: RoutineCalendarProps) {
   // Blank cells before the 1st so weekday columns line up (Monday-first).
   const leadingBlanks = days.length > 0 ? getIsoWeekday(days[0].date) - 1 : 0;
+  const reducedMotion = useReducedMotion();
+  // Keyed on the title (the shown month), so paging fades the new grid in
+  // while a data refresh of the same month does not blink.
+  const monthFade = useDrawIn(title, reducedMotion, MONTH_FADE_DURATION_MS);
 
   return (
     <View testID={testID}>
@@ -149,7 +159,7 @@ export function RoutineCalendar({
         </Pressable>
       </View>
 
-      <View style={styles.grid}>
+      <Animated.View style={[styles.grid, { opacity: monthFade }]}>
         {WEEKDAY_HEADERS.map((label) => (
           <View key={label} style={styles.cell}>
             <Text style={styles.weekdayLabel}>{label}</Text>
@@ -194,7 +204,7 @@ export function RoutineCalendar({
             </View>
           );
         })}
-      </View>
+      </Animated.View>
 
       <View style={styles.legend} testID={testID ? `${testID}-legend` : undefined}>
         {LEGEND_ITEMS.map(({ state, label }) => {
@@ -233,7 +243,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   navButtonPressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   navLabel: {
     fontSize: typography.heading.fontSize,
@@ -272,7 +282,7 @@ const styles = StyleSheet.create({
     borderColor: colors.accent,
   },
   dayPressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   dayLabel: {
     fontSize: typography.caption.fontSize,

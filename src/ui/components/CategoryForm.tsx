@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button } from './Button';
 import { CategoryBadge } from './CategoryBadge';
 import { IconBadge } from './IconBadge';
-import { colors, pressedOpacity, radius, spacing, typography, type CategoryColorFamily } from '../theme';
+import { colors, pressedFeedback, radius, spacing, typography, type CategoryColorFamily } from '../theme';
 import { categoryPalette } from '../theme/categoryVariant';
 import { CATEGORY_ICON_OPTIONS } from '../categoryIcons';
 
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   pressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   label: {
     ...typography.label,

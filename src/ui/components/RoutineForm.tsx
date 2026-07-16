@@ -4,7 +4,7 @@ import { Link } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { Button } from './Button';
-import { colors, iconBadgeSizes, pressedOpacity, radius, spacing, typography } from '../theme';
+import { colors, iconBadgeSizes, pressedFeedback, radius, spacing, typography } from '../theme';
 import { categoryIconName } from '../categoryIcons';
 import type { ScheduleType } from '../../data/db/schema';
 import {
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   pressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   label: {
     ...typography.label,

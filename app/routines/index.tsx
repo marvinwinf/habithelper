@@ -29,7 +29,7 @@ import { EmptyState } from '../../src/ui/components/EmptyState';
 import { ReorderableList } from '../../src/ui/components/ReorderableList';
 import { ScreenHeader } from '../../src/ui/components/ScreenHeader';
 import { Sheet } from '../../src/ui/components/Sheet';
-import { colors, pressedOpacity, radius, spacing, typography } from '../../src/ui/theme';
+import { colors, pressedFeedback, radius, spacing, typography } from '../../src/ui/theme';
 
 type RoutinesTab = 'active' | 'paused';
 
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceMuted,
   },
   tabPressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   tabLabel: {
     ...typography.label,
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   rowPressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   rowMain: {
     flex: 1,

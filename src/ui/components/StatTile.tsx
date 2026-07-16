@@ -1,5 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useCountUpText } from '../animation/useCountUp';
+import { useReducedMotion } from '../animation/useReducedMotion';
 import { colors, radius, spacing, typography } from '../theme';
 
 export interface StatTileProps {
@@ -8,11 +10,18 @@ export interface StatTileProps {
   testID?: string;
 }
 
-/** A single stat card in the Progress screen's 2×2 overview grid. */
+/**
+ * A single stat card in the Progress screen's 2×2 overview grid. The number
+ * counts up to its value (useCountUpText) so the stat feels earned rather
+ * than printed; reduced motion shows the final value immediately.
+ */
 export function StatTile({ value, label, testID }: StatTileProps) {
+  const reducedMotion = useReducedMotion();
+  const displayValue = useCountUpText(value, reducedMotion);
+
   return (
     <View style={styles.tile} testID={testID}>
-      <Text style={styles.value}>{value}</Text>
+      <Text style={styles.value}>{displayValue}</Text>
       <Text style={styles.label}>{label}</Text>
     </View>
   );

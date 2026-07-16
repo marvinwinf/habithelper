@@ -1,7 +1,11 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
+import { useDrawIn } from '../animation/useDrawIn';
+import { useReducedMotion } from '../animation/useReducedMotion';
 import { colors, spacing, typography } from '../theme';
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export interface DonutChartSegment {
   label: string;
@@ -15,6 +19,9 @@ export interface DonutChartSegmentGeometry {
   percentage: number;
   strokeDasharray: string;
   strokeDashoffset: number;
+  /** Where around the circle (0–1) this segment starts / how much it spans — drives the sweep animation. */
+  startFraction: number;
+  fraction: number;
 }
 
 /**
@@ -47,6 +54,8 @@ export function buildDonutSegments(
       percentage: Math.round(fraction * 100),
       strokeDasharray: dasharray,
       strokeDashoffset: dashoffset,
+      startFraction: cumulative - fraction,
+      fraction,
     };
   });
 }
@@ -61,11 +70,21 @@ export interface DonutChartProps {
 /**
  * Segmented ring + external legend, used by the Progress screen's habit
  * breakdown (docs/SCREEN_SPECIFICATIONS.md's Progress Screen section).
+ * The ring sweeps clockwise into place — one shared 0→1 progress that each
+ * segment clips to its own span, so arcs appear consecutively as one motion.
+ * The sweep replays only when the drawn data actually changes (useDrawIn's
+ * key), and reduced motion renders the finished ring immediately.
  */
 export function DonutChart({ segments, size = 120, strokeWidth = 20, testID }: DonutChartProps) {
   const radius = (size - strokeWidth) / 2;
   const center = size / 2;
+  const circumference = 2 * Math.PI * radius;
   const geometry = buildDonutSegments(segments, radius);
+  const reducedMotion = useReducedMotion();
+  const sweep = useDrawIn(
+    geometry.map((segment) => `${segment.label}:${segment.fraction}`).join('|'),
+    reducedMotion,
+  );
 
   return (
     <View style={styles.row} testID={testID}>
@@ -82,7 +101,7 @@ export function DonutChart({ segments, size = 120, strokeWidth = 20, testID }: D
             />
           ) : (
             geometry.map((segment) => (
-              <Circle
+              <AnimatedCircle
                 key={segment.label}
                 cx={center}
                 cy={center}
@@ -90,7 +109,21 @@ export function DonutChart({ segments, size = 120, strokeWidth = 20, testID }: D
                 stroke={segment.color}
                 strokeWidth={strokeWidth}
                 fill="none"
-                strokeDasharray={segment.strokeDasharray}
+                // While the shared sweep passes through this segment's span
+                // of the circle, its visible arc grows from nothing to its
+                // full dash pattern; before/after it clamps empty/full.
+                strokeDasharray={
+                  segment.fraction > 0
+                    ? sweep.interpolate({
+                        inputRange: [
+                          segment.startFraction,
+                          segment.startFraction + segment.fraction,
+                        ],
+                        outputRange: [`0 ${circumference}`, segment.strokeDasharray],
+                        extrapolate: 'clamp',
+                      })
+                    : segment.strokeDasharray
+                }
                 strokeDashoffset={segment.strokeDashoffset}
                 rotation="-90"
                 origin={`${center}, ${center}`}
