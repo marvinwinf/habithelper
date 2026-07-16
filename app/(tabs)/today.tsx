@@ -55,6 +55,7 @@ import { focusOfTheDay } from '../../src/domain/focusOfTheDay';
 import { confirmRoutineDeletion, confirmTaskDeletion } from '../../src/ui/alerts';
 import { triggerFirstCompletionOfDayHaptic } from '../../src/ui/animation/haptics';
 import { animateListSettle } from '../../src/ui/animation/listTransitions';
+import { pulseScale, useMilestonePulse } from '../../src/ui/animation/useMilestonePulse';
 import { mountStaggerDelayMs } from '../../src/ui/animation/useMountAnimation';
 import { useReducedMotion } from '../../src/ui/animation/useReducedMotion';
 import { useRewardToast } from '../../src/ui/animation/useRewardToast';
@@ -68,7 +69,7 @@ import { RewardToast } from '../../src/ui/components/RewardToast';
 import { RoutineCard, type RoutineCardOccurrenceState } from '../../src/ui/components/RoutineCard';
 import { Sheet } from '../../src/ui/components/Sheet';
 import { TaskCard } from '../../src/ui/components/TaskCard';
-import { colors, pressedOpacity, spacing, typography } from '../../src/ui/theme';
+import { colors, pressedFeedback, spacing, typography } from '../../src/ui/theme';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('de-DE', {
   weekday: 'long',
@@ -104,7 +105,12 @@ export default function TodayScreen() {
   const streakBurst = useStreakBurst();
   const reducedMotion = useReducedMotion();
   const rewardToast = useRewardToast(reducedMotion);
+  const dayCompletePulse = useMilestonePulse(reducedMotion);
   const [allDoneOpacity] = useState(() => new Animated.Value(0));
+  // Whether the previous render still had unresolved routines — the guard
+  // that makes the day-complete pulse fire only on the transition caused by
+  // an interaction, never when the screen merely loads an already-done day.
+  const hadIncompleteRoutines = useRef(false);
   // Monotonic reload token. `loadData` fires many independent queries that
   // each set their own slice of state; two overlapping reloads (e.g. from
   // completing several items quickly) could otherwise resolve per-slice out
@@ -330,6 +336,17 @@ export default function TodayScreen() {
     }
   }, [allRoutinesDone, allDoneOpacity, reducedMotion]);
 
+  // The day's quiet milestone gets one gentle swell of the progress block —
+  // only when the user's own completion finished the day (the list held
+  // incomplete routines a render ago), never when a day loads already done.
+  const startDayCompletePulse = dayCompletePulse.start;
+  useEffect(() => {
+    if (allRoutinesDone && hadIncompleteRoutines.current) {
+      startDayCompletePulse();
+    }
+    hadIncompleteRoutines.current = dueRoutines.length > 0 && !allRoutinesDone;
+  }, [allRoutinesDone, dueRoutines.length, startDayCompletePulse]);
+
   return (
     <>
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -385,7 +402,12 @@ export default function TodayScreen() {
           </View>
         </View>
 
-        <View style={styles.progressBlock}>
+        <Animated.View
+          style={[
+            styles.progressBlock,
+            { transform: [{ scale: pulseScale(dayCompletePulse.progress) }] },
+          ]}
+        >
           <View style={styles.progressHeaderRow}>
             <Text style={styles.progressTitle}>Heutige Routinen</Text>
             {allRoutinesDone ? (
@@ -405,7 +427,7 @@ export default function TodayScreen() {
             value={dueRoutines.length === 0 ? 0 : completedRoutineCount / dueRoutines.length}
             testID="today-routine-progress-bar"
           />
-        </View>
+        </Animated.View>
       </View>
 
       <FocusOfTheDayCard prompt={focusPrompt} testID="today-focus-of-the-day" />
@@ -624,7 +646,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   iconButtonPressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   headerTopRow: {
     flexDirection: 'row',

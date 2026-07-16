@@ -5,7 +5,7 @@ import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-nativ
 import { Button } from './Button';
 import { Sheet } from './Sheet';
 import { useReducedMotion } from '../animation/useReducedMotion';
-import { colors, pressedOpacity, radius, softShadow, spacing, typography } from '../theme';
+import { colors, pressedFeedback, radius, softShadow, spacing, typography } from '../theme';
 
 type CreatePath = '/routine/create' | '/task/create';
 
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     ...softShadow,
   },
   fabPressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   fabLabel: {
     fontSize: typography.title.fontSize,

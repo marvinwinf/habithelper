@@ -1,7 +1,11 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
+import { useAnimatedProgress } from '../animation/useAnimatedProgress';
+import { useReducedMotion } from '../animation/useReducedMotion';
 import { colors, typography } from '../theme';
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export interface RingProgressProps {
   /** 0–1; values outside this range are clamped. */
@@ -26,6 +30,8 @@ export function clampRingValue(value: number): number {
  * Circular progress ring used by the Progress screen's streak hero
  * (docs/DESIGN_SYSTEM.md's Streak Ring section) — not used elsewhere; the
  * plain bold numeral remains the streak treatment on Today/routine detail.
+ * The fill sweeps in from empty on mount and eases to each new value
+ * (useAnimatedProgress), collapsing to an instant fill under reduced motion.
  */
 export function RingProgress({
   value,
@@ -39,8 +45,14 @@ export function RingProgress({
   const clamped = clampRingValue(value);
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const dashOffset = circumference * (1 - clamped);
   const center = size / 2;
+  const reducedMotion = useReducedMotion();
+  const progress = useAnimatedProgress(clamped, reducedMotion);
+  // A progress of v shows as a dash offset of circumference * (1 - v).
+  const dashOffset = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [circumference, 0],
+  });
 
   return (
     <View style={{ width: size, height: size }} testID={testID}>
@@ -53,7 +65,7 @@ export function RingProgress({
           strokeWidth={strokeWidth}
           fill="none"
         />
-        <Circle
+        <AnimatedCircle
           testID={testID ? `${testID}-fill` : undefined}
           cx={center}
           cy={center}

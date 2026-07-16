@@ -46,6 +46,20 @@ describe('buildDonutSegments', () => {
     );
     expect(geometry.map((g) => g.percentage)).toEqual([100, 0]);
   });
+
+  it('exposes each segment span as fractions for the sweep animation', () => {
+    const geometry = buildDonutSegments(
+      [
+        { label: 'A', value: 1, color: '#111' },
+        { label: 'B', value: 3, color: '#222' },
+      ],
+      50,
+    );
+    expect(geometry[0].startFraction).toBe(0);
+    expect(geometry[0].fraction).toBeCloseTo(0.25);
+    expect(geometry[1].startFraction).toBeCloseTo(0.25);
+    expect(geometry[1].fraction).toBeCloseTo(0.75);
+  });
 });
 
 describe('DonutChart', () => {

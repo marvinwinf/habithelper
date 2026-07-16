@@ -16,7 +16,7 @@ import { useMountAnimation } from '../animation/useMountAnimation';
 import {
   colors,
   listCardMinHeight,
-  pressedOpacity,
+  pressedFeedback,
   radius,
   softShadow,
   spacing,
@@ -271,7 +271,7 @@ export function RoutineCard({
 
 const styles = StyleSheet.create({
   pressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   row: {
     flexDirection: 'row',

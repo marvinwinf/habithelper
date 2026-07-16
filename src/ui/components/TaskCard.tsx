@@ -10,7 +10,7 @@ import { useMountAnimation } from '../animation/useMountAnimation';
 import {
   colors,
   listCardMinHeight,
-  pressedOpacity,
+  pressedFeedback,
   radius,
   softShadow,
   spacing,
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     ...softShadow,
   },
   rowPressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   main: {
     flex: 1,

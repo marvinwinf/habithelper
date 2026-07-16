@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Link, type Href } from 'expo-router';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-import { colors, iconBadgeSizes, pressedOpacity, spacing, typography } from '../theme';
+import { colors, iconBadgeSizes, pressedFeedback, spacing, typography } from '../theme';
 
 export type NavRowIconName = keyof typeof Ionicons.glyphMap;
 
@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   pressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   label: {
     flex: 1,

@@ -16,7 +16,7 @@ import {
   colors,
   iconBadgeSizes,
   listCardMinHeight,
-  pressedOpacity,
+  pressedFeedback,
   radius,
   softShadow,
   spacing,
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     ...softShadow,
   },
   rowPressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   name: {
     flex: 1,

@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, iconBadgeSizes, pressedOpacity, radius, spacing, typography } from '../theme';
+import { colors, iconBadgeSizes, pressedFeedback, radius, spacing, typography } from '../theme';
 
 export interface ScreenHeaderProps {
   title: string;
@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backButtonPressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   title: {
     flex: 1,

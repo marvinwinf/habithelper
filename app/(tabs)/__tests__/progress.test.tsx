@@ -96,6 +96,7 @@ describe('ProgressScreen', () => {
 
     const tile = await screen.findByTestId('progress-stat-active-routines');
     expect(tile).toBeTruthy();
-    expect(screen.getByText('2')).toBeTruthy();
+    // The stat's number counts up to its value, so wait for it to settle.
+    expect(await screen.findByText('2')).toBeTruthy();
   });
 });

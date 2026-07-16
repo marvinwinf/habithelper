@@ -19,7 +19,7 @@ import { confirmTaskDeletion } from '../../src/ui/alerts';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { ScreenHeader } from '../../src/ui/components/ScreenHeader';
 import { TaskCard } from '../../src/ui/components/TaskCard';
-import { colors, pressedOpacity, spacing, typography } from '../../src/ui/theme';
+import { colors, pressedFeedback, spacing, typography } from '../../src/ui/theme';
 
 interface Section {
   key: string;
@@ -195,6 +195,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   sectionTogglePressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
 });

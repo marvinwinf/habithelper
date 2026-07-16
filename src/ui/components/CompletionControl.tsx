@@ -8,7 +8,7 @@ import {
 
 import { useCompletionAnimation } from '../animation/useCompletionAnimation';
 import { useReducedMotion } from '../animation/useReducedMotion';
-import { colors, pressedOpacity, radius, spacing, typography } from '../theme';
+import { colors, pressedFeedback, radius, spacing, typography } from '../theme';
 
 export interface CompletionControlProps {
   onComplete: (event: GestureResponderEvent) => void;
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   pressed: {
-    opacity: pressedOpacity,
+    ...pressedFeedback,
   },
   fill: {
     position: 'absolute',

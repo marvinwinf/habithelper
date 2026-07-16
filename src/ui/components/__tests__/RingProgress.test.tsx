@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react-native';
+import { act, render, screen } from '@testing-library/react-native';
 
+import { PROGRESS_FILL_ANIMATION_DURATION_MS } from '../../animation/useAnimatedProgress';
 import { RingProgress, clampRingValue } from '../RingProgress';
 
 describe('clampRingValue', () => {
@@ -20,32 +21,65 @@ describe('clampRingValue', () => {
   });
 });
 
+// The fill's strokeDashoffset is an animated interpolation (the ring sweeps
+// in, per docs/DESIGN_SYSTEM.md's Motion section); this resolves its current
+// numeric value.
+function dashOffsetOf(fill: { props: Record<string, unknown> }): number {
+  const prop = fill.props.strokeDashoffset;
+  // react-native-svg normalizes a strokeDashoffset of exactly 0 to null
+  // rather than passing the literal number through.
+  if (prop == null) {
+    return 0;
+  }
+  if (typeof prop === 'number') {
+    return prop;
+  }
+  return (prop as { __getValue(): number }).__getValue();
+}
+
+async function settleFill() {
+  await act(() => {
+    jest.advanceTimersByTime(PROGRESS_FILL_ANIMATION_DURATION_MS + 50);
+  });
+}
+
 describe('RingProgress', () => {
-  it('renders the fill circle with a dash offset proportional to the value', async () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('starts the fill empty and sweeps to a dash offset proportional to the value', async () => {
     await render(<RingProgress value={0.5} size={100} strokeWidth={10} testID="ring" />);
     const fill = screen.getByTestId('ring-fill');
     const radius = (100 - 10) / 2;
     const circumference = 2 * Math.PI * radius;
 
-    expect(fill.props.strokeDashoffset).toBeCloseTo(circumference * 0.5);
+    // Before the sweep, the ring is empty (full offset).
+    expect(dashOffsetOf(fill)).toBeCloseTo(circumference);
+    await settleFill();
+    expect(dashOffsetOf(fill)).toBeCloseTo(circumference * 0.5);
   });
 
-  it('renders a full offset (empty ring) at value 0', async () => {
+  it('settles at a full offset (empty ring) at value 0', async () => {
     await render(<RingProgress value={0} size={100} strokeWidth={10} testID="ring" />);
     const fill = screen.getByTestId('ring-fill');
     const radius = (100 - 10) / 2;
     const circumference = 2 * Math.PI * radius;
 
-    expect(fill.props.strokeDashoffset).toBeCloseTo(circumference);
+    await settleFill();
+    expect(dashOffsetOf(fill)).toBeCloseTo(circumference);
   });
 
-  it('renders a zero (or unset) offset (full ring) at value 1', async () => {
+  it('settles at a zero offset (full ring) at value 1', async () => {
     await render(<RingProgress value={1} size={100} strokeWidth={10} testID="ring" />);
     const fill = screen.getByTestId('ring-fill');
 
-    // react-native-svg normalizes a strokeDashoffset of exactly 0 to null
-    // rather than passing the literal number through.
-    expect(fill.props.strokeDashoffset ?? 0).toBe(0);
+    await settleFill();
+    expect(dashOffsetOf(fill)).toBeCloseTo(0);
   });
 
   it('renders the given label centered', async () => {

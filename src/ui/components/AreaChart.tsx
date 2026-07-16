@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
+import { Animated, LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
+import { useDrawIn } from '../animation/useDrawIn';
+import { useReducedMotion } from '../animation/useReducedMotion';
 import { colors, spacing, typography } from '../theme';
 
 export interface AreaChartPoint {
@@ -58,6 +60,9 @@ export interface AreaChartProps {
  * Simple filled line/area chart, used by the Progress screen's
  * "completion over time" section (docs/SCREEN_SPECIFICATIONS.md). Width is
  * measured from the parent via onLayout so the chart fills its container.
+ * The plot draws itself in left-to-right — a clipping wrapper widens over the
+ * fixed-size Svg (useDrawIn) — replaying only when the plotted values change
+ * and rendering fully drawn under reduced motion.
  */
 export function AreaChart({
   data,
@@ -68,6 +73,11 @@ export function AreaChart({
   testID,
 }: AreaChartProps) {
   const [width, setWidth] = useState(0);
+  const reducedMotion = useReducedMotion();
+  const reveal = useDrawIn(
+    width > 0 ? data.map((d) => d.value).join(',') : '',
+    reducedMotion,
+  );
 
   function handleLayout(event: LayoutChangeEvent) {
     setWidth(event.nativeEvent.layout.width);
@@ -84,10 +94,18 @@ export function AreaChart({
     <View testID={testID}>
       <View style={{ height }} onLayout={handleLayout}>
         {width > 0 && (
-          <Svg width={width} height={height}>
-            <Path d={areaPath} fill={fillColor} fillOpacity={0.15} stroke="none" />
-            <Path d={linePath} fill="none" stroke={lineColor} strokeWidth={2} />
-          </Svg>
+          <Animated.View
+            style={{
+              height,
+              overflow: 'hidden',
+              width: reveal.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+            }}
+          >
+            <Svg width={width} height={height}>
+              <Path d={areaPath} fill={fillColor} fillOpacity={0.15} stroke="none" />
+              <Path d={linePath} fill="none" stroke={lineColor} strokeWidth={2} />
+            </Svg>
+          </Animated.View>
         )}
       </View>
       <View style={styles.labelRow}>
