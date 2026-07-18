@@ -5,4 +5,8 @@
 // an individual card has a subtitle (docs/DESIGN_SYSTEM.md's Routine and
 // Task Item Design). Uniform heights are also load-bearing for
 // ReorderableList, whose drag math assumes a constant row pitch.
-export const listCardMinHeight = 76;
+// Kept compact (rather than the earlier 76) so more routines/tasks fit on the
+// Today screen at once; two text lines plus the tightened row padding still
+// clear this floor, so the value stays a genuine shared minimum rather than a
+// clipping hard height.
+export const listCardMinHeight = 60;

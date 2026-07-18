@@ -280,8 +280,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     // Breathing room horizontally, compact vertically: every list card sits
     // at the same shared minimum height so routines and tasks line up as one
-    // calm, even rhythm (docs/DESIGN_SYSTEM.md's Whitespace and Rhythm).
-    paddingVertical: spacing.sm,
+    // calm, even rhythm (docs/DESIGN_SYSTEM.md's Whitespace and Rhythm). The
+    // vertical padding is kept tight so more cards fit on the Today screen.
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
     minHeight: listCardMinHeight,
     borderRadius: radius.lg,

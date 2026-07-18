@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
     // Breathing room horizontally, compact vertically: matches RoutineCard
     // so routines and tasks line up as one calm, even rhythm
     // (docs/DESIGN_SYSTEM.md's Whitespace and Rhythm).
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
     minHeight: listCardMinHeight,
     borderRadius: radius.lg,
