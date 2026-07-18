@@ -20,10 +20,20 @@ export interface SheetProps {
 
 // RN's Modal animationType="slide" slides the ENTIRE modal subtree — including
 // the full-screen scrim — up from the bottom, which reads as a big translucent
-// pane gliding over the screen. So the Modal mounts with animationType="none"
+// pane gliding over the screen. So the Modal renders with animationType="none"
 // and the two layers animate independently: the scrim only fades (it never
 // moves), and the panel alone slides up with a gentle ease-out, per
 // docs/DESIGN_SYSTEM.md's Motion section.
+//
+// The native Modal is driven by its `visible` prop and stays mounted while
+// idle (visible={false}) rather than being conditionally unmounted. On Android,
+// unmounting a `<Modal>` that RN still considers visible — which is exactly
+// what happens when a list row containing a Sheet is removed (e.g. deleting a
+// routine on the Today screen) — can skip the native dialog's dismiss
+// lifecycle and leave a transparent, touch-swallowing window on top of the app,
+// making it unresponsive. Toggling `visible` false lets RN tear the native
+// window down properly, so a later parent unmount only ever removes an
+// already-dismissed Modal.
 export const SHEET_ENTER_DURATION_MS = 260;
 export const SHEET_EXIT_DURATION_MS = 200;
 const BACKDROP_MAX_OPACITY = 0.4;
@@ -82,58 +92,63 @@ export function Sheet({ visible, onClose, onDismissed, children, testID }: Sheet
     });
   }, [visible, exiting, progress, reducedMotion]);
 
-  if (!visible && !exiting) {
-    return null;
-  }
+  // Shown during both the open state and the exit animation, so the native
+  // window stays up while the panel slides back down. Once it settles false,
+  // RN dismisses the dialog. The inner content is gated on the same flag so a
+  // closed sheet renders nothing (its children never mount while idle), even
+  // though the Modal element itself remains in the tree.
+  const shown = visible || exiting;
 
   return (
     <Modal
-      visible
+      visible={shown}
       transparent
       animationType="none"
       onRequestClose={onClose}
       testID={testID}
     >
-      <View style={styles.container}>
-        <Animated.View
-          style={[
-            styles.backdrop,
-            {
-              opacity: progress.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, BACKDROP_MAX_OPACITY],
-              }),
-            },
-          ]}
-        >
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={onClose}
-            accessibilityRole="button"
-            accessibilityLabel="Schließen"
-            testID={testID ? `${testID}-backdrop` : undefined}
-          />
-        </Animated.View>
-        <Animated.View
-          style={[
-            styles.sheet,
-            {
-              transform: [
-                {
-                  translateY: progress.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [PANEL_SLIDE_DISTANCE, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-          testID={testID ? `${testID}-content` : undefined}
-        >
-          <View style={styles.grabber} />
-          {children}
-        </Animated.View>
-      </View>
+      {shown ? (
+        <View style={styles.container}>
+          <Animated.View
+            style={[
+              styles.backdrop,
+              {
+                opacity: progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, BACKDROP_MAX_OPACITY],
+                }),
+              },
+            ]}
+          >
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Schließen"
+              testID={testID ? `${testID}-backdrop` : undefined}
+            />
+          </Animated.View>
+          <Animated.View
+            style={[
+              styles.sheet,
+              {
+                transform: [
+                  {
+                    translateY: progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [PANEL_SLIDE_DISTANCE, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+            testID={testID ? `${testID}-content` : undefined}
+          >
+            <View style={styles.grabber} />
+            {children}
+          </Animated.View>
+        </View>
+      ) : null}
     </Modal>
   );
 }
