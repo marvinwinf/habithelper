@@ -373,12 +373,12 @@ describe('TodayScreen', () => {
     expect(screen.queryByTestId('today-reward-toast')).toBeNull();
   });
 
-  it('moves a routine to tomorrow from the actions sheet', async () => {
+  it('moves a routine to tomorrow from the screen-level actions sheet', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
 
     await renderToday();
     await fireEvent.press(await screen.findByTestId(`routine-card-${dailyRoutine.id}`));
-    await fireEvent.press(screen.getByTestId(`routine-card-${dailyRoutine.id}-menu-move`));
+    await fireEvent.press(screen.getByTestId('today-routine-menu-move'));
 
     expect(moveRoutineOccurrence).toHaveBeenCalledWith(
       {},
@@ -388,12 +388,51 @@ describe('TodayScreen', () => {
     );
   });
 
+  it('hides move and skip in the actions sheet once the occurrence is resolved', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([
+      { ...dailyRoutine, allowConsciousSkip: true },
+    ]);
+    (listRoutineEventsInRange as jest.Mock).mockResolvedValue([
+      {
+        id: 'event-1',
+        routineId: dailyRoutine.id,
+        occurrenceDate: TODAY,
+        eventType: 'completed',
+        recordedAt: TODAY,
+        movedToDate: null,
+        skipReason: null,
+        supersededByEventId: null,
+      },
+    ]);
+
+    await renderToday();
+    await fireEvent.press(await screen.findByTestId(`routine-card-${dailyRoutine.id}`));
+
+    expect(screen.queryByTestId('today-routine-menu-move')).toBeNull();
+    expect(screen.queryByTestId('today-routine-menu-skip')).toBeNull();
+    expect(screen.getByTestId('today-routine-menu-detail')).toBeTruthy();
+    expect(screen.getByTestId('today-routine-menu-edit')).toBeTruthy();
+    expect(screen.getByTestId('today-routine-menu-delete')).toBeTruthy();
+  });
+
+  it('offers conscious skip in the actions sheet only when the routine allows it', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([
+      { ...dailyRoutine, allowConsciousSkip: false },
+    ]);
+
+    await renderToday();
+    await fireEvent.press(await screen.findByTestId(`routine-card-${dailyRoutine.id}`));
+
+    expect(screen.queryByTestId('today-routine-menu-skip')).toBeNull();
+    expect(screen.getByTestId('today-routine-menu-move')).toBeTruthy();
+  });
+
   it('deletes a routine from the actions sheet only after confirmation', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
 
     await renderToday();
     await fireEvent.press(await screen.findByTestId(`routine-card-${dailyRoutine.id}`));
-    await fireEvent.press(screen.getByTestId(`routine-card-${dailyRoutine.id}-menu-delete`));
+    await fireEvent.press(screen.getByTestId('today-routine-menu-delete'));
 
     expect(softDeleteRoutine).not.toHaveBeenCalled();
 
@@ -402,6 +441,32 @@ describe('TodayScreen', () => {
     await buttons.find((b) => b.text === 'Löschen')?.onPress?.();
 
     expect(softDeleteRoutine).toHaveBeenCalledWith({}, dailyRoutine.id);
+  });
+
+  it('keeps the remaining routines completable after deleting one (the Android freeze regression)', async () => {
+    const secondRoutine = { ...dailyRoutine, id: 'routine-daily-2', name: 'Lesen', sortOrder: 1 };
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine, secondRoutine]);
+
+    await renderToday();
+    await fireEvent.press(await screen.findByTestId(`routine-card-${dailyRoutine.id}`));
+    await fireEvent.press(screen.getByTestId('today-routine-menu-delete'));
+
+    // Confirm the deletion; the reload now returns only the second routine.
+    (listRoutines as jest.Mock).mockResolvedValue([secondRoutine]);
+    const alertCall = (Alert.alert as jest.Mock).mock.calls.at(-1);
+    const buttons = alertCall[2] as { text: string; onPress?: () => void }[];
+    await buttons.find((b) => b.text === 'Löschen')?.onPress?.();
+    expect(softDeleteRoutine).toHaveBeenCalledWith({}, dailyRoutine.id);
+
+    // The deleted row is gone and the remaining routine still completes.
+    await waitFor(() =>
+      expect(screen.queryByTestId(`routine-card-${dailyRoutine.id}`)).toBeNull(),
+    );
+    const control = await screen.findByTestId(`routine-card-${secondRoutine.id}-complete`);
+    await fireEvent(control, 'pressIn');
+    await fireEvent(control, 'pressOut');
+
+    expect(completeRoutineOccurrence).toHaveBeenCalledWith({}, secondRoutine.id, TODAY);
   });
 
   it('renders Routines, then Tasks, then For later, in that order', async () => {
@@ -483,12 +548,12 @@ describe('TodayScreen', () => {
 
     await renderToday();
     await fireEvent.press(await screen.findByTestId('today-task-task-1'));
-    await fireEvent.press(screen.getByTestId('today-task-task-1-menu-move'));
+    await fireEvent.press(screen.getByTestId('today-task-menu-move'));
 
     expect(moveTask).toHaveBeenCalledWith({}, 'task-1', expect.any(String));
 
     await fireEvent.press(await screen.findByTestId('today-task-task-1'));
-    await fireEvent.press(screen.getByTestId('today-task-task-1-menu-delete'));
+    await fireEvent.press(screen.getByTestId('today-task-menu-delete'));
 
     const alertCall = (Alert.alert as jest.Mock).mock.calls.at(-1);
     const buttons = alertCall[2] as { text: string; onPress?: () => void }[];

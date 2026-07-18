@@ -15,9 +15,7 @@ const task = {
 async function renderCard(overrides: Partial<React.ComponentProps<typeof TaskCard>> = {}) {
   const callbacks = {
     onToggleComplete: jest.fn(),
-    onMoveToTomorrow: jest.fn(),
-    onEdit: jest.fn(),
-    onDelete: jest.fn(),
+    onOpenMenu: jest.fn(),
   };
   const result = await render(
     <TaskCard task={task} isOverdue={false} testID="task-card" {...callbacks} {...overrides} />,
@@ -59,39 +57,16 @@ describe('TaskCard', () => {
     expect(screen.queryByTestId('task-card-overdue-label')).toBeNull();
   });
 
-  it('opens the actions sheet on card tap and wires its entries', async () => {
-    const { callbacks } = await renderCard();
-
-    await fireEvent.press(screen.getByTestId('task-card'));
-    await fireEvent.press(screen.getByTestId('task-card-menu-move'));
-    expect(callbacks.onMoveToTomorrow).toHaveBeenCalledTimes(1);
-
-    await fireEvent.press(screen.getByTestId('task-card'));
-    await fireEvent.press(screen.getByTestId('task-card-menu-edit'));
-    expect(callbacks.onEdit).toHaveBeenCalledTimes(1);
-
-    await fireEvent.press(screen.getByTestId('task-card'));
-    await fireEvent.press(screen.getByTestId('task-card-menu-delete'));
-    expect(callbacks.onDelete).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not complete the task when tapping the card body to open actions', async () => {
+  it('requests the screen-level actions sheet on card tap, without completing', async () => {
+    // The card must NOT own a Sheet of its own — a per-row native Modal is
+    // what caused the Android freeze after deleting a row (the screen owns
+    // the one sheet instead); the card only reports the tap upward.
     const { callbacks } = await renderCard();
 
     await fireEvent.press(screen.getByTestId('task-card'));
 
+    expect(callbacks.onOpenMenu).toHaveBeenCalledTimes(1);
     expect(callbacks.onToggleComplete).not.toHaveBeenCalled();
-    expect(screen.getByTestId('task-card-menu-edit')).toBeTruthy();
-  });
-
-  it('hides the move-to-tomorrow option once the task is completed', async () => {
-    await renderCard({ task: { ...task, isCompleted: true } });
-
-    await fireEvent.press(screen.getByTestId('task-card'));
-
-    expect(screen.queryByTestId('task-card-menu-move')).toBeNull();
-    expect(screen.getByTestId('task-card-menu-edit')).toBeTruthy();
-    expect(screen.getByTestId('task-card-menu-delete')).toBeTruthy();
   });
 
   it('shows "Heute" as the subtitle for a task dated today', async () => {

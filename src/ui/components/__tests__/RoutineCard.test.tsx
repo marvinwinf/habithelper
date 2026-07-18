@@ -29,12 +29,7 @@ async function renderCard(overrides: Partial<React.ComponentProps<typeof Routine
     onComplete: jest.fn(),
     onExceed: jest.fn(),
     onUndo: jest.fn(),
-    onOpenDetail: jest.fn(),
-    onMoveToTomorrow: jest.fn(),
-    onSkip: jest.fn(),
-    onEdit: jest.fn(),
-    onPause: jest.fn(),
-    onDelete: jest.fn(),
+    onOpenMenu: jest.fn(),
   };
   const result = await render(
     <RoutineCard
@@ -69,7 +64,7 @@ describe('RoutineCard', () => {
 
     expect(callbacks.onComplete).toHaveBeenCalledTimes(1);
     expect(callbacks.onExceed).not.toHaveBeenCalled();
-    expect(callbacks.onOpenDetail).not.toHaveBeenCalled();
+    expect(callbacks.onOpenMenu).not.toHaveBeenCalled();
 
     await fireEvent(control, 'pressIn');
     jest.advanceTimersByTime(500);
@@ -134,62 +129,17 @@ describe('RoutineCard', () => {
     await waitFor(() => expect(triggerLevelMilestoneHaptic).toHaveBeenCalledTimes(1));
   });
 
-  it('tapping the card body opens the actions sheet rather than completing', async () => {
+  it('requests the screen-level actions sheet on card tap, without completing', async () => {
+    // The card must NOT own a Sheet of its own — a per-row native Modal is
+    // what caused the Android freeze after deleting a row (the screen owns
+    // the one sheet instead); the card only reports the tap upward.
     const { callbacks } = await renderCard();
 
     await fireEvent.press(screen.getByTestId('routine-card'));
 
-    // The sheet's actions become reachable, and the tap did not complete.
-    expect(screen.getByTestId('routine-card-menu-detail')).toBeTruthy();
+    expect(callbacks.onOpenMenu).toHaveBeenCalledTimes(1);
     expect(callbacks.onComplete).not.toHaveBeenCalled();
     expect(callbacks.onExceed).not.toHaveBeenCalled();
-  });
-
-  it('opens the detail from the actions sheet Statistik entry', async () => {
-    const { callbacks } = await renderCard();
-
-    await fireEvent.press(screen.getByTestId('routine-card'));
-    await fireEvent.press(screen.getByTestId('routine-card-menu-detail'));
-
-    expect(callbacks.onOpenDetail).toHaveBeenCalledTimes(1);
-  });
-
-  it('omits conscious skip from the actions sheet when the routine disallows it', async () => {
-    await renderCard({ routine: { ...routine, allowConsciousSkip: false } });
-
-    await fireEvent.press(screen.getByTestId('routine-card'));
-
-    expect(screen.queryByTestId('routine-card-menu-skip')).toBeNull();
-    expect(screen.getByTestId('routine-card-menu-move')).toBeTruthy();
-  });
-
-  it('includes conscious skip in the actions sheet when the routine allows it', async () => {
-    const { callbacks } = await renderCard({ routine: { ...routine, allowConsciousSkip: true } });
-
-    await fireEvent.press(screen.getByTestId('routine-card'));
-    await fireEvent.press(screen.getByTestId('routine-card-menu-skip'));
-
-    expect(callbacks.onSkip).toHaveBeenCalledTimes(1);
-  });
-
-  it('wires the remaining actions-sheet entries', async () => {
-    const { callbacks } = await renderCard();
-
-    await fireEvent.press(screen.getByTestId('routine-card'));
-    await fireEvent.press(screen.getByTestId('routine-card-menu-move'));
-    expect(callbacks.onMoveToTomorrow).toHaveBeenCalledTimes(1);
-
-    await fireEvent.press(screen.getByTestId('routine-card'));
-    await fireEvent.press(screen.getByTestId('routine-card-menu-edit'));
-    expect(callbacks.onEdit).toHaveBeenCalledTimes(1);
-
-    await fireEvent.press(screen.getByTestId('routine-card'));
-    await fireEvent.press(screen.getByTestId('routine-card-menu-pause'));
-    expect(callbacks.onPause).toHaveBeenCalledTimes(1);
-
-    await fireEvent.press(screen.getByTestId('routine-card'));
-    await fireEvent.press(screen.getByTestId('routine-card-menu-delete'));
-    expect(callbacks.onDelete).toHaveBeenCalledTimes(1);
   });
 
   it('disables the completion control only when the occurrence was skipped', async () => {
@@ -266,18 +216,4 @@ describe('RoutineCard', () => {
     expect(screen.getByText('Mo, Mi, Fr')).toBeTruthy();
   });
 
-  it('hides move and skip in the actions sheet once the occurrence is resolved', async () => {
-    await renderCard({
-      routine: { ...routine, allowConsciousSkip: true },
-      state: 'completed',
-    });
-
-    await fireEvent.press(screen.getByTestId('routine-card'));
-
-    expect(screen.queryByTestId('routine-card-menu-move')).toBeNull();
-    expect(screen.queryByTestId('routine-card-menu-skip')).toBeNull();
-    expect(screen.getByTestId('routine-card-menu-detail')).toBeTruthy();
-    expect(screen.getByTestId('routine-card-menu-edit')).toBeTruthy();
-    expect(screen.getByTestId('routine-card-menu-delete')).toBeTruthy();
-  });
 });

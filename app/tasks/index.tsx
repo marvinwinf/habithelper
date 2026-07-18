@@ -16,8 +16,10 @@ import { deleteTask, moveTask, setTaskCompletion } from '../../src/services/task
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
 import { compareByDateThenTime } from '../../src/domain/tasks/ordering';
 import { confirmTaskDeletion } from '../../src/ui/alerts';
+import { Button } from '../../src/ui/components/Button';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { ScreenHeader } from '../../src/ui/components/ScreenHeader';
+import { Sheet } from '../../src/ui/components/Sheet';
 import { TaskCard } from '../../src/ui/components/TaskCard';
 import { colors, pressedFeedback, spacing, typography } from '../../src/ui/theme';
 
@@ -36,6 +38,12 @@ export default function TasksScreen() {
   const [undated, setUndated] = useState<Task[]>([]);
   const [completed, setCompleted] = useState<Task[]>([]);
   const [completedExpanded, setCompletedExpanded] = useState(false);
+  // The task actions sheet is owned here at screen level and opened for
+  // whichever row was tapped — never rendered inside the rows. A per-row
+  // Sheet puts a native Modal inside the row, and on Android removing that
+  // row (deleting or moving the task) tears the Modal down mid-lifecycle,
+  // which can leave a transparent, touch-swallowing window over the app.
+  const [menuTaskId, setMenuTaskId] = useState<string | null>(null);
 
   // Monotonic reload token: two overlapping reloads (e.g. from completing
   // several tasks quickly) could otherwise resolve their independent per-
@@ -107,6 +115,17 @@ export default function TasksScreen() {
     });
   }
 
+  // Closes the actions sheet, then runs the chosen action — the same
+  // close-first sequencing the Routines screen uses.
+  function closeMenuThen(action: () => void) {
+    setMenuTaskId(null);
+    action();
+  }
+
+  // Looked up fresh each render so a reload while the sheet is open keeps
+  // its contents honest; if the id no longer resolves, the sheet renders empty.
+  const menuTask = menuTaskId !== null ? allTasks.find((task) => task.id === menuTaskId) : undefined;
+
   function renderTask(item: Task, isOverdue: boolean) {
     const category = item.categoryId ? categoryById.get(item.categoryId) : undefined;
     return (
@@ -117,9 +136,7 @@ export default function TasksScreen() {
         category={category}
         isOverdue={isOverdue}
         onToggleComplete={() => handleToggleComplete(item)}
-        onMoveToTomorrow={() => handleMoveToTomorrow(item)}
-        onEdit={() => handleEdit(item)}
-        onDelete={() => handleDelete(item)}
+        onOpenMenu={() => setMenuTaskId(item.id)}
       />
     );
   }
@@ -167,6 +184,32 @@ export default function TasksScreen() {
           </View>
         </ScrollView>
       )}
+
+      <Sheet visible={menuTaskId !== null} onClose={() => setMenuTaskId(null)} testID="tasks-task-menu">
+        {menuTask && (
+          <View style={styles.menu}>
+            <Button
+              label="Bearbeiten"
+              onPress={() => closeMenuThen(() => handleEdit(menuTask))}
+              testID="tasks-task-menu-edit"
+            />
+            {!menuTask.isCompleted && (
+              <Button
+                label="Auf morgen verschieben"
+                variant="secondary"
+                onPress={() => closeMenuThen(() => handleMoveToTomorrow(menuTask))}
+                testID="tasks-task-menu-move"
+              />
+            )}
+            <Button
+              label="Löschen"
+              variant="destructive"
+              onPress={() => closeMenuThen(() => handleDelete(menuTask))}
+              testID="tasks-task-menu-delete"
+            />
+          </View>
+        )}
+      </Sheet>
     </View>
   );
 }
@@ -196,5 +239,8 @@ const styles = StyleSheet.create({
   },
   sectionTogglePressed: {
     ...pressedFeedback,
+  },
+  menu: {
+    gap: spacing.sm,
   },
 });

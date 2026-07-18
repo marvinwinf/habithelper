@@ -1,11 +1,8 @@
-import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Button } from './Button';
 import { CompletionControl } from './CompletionControl';
 import { IconBadge } from './IconBadge';
-import { Sheet } from './Sheet';
 import {
   triggerExceededCompletionHaptic,
   triggerLevelMilestoneHaptic,
@@ -69,12 +66,16 @@ export interface RoutineCardProps {
   // correctly reverting the routine's streak/level/joker state and (if this
   // was the day's sole completion) the overall app streak.
   onUndo: () => void | Promise<void>;
-  onOpenDetail: () => void;
-  onMoveToTomorrow: () => void;
-  onSkip: () => void;
-  onEdit: () => void;
-  onPause: () => void;
-  onDelete: () => void;
+  /**
+   * Tapping the card body requests the screen-level actions sheet for this
+   * routine. The card deliberately does NOT own the sheet itself: a per-row
+   * Sheet renders a native Modal inside the row, and on Android removing the
+   * row (deleting the routine) tears that Modal down mid-lifecycle, which can
+   * leave a transparent, touch-swallowing window over the whole app. The
+   * screen owns a single Sheet instead (same pattern as the Routines screen,
+   * which never exhibited the bug).
+   */
+  onOpenMenu: () => void;
   /** Staggered mount-fade delay for list rendering (see mountStaggerDelayMs). */
   mountDelayMs?: number;
   testID?: string;
@@ -87,9 +88,9 @@ export interface RoutineCardProps {
  * "time · schedule" subtitle and the streak. The row itself carries only the
  * completion control — per the
  * design system's List Row Actions rule there is no inline overflow menu;
- * tapping the row opens an actions bottom sheet (Statistik/detail plus
- * docs/ROUTINE_RULES.md's per-occurrence actions), so the list stays focused
- * on viewing and completing (T030/T065).
+ * tapping the row opens the screen's actions bottom sheet
+ * (Statistik/detail plus docs/ROUTINE_RULES.md's per-occurrence actions),
+ * so the list stays focused on viewing and completing (T030/T065).
  */
 export function RoutineCard({
   routine,
@@ -99,19 +100,12 @@ export function RoutineCard({
   onComplete,
   onExceed,
   onUndo,
-  onOpenDetail,
-  onMoveToTomorrow,
-  onSkip,
-  onEdit,
-  onPause,
-  onDelete,
+  onOpenMenu,
   mountDelayMs = 0,
   testID,
 }: RoutineCardProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const levelUpAnimation = useLevelUpAnimation();
   const mountAnimation = useMountAnimation(mountDelayMs);
-  const isResolved = state !== 'pending';
   const isCompletedOrExceeded = state === 'completed' || state === 'exceeded';
   const isSkipped = state === 'skipped';
 
@@ -123,11 +117,6 @@ export function RoutineCard({
     ? getCategoryColorVariant(category.baseColor, routine.colorVariantSeed)
     : null;
   const solidFill = category ? getCategorySolidFill(category.baseColor) : null;
-
-  function closeMenuThen(action: () => void) {
-    setMenuOpen(false);
-    action();
-  }
 
   function maybeStartLevelUpMilestone(leveledUp: void | boolean) {
     if (leveledUp) {
@@ -165,107 +154,55 @@ export function RoutineCard({
   const rowOpacity = Animated.multiply(mountAnimation.progress, levelUpDip);
 
   return (
-    <>
-      <Pressable
-        onPress={() => setMenuOpen(true)}
-        accessibilityRole="button"
-        testID={testID}
-        style={({ pressed }) => pressed && styles.pressed}
-      >
-        <Animated.View style={{ opacity: rowOpacity }}>
-          <View style={[styles.row, variant && { backgroundColor: variant.background }]}>
-            <IconBadge
-              name={categoryIconName(category?.icon)}
-              backgroundColor={solidFill?.background}
-              iconColor={solidFill?.iconColor}
-            />
-            <View style={styles.main}>
-              <Text style={[styles.name, isSkipped && styles.nameSkipped]} numberOfLines={1}>
-                {routine.name}
-              </Text>
-              {/* One compact meta line — subtitle and streak share it so every
-                  card stays two lines tall and all list cards line up at the
-                  shared minimum height. */}
-              <View style={styles.metaRow}>
-                {subtitle.length > 0 && (
-                  <Text style={styles.subtitle} numberOfLines={1}>
-                    {subtitle}
-                  </Text>
-                )}
-                <View style={styles.streakRow}>
-                  <Ionicons name="flame" size={typography.caption.fontSize} color={colors.accent} />
-                  <Text style={styles.streakLabel} testID={testID ? `${testID}-streak` : undefined}>
-                    Streak {streak}
-                  </Text>
-                </View>
+    <Pressable
+      onPress={onOpenMenu}
+      accessibilityRole="button"
+      testID={testID}
+      style={({ pressed }) => pressed && styles.pressed}
+    >
+      <Animated.View style={{ opacity: rowOpacity }}>
+        <View style={[styles.row, variant && { backgroundColor: variant.background }]}>
+          <IconBadge
+            name={categoryIconName(category?.icon)}
+            backgroundColor={solidFill?.background}
+            iconColor={solidFill?.iconColor}
+          />
+          <View style={styles.main}>
+            <Text style={[styles.name, isSkipped && styles.nameSkipped]} numberOfLines={1}>
+              {routine.name}
+            </Text>
+            {/* One compact meta line — subtitle and streak share it so every
+                card stays two lines tall and all list cards line up at the
+                shared minimum height. */}
+            <View style={styles.metaRow}>
+              {subtitle.length > 0 && (
+                <Text style={styles.subtitle} numberOfLines={1}>
+                  {subtitle}
+                </Text>
+              )}
+              <View style={styles.streakRow}>
+                <Ionicons name="flame" size={typography.caption.fontSize} color={colors.accent} />
+                <Text style={styles.streakLabel} testID={testID ? `${testID}-streak` : undefined}>
+                  Streak {streak}
+                </Text>
               </View>
             </View>
-            <View style={styles.actions}>
-              <CompletionControl
-                completed={state === 'completed'}
-                exceeded={state === 'exceeded'}
-                // Only a conscious skip stays locked — a completed/exceeded
-                // control remains tappable so a misclick can be undone.
-                disabled={isSkipped}
-                onComplete={handleComplete}
-                onExceed={handleExceed}
-                testID={`${testID}-complete`}
-              />
-            </View>
           </View>
-        </Animated.View>
-      </Pressable>
-
-      <Sheet visible={menuOpen} onClose={() => setMenuOpen(false)} testID={`${testID}-menu`}>
-        <View style={styles.menu}>
-          {/* The list row has no inline overflow menu; this sheet is the one
-              place a routine's actions live. "Statistik" opens the full
-              Routine Detail (streak, level, calendar). */}
-          <Button
-            label="Statistik"
-            onPress={() => closeMenuThen(onOpenDetail)}
-            testID={`${testID}-menu-detail`}
-          />
-          {/* Move and skip act on today's occurrence, so they disappear once
-              it is resolved — writing a second outcome event for the same
-              date would leave the occurrence's state ambiguous. */}
-          {!isResolved && (
-            <Button
-              label="Auf morgen verschieben"
-              variant="secondary"
-              onPress={() => closeMenuThen(onMoveToTomorrow)}
-              testID={`${testID}-menu-move`}
+          <View style={styles.actions}>
+            <CompletionControl
+              completed={state === 'completed'}
+              exceeded={state === 'exceeded'}
+              // Only a conscious skip stays locked — a completed/exceeded
+              // control remains tappable so a misclick can be undone.
+              disabled={isSkipped}
+              onComplete={handleComplete}
+              onExceed={handleExceed}
+              testID={`${testID}-complete`}
             />
-          )}
-          {!isResolved && routine.allowConsciousSkip && (
-            <Button
-              label="Bewusst auslassen"
-              variant="secondary"
-              onPress={() => closeMenuThen(onSkip)}
-              testID={`${testID}-menu-skip`}
-            />
-          )}
-          <Button
-            label="Bearbeiten"
-            variant="secondary"
-            onPress={() => closeMenuThen(onEdit)}
-            testID={`${testID}-menu-edit`}
-          />
-          <Button
-            label="Pausieren"
-            variant="secondary"
-            onPress={() => closeMenuThen(onPause)}
-            testID={`${testID}-menu-pause`}
-          />
-          <Button
-            label="Löschen"
-            variant="destructive"
-            onPress={() => closeMenuThen(onDelete)}
-            testID={`${testID}-menu-delete`}
-          />
+          </View>
         </View>
-      </Sheet>
-    </>
+      </Animated.View>
+    </Pressable>
   );
 }
 
@@ -331,9 +268,6 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-  },
-  menu: {
     gap: spacing.sm,
   },
 });
