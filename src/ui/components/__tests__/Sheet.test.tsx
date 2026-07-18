@@ -73,6 +73,21 @@ describe('Sheet', () => {
     expect(onDismissed).toHaveBeenCalledTimes(1);
   });
 
+  it('drives the native Modal through its visible prop while open', async () => {
+    // The Sheet controls the native Modal via `visible` (rather than
+    // conditionally unmounting a still-visible Modal), which is what lets RN
+    // Android run the dialog's dismiss lifecycle instead of leaving a
+    // touch-swallowing ghost window when a list row owning the Sheet is
+    // removed — e.g. deleting a routine on the Today screen.
+    await render(
+      <Sheet visible onClose={jest.fn()} testID="sheet">
+        <Text>Sheet content</Text>
+      </Sheet>
+    );
+
+    expect(screen.getByTestId('sheet').props.visible).toBe(true);
+  });
+
   it('does not fire onDismissed for a sheet that never opened', async () => {
     const onDismissed = jest.fn();
     await render(
