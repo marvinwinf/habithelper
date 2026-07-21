@@ -102,6 +102,15 @@ export default function TodayScreen() {
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  // The routine/task actions sheets are owned HERE, at screen level, and
+  // opened for whichever row was tapped — never rendered inside the rows
+  // themselves. A per-row Sheet puts a native Modal inside the row, and on
+  // Android removing that row (deleting the routine/task) tears the Modal
+  // down mid-lifecycle, which can leave a transparent, touch-swallowing
+  // window over the whole app, making it unusable. The Routines screen has
+  // always used this screen-level pattern and never exhibited the bug.
+  const [menuRoutineId, setMenuRoutineId] = useState<string | null>(null);
+  const [menuTaskId, setMenuTaskId] = useState<string | null>(null);
   const streakBurst = useStreakBurst();
   const reducedMotion = useReducedMotion();
   const rewardToast = useRewardToast(reducedMotion);
@@ -229,6 +238,19 @@ export default function TodayScreen() {
 
   const overdueTaskIds = useMemo(() => new Set(overdueTasks.map((t) => t.id)), [overdueTasks]);
 
+  // The row the actions sheet is currently open for. Looked up fresh each
+  // render (not stored as a snapshot) so a reload while the sheet is open —
+  // or the row disappearing entirely — keeps the sheet's contents honest;
+  // when the id no longer resolves, the sheet simply renders empty.
+  const menuRoutineEntry =
+    menuRoutineId !== null
+      ? dueRoutines.find((entry) => entry.routine.id === menuRoutineId)
+      : undefined;
+  const menuTask =
+    menuTaskId !== null
+      ? [...todayTasks, ...laterTasks].find((taskItem) => taskItem.id === menuTaskId)
+      : undefined;
+
   // Queues the gentle glide for rows that re-sort (completed/undone items
   // moving between the pending and resolved groups) before reloading.
   const reloadWithListSettle = useCallback(() => {
@@ -258,6 +280,19 @@ export default function TodayScreen() {
       await softDeleteRoutine(db, routine.id);
       loadData();
     });
+  }
+
+  // Closes the routine actions sheet, then runs the chosen action — the same
+  // close-first sequencing the Routines screen uses, so the sheet is already
+  // on its way out before any follow-up (alert, navigation, reload) starts.
+  function closeRoutineMenuThen(action: () => void) {
+    setMenuRoutineId(null);
+    action();
+  }
+
+  function closeTaskMenuThen(action: () => void) {
+    setMenuTaskId(null);
+    action();
   }
 
   async function handleToggleTaskComplete(taskItem: Task) {
@@ -492,26 +527,7 @@ export default function TodayScreen() {
                             reloadWithListSettle,
                           )
                         }
-                        onOpenDetail={() => router.push(`/routine/${routine.id}`)}
-                        onMoveToTomorrow={() => {
-                          const today = todayDateString();
-                          return moveRoutineOccurrence(
-                            db,
-                            routine.id,
-                            today,
-                            addDaysToDateString(today, 1),
-                          ).then(reloadWithListSettle);
-                        }}
-                        onSkip={() =>
-                          skipRoutineOccurrence(db, routine.id, todayDateString()).then(
-                            reloadWithListSettle,
-                          )
-                        }
-                        onEdit={() => router.push(`/routine/${routine.id}/edit`)}
-                        onPause={() =>
-                          pauseRoutine(db, routine.id, todayDateString()).then(loadData)
-                        }
-                        onDelete={() => handleDelete(routine)}
+                        onOpenMenu={() => setMenuRoutineId(routine.id)}
                       />
                     </View>
                   );
@@ -537,9 +553,7 @@ export default function TodayScreen() {
                       mountDelayMs={mountStaggerDelayMs(index)}
                       isOverdue={overdueTaskIds.has(taskItem.id)}
                       onToggleComplete={() => handleToggleTaskComplete(taskItem)}
-                      onMoveToTomorrow={() => handleMoveTaskToTomorrow(taskItem)}
-                      onEdit={() => router.push(`/task/${taskItem.id}/edit`)}
-                      onDelete={() => handleDeleteTask(taskItem)}
+                      onOpenMenu={() => setMenuTaskId(taskItem.id)}
                     />
                   );
                 })}
@@ -565,9 +579,7 @@ export default function TodayScreen() {
                       isOverdue={false}
                       forLater
                       onToggleComplete={() => handleToggleTaskComplete(taskItem)}
-                      onMoveToTomorrow={() => handleMoveTaskToTomorrow(taskItem)}
-                      onEdit={() => router.push(`/task/${taskItem.id}/edit`)}
-                      onDelete={() => handleDeleteTask(taskItem)}
+                      onOpenMenu={() => setMenuTaskId(taskItem.id)}
                     />
                   );
                 })}
@@ -577,6 +589,115 @@ export default function TodayScreen() {
         </View>
       )}
     </ScrollView>
+
+    {/* The one routine actions sheet, shared by every routine row (see the
+        comment on menuRoutineId for why it must not live inside the rows).
+        "Statistik" opens the full Routine Detail (streak, level, calendar). */}
+    <Sheet
+      visible={menuRoutineId !== null}
+      onClose={() => setMenuRoutineId(null)}
+      testID="today-routine-menu"
+    >
+      {menuRoutineEntry && (
+        <View style={styles.menu}>
+          <Button
+            label="Statistik"
+            onPress={() =>
+              closeRoutineMenuThen(() => router.push(`/routine/${menuRoutineEntry.routine.id}`))
+            }
+            testID="today-routine-menu-detail"
+          />
+          {/* Move and skip act on today's occurrence, so they disappear once
+              it is resolved — writing a second outcome event for the same
+              date would leave the occurrence's state ambiguous. */}
+          {menuRoutineEntry.state === 'pending' && (
+            <Button
+              label="Auf morgen verschieben"
+              variant="secondary"
+              onPress={() =>
+                closeRoutineMenuThen(() => {
+                  const today = todayDateString();
+                  moveRoutineOccurrence(
+                    db,
+                    menuRoutineEntry.routine.id,
+                    today,
+                    addDaysToDateString(today, 1),
+                  ).then(reloadWithListSettle);
+                })
+              }
+              testID="today-routine-menu-move"
+            />
+          )}
+          {menuRoutineEntry.state === 'pending' && menuRoutineEntry.routine.allowConsciousSkip && (
+            <Button
+              label="Bewusst auslassen"
+              variant="secondary"
+              onPress={() =>
+                closeRoutineMenuThen(() => {
+                  skipRoutineOccurrence(db, menuRoutineEntry.routine.id, todayDateString()).then(
+                    reloadWithListSettle,
+                  );
+                })
+              }
+              testID="today-routine-menu-skip"
+            />
+          )}
+          <Button
+            label="Bearbeiten"
+            variant="secondary"
+            onPress={() =>
+              closeRoutineMenuThen(() =>
+                router.push(`/routine/${menuRoutineEntry.routine.id}/edit`),
+              )
+            }
+            testID="today-routine-menu-edit"
+          />
+          <Button
+            label="Pausieren"
+            variant="secondary"
+            onPress={() =>
+              closeRoutineMenuThen(() => {
+                pauseRoutine(db, menuRoutineEntry.routine.id, todayDateString()).then(loadData);
+              })
+            }
+            testID="today-routine-menu-pause"
+          />
+          <Button
+            label="Löschen"
+            variant="destructive"
+            onPress={() => closeRoutineMenuThen(() => handleDelete(menuRoutineEntry.routine))}
+            testID="today-routine-menu-delete"
+          />
+        </View>
+      )}
+    </Sheet>
+
+    {/* The one task actions sheet, shared by the Tasks and For-later rows. */}
+    <Sheet visible={menuTaskId !== null} onClose={() => setMenuTaskId(null)} testID="today-task-menu">
+      {menuTask && (
+        <View style={styles.menu}>
+          <Button
+            label="Bearbeiten"
+            onPress={() => closeTaskMenuThen(() => router.push(`/task/${menuTask.id}/edit`))}
+            testID="today-task-menu-edit"
+          />
+          {!menuTask.isCompleted && (
+            <Button
+              label="Auf morgen verschieben"
+              variant="secondary"
+              onPress={() => closeTaskMenuThen(() => handleMoveTaskToTomorrow(menuTask))}
+              testID="today-task-menu-move"
+            />
+          )}
+          <Button
+            label="Löschen"
+            variant="destructive"
+            onPress={() => closeTaskMenuThen(() => handleDeleteTask(menuTask))}
+            testID="today-task-menu-delete"
+          />
+        </View>
+      )}
+    </Sheet>
 
     <Sheet
       visible={shortcutsOpen}
