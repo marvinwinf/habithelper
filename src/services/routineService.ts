@@ -22,7 +22,13 @@ import { addDaysToDateString, todayDateString } from '../domain/dates';
 import { requestConsciousSkip } from '../domain/routines/completion';
 import { planRetroactiveCompletion } from '../domain/routines/retroactive';
 import { scheduleFromRoutineRow } from '../domain/routines/schedule';
-import { planUndoCompletion } from '../domain/routines/undo';
+import {
+  hasCompletionToUndo,
+  hasSkipToUndo,
+  planUndoCompletion,
+  planUndoSkip,
+  type UndoCompletionPlan,
+} from '../domain/routines/undo';
 import { computeAppStreak } from '../domain/streaks/appStreak';
 import { JOKER_EARN_THRESHOLD, replayRoutineStreak } from '../domain/streaks/replay';
 
@@ -213,6 +219,13 @@ export async function createRoutine(db: RoutineServiceDb, input: CreateRoutineIn
  * insert into the middle of history) would need a forward walk similar to
  * reconciliation to backfill any joker_earned crossing correctly, which is
  * out of scope here and left as a known limitation.
+ *
+ * The threshold comparison is `>=`, not `===`, precisely because of that
+ * limitation: a retroactive completion adds to jokerProgress without ever
+ * writing the joker_earned that would reset it, so the counter can land on 6
+ * or higher. A strict equality then never matched again and the routine
+ * silently stopped earning jokers for good; `>=` grants the overdue joker and
+ * resets progress, so the count heals itself on the next completion.
  */
 function maybeWriteJokerEarnedEventTx(
   tx: RoutineServiceTx,
@@ -221,7 +234,7 @@ function maybeWriteJokerEarnedEventTx(
 ): void {
   const events = tx.select().from(routineEvent).where(eq(routineEvent.routineId, routineId)).all();
   const state = replayRoutineStreak(events);
-  if (state.jokerProgress === JOKER_EARN_THRESHOLD) {
+  if (state.jokerProgress >= JOKER_EARN_THRESHOLD) {
     const jokerEarnedEvent = buildRoutineEvent({ routineId, occurrenceDate, eventType: 'joker_earned' });
     tx.insert(routineEvent).values(jokerEarnedEvent).run();
   }
@@ -491,24 +504,20 @@ export interface UndoCompletionResult {
 }
 
 /**
- * Undoes a misclicked completion (`completed` or `exceeded`) on
- * `occurrenceDate`: supersedes it (and any `joker_earned` event it produced)
- * via T027's supersede pattern, then recomputes both the routine cache — a
- * full replay naturally reflects the completion no longer counting — and the
- * app streak cache, which is likewise fully re-derived from the event log so
- * the global streak drops exactly when the undone day was the last one
- * holding it up. All in one transaction, per docs/ARCHITECTURE.md's Event and
- * Cache Write Atomicity.
+ * Persists an undo plan: writes each new marker event and stamps
+ * `superseded_by_event_id` on the rows it replaces, then recomputes the
+ * routine cache — a full replay naturally reflects the undone event no longer
+ * counting — and the app streak cache, which is likewise fully re-derived from
+ * the event log so the global streak drops exactly when the undone day was the
+ * last one holding it up. All in one transaction, per docs/ARCHITECTURE.md's
+ * Event and Cache Write Atomicity.
  */
-export async function undoRoutineCompletion(
+function applyUndoPlanTx(
   db: RoutineServiceDb,
   routineId: string,
-  occurrenceDate: string,
-  today: string = todayDateString(),
-): Promise<UndoCompletionResult> {
-  const priorEvents = await listRoutineEvents(db, routineId);
-  const plan = planUndoCompletion(occurrenceDate, priorEvents);
-
+  plan: UndoCompletionPlan,
+  today: string,
+): RoutineEvent[] {
   const writtenEvents: RoutineEvent[] = [];
   db.transaction((tx) => {
     for (const eventToWrite of plan.eventsToWrite) {
@@ -531,6 +540,57 @@ export async function undoRoutineCompletion(
     recomputeRoutineCacheTx(tx, routineId);
     recomputeAppStreakCacheTx(tx, today);
   });
+  return writtenEvents;
+}
 
-  return { writtenEvents };
+/**
+ * Undoes a misclicked completion (`completed` or `exceeded`) on
+ * `occurrenceDate`: supersedes it (and any `joker_earned` event it produced)
+ * via T027's supersede pattern.
+ *
+ * Idempotent, exactly like `writeCompletionEventTx` and for the same reason:
+ * a repeated tap — or a rapid double-tap racing the Today screen's async
+ * reload, where the card is still rendered as completed — must not fail. It
+ * used to throw `NoCompletionToUndoError` from a fire-and-forget promise,
+ * which surfaced as an unhandled rejection and, worse, skipped the reload that
+ * would have corrected the row, leaving it stuck showing a completion that no
+ * longer existed. With nothing left to undo there is simply nothing to write.
+ */
+export async function undoRoutineCompletion(
+  db: RoutineServiceDb,
+  routineId: string,
+  occurrenceDate: string,
+  today: string = todayDateString(),
+): Promise<UndoCompletionResult> {
+  const priorEvents = await listRoutineEvents(db, routineId);
+  if (!hasCompletionToUndo(occurrenceDate, priorEvents)) {
+    return { writtenEvents: [] };
+  }
+
+  const plan = planUndoCompletion(occurrenceDate, priorEvents);
+  return { writtenEvents: applyUndoPlanTx(db, routineId, plan, today) };
+}
+
+/**
+ * Undoes a misclicked conscious skip on `occurrenceDate`, returning the
+ * occurrence to pending so it can be completed after all. Without it a
+ * mis-tapped "Bewusst auslassen" was a dead end: the completion control
+ * renders disabled for a skipped occurrence, and the actions sheet only offers
+ * move/skip while the occurrence is still pending.
+ *
+ * Idempotent for the same reason as `undoRoutineCompletion`.
+ */
+export async function undoRoutineSkip(
+  db: RoutineServiceDb,
+  routineId: string,
+  occurrenceDate: string,
+  today: string = todayDateString(),
+): Promise<UndoCompletionResult> {
+  const priorEvents = await listRoutineEvents(db, routineId);
+  if (!hasSkipToUndo(occurrenceDate, priorEvents)) {
+    return { writtenEvents: [] };
+  }
+
+  const plan = planUndoSkip(occurrenceDate, priorEvents);
+  return { writtenEvents: applyUndoPlanTx(db, routineId, plan, today) };
 }

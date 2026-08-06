@@ -2,7 +2,7 @@ import { eq, isNull } from 'drizzle-orm';
 import { routine, routineEvent, routineStateCache } from '../data/db/schema';
 import { buildRoutineEvent } from '../data/repositories/routineEventRepository';
 import type { RoutineStateCache } from '../data/repositories/routineStateCacheRepository';
-import { addDaysToDateString, todayDateString } from '../domain/dates';
+import { addDaysToDateString, toLocalDateString, todayDateString } from '../domain/dates';
 import { reconcileMissedOccurrences } from '../domain/routines/reconcile';
 import { scheduleFromRoutineRow } from '../domain/routines/schedule';
 import {
@@ -43,8 +43,19 @@ export async function reconcileRoutine(
       .all();
 
     const schedule = scheduleFromRoutineRow(routineRow);
+    // created_at is a UTC timestamp, but every routine rule is about the
+    // user's LOCAL calendar day (docs/DATA_MODEL.md: "created_at date is the
+    // start"; src/domain/dates.ts), so convert rather than slicing the UTC
+    // date part. Slicing was off by a day for anyone not on UTC: east of it a
+    // routine created just after local midnight seeded the watermark a day
+    // early and reconciliation immediately wrote a `missed` event for a day
+    // the routine did not yet exist on — breaking its streak before the first
+    // completion, and invisibly, since the calendar renders days before the
+    // start date as not_due. West of UTC the opposite happened and the local
+    // creation day was skipped entirely.
     const reconciledThroughDate =
-      existingCache?.reconciledThroughDate ?? addDaysToDateString(routineRow.createdAt.slice(0, 10), -1);
+      existingCache?.reconciledThroughDate ??
+      addDaysToDateString(toLocalDateString(new Date(routineRow.createdAt)), -1);
 
     const plan = reconcileMissedOccurrences(schedule, events, reconciledThroughDate, today);
     for (const eventToWrite of plan.eventsToWrite) {

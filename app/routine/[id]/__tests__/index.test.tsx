@@ -317,6 +317,72 @@ describe('RoutineDetailScreen', () => {
     expect(triggerLevelMilestoneHaptic).toHaveBeenCalledTimes(1);
   });
 
+  // Reconciliation writes `joker_protected` rather than `missed` whenever a
+  // joker was available to spend, so restricting the tap to `missed` made
+  // exactly the days a joker paid for impossible to correct — and the joker
+  // impossible to get back, though docs/ROUTINE_RULES.md requires a
+  // retroactive completion to restore it.
+  it('offers retroactive completion for a joker-protected past day', async () => {
+    (listRoutineEvents as jest.Mock).mockResolvedValue([
+      {
+        id: 'event-1',
+        routineId: routine.id,
+        occurrenceDate: PREV_MONTH_15TH,
+        eventType: 'joker_protected',
+        recordedAt: PREV_MONTH_15TH,
+        movedToDate: null,
+        skipReason: null,
+        supersededByEventId: null,
+      },
+      {
+        id: 'event-2',
+        routineId: routine.id,
+        occurrenceDate: PREV_MONTH_15TH,
+        eventType: 'joker_consumed',
+        recordedAt: PREV_MONTH_15TH,
+        movedToDate: null,
+        skipReason: null,
+        supersededByEventId: null,
+      },
+    ]);
+
+    await render(<RoutineDetailScreen />);
+    await screen.findByText('Laufen');
+
+    await fireEvent.press(screen.getByTestId('routine-detail-calendar-prev'));
+    await fireEvent.press(screen.getByTestId(`calendar-day-${PREV_MONTH_15TH}-joker_protected`));
+
+    const alertCall = (Alert.alert as jest.Mock).mock.calls.at(-1);
+    const buttons = alertCall[2] as { text: string; onPress?: () => void }[];
+    await buttons.find((b) => b.text === 'Erledigt')?.onPress?.();
+
+    expect(retroactivelyCompleteOccurrence).toHaveBeenCalledWith({}, 'routine-1', PREV_MONTH_15TH);
+  });
+
+  it('does not offer retroactive completion for a consciously skipped past day', async () => {
+    (listRoutineEvents as jest.Mock).mockResolvedValue([
+      {
+        id: 'event-1',
+        routineId: routine.id,
+        occurrenceDate: PREV_MONTH_15TH,
+        eventType: 'skipped',
+        recordedAt: PREV_MONTH_15TH,
+        movedToDate: null,
+        skipReason: null,
+        supersededByEventId: null,
+      },
+    ]);
+
+    await render(<RoutineDetailScreen />);
+    await screen.findByText('Laufen');
+
+    await fireEvent.press(screen.getByTestId('routine-detail-calendar-prev'));
+    await fireEvent.press(screen.getByTestId(`calendar-day-${PREV_MONTH_15TH}-skipped`));
+
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(retroactivelyCompleteOccurrence).not.toHaveBeenCalled();
+  });
+
   it('does not offer retroactive completion for an already-completed past day', async () => {
     (listRoutineEvents as jest.Mock).mockResolvedValue([
       {

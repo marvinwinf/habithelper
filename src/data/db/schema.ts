@@ -33,7 +33,12 @@ export type RoutineEventType =
   // Supersedes a misclicked completed/exceeded event (and its joker_earned
   // sibling, if any) — see src/domain/routines/undo.ts. event_type is a plain
   // TEXT column with no DB-level constraint, so this needs no migration.
-  | 'completion_undone';
+  | 'completion_undone'
+  // The same audit marker for a misclicked conscious skip: supersedes the
+  // `skipped` event so the occurrence returns to pending and can be completed.
+  // Without it a mis-tapped skip locked that day permanently — the completion
+  // control renders disabled for a skipped occurrence.
+  | 'skip_undone';
 
 export const profile = sqliteTable('profile', {
   id: text('id').primaryKey(),

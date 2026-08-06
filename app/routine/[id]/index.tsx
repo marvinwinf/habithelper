@@ -27,7 +27,11 @@ import {
 import { reconcileRoutine } from '../../../src/services/reconciliationService';
 import { confirmRoutineDeletion } from '../../../src/ui/alerts';
 import { toLocalDateString, todayDateString } from '../../../src/domain/dates';
-import { getCalendarDayState, listMonthDates } from '../../../src/domain/routines/calendar';
+import {
+  getCalendarDayState,
+  listMonthDates,
+  type CalendarDayState,
+} from '../../../src/domain/routines/calendar';
 import { scheduleFromRoutineRow, type IsoWeekday } from '../../../src/domain/routines/schedule';
 import { LEVEL_SEGMENT_SIZE } from '../../../src/domain/streaks/replay';
 import { levelName } from '../../../src/domain/streaks/levelName';
@@ -75,6 +79,11 @@ const PLAN_ROWS: {
   { key: 'pairing', label: 'Verknüpfung', icon: 'link-outline' },
   { key: 'reward', label: 'Belohnung', icon: 'gift-outline' },
 ];
+
+// Calendar states an elapsed day can be corrected from by tapping it (see
+// handleDayPress). Deliberately excludes `skipped` (a conscious, recorded
+// decision), `moved`, `paused`, and `not_due`.
+const RETROACTIVELY_COMPLETABLE_STATES: readonly CalendarDayState[] = ['missed', 'joker_protected'];
 
 const MONTH_NAMES = [
   'Januar',
@@ -164,9 +173,14 @@ export default function RoutineDetailScreen() {
   }
 
   function handleDayPress(day: CalendarDay) {
-    // Retroactive completion applies to elapsed missed occurrences only,
-    // per docs/ROUTINE_RULES.md's Retroactive Completion section.
-    if (day.state !== 'missed' || day.date >= todayDateString()) {
+    // Retroactive completion applies to elapsed unsuccessful occurrences, per
+    // docs/ROUTINE_RULES.md's Retroactive Completion section — which covers
+    // joker-protected days explicitly ("if a joker was previously consumed for
+    // that occurrence, the joker must be restored"). Reconciliation writes
+    // `joker_protected` rather than `missed` whenever a joker was available,
+    // so restricting this to `missed` made exactly the days a joker paid for
+    // impossible to correct, and the joker impossible to get back.
+    if (!RETROACTIVELY_COMPLETABLE_STATES.includes(day.state) || day.date >= todayDateString()) {
       return;
     }
     Alert.alert('Nachträglich erledigen?', `${day.date} als erledigt markieren.`, [

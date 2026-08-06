@@ -1,4 +1,12 @@
-import { NoCompletionToUndoError, planUndoCompletion, type RecordedOccurrenceEvent } from '../undo';
+import {
+  NoCompletionToUndoError,
+  NoSkipToUndoError,
+  hasCompletionToUndo,
+  hasSkipToUndo,
+  planUndoCompletion,
+  planUndoSkip,
+  type RecordedOccurrenceEvent,
+} from '../undo';
 
 const DATE = '2026-06-20';
 const OTHER_DATE = '2026-06-21';
@@ -71,5 +79,55 @@ describe('planUndoCompletion', () => {
     expect(plan.eventsToWrite).toEqual([
       { eventType: 'completion_undone', occurrenceDate: DATE, supersedesEventIds: ['e1'] },
     ]);
+  });
+});
+
+describe('planUndoSkip', () => {
+  it('supersedes the active skipped event', () => {
+    const priorEvents: RecordedOccurrenceEvent[] = [
+      { id: 'e1', occurrenceDate: DATE, eventType: 'skipped' },
+    ];
+
+    const plan = planUndoSkip(DATE, priorEvents);
+
+    expect(plan.occurrenceDate).toBe(DATE);
+    expect(plan.requiresFullRecalculation).toBe(true);
+    expect(plan.eventsToWrite).toEqual([
+      { eventType: 'skip_undone', occurrenceDate: DATE, supersedesEventIds: ['e1'] },
+    ]);
+  });
+
+  it('ignores skips on other dates and already-superseded ones', () => {
+    const priorEvents: RecordedOccurrenceEvent[] = [
+      { id: 'e1', occurrenceDate: DATE, eventType: 'skipped', supersededByEventId: 'e2' },
+      { id: 'e2', occurrenceDate: DATE, eventType: 'skip_undone' },
+      { id: 'e3', occurrenceDate: OTHER_DATE, eventType: 'skipped' },
+    ];
+
+    expect(() => planUndoSkip(DATE, priorEvents)).toThrow(NoSkipToUndoError);
+  });
+});
+
+describe('hasCompletionToUndo / hasSkipToUndo', () => {
+  it('reports an active completion and, after undoing, none', () => {
+    expect(hasCompletionToUndo(DATE, [{ id: 'e1', occurrenceDate: DATE, eventType: 'completed' }])).toBe(
+      true,
+    );
+    expect(
+      hasCompletionToUndo(DATE, [
+        { id: 'e1', occurrenceDate: DATE, eventType: 'completed', supersededByEventId: 'e2' },
+        { id: 'e2', occurrenceDate: DATE, eventType: 'completion_undone' },
+      ]),
+    ).toBe(false);
+  });
+
+  it('reports an active skip and, after undoing, none', () => {
+    expect(hasSkipToUndo(DATE, [{ id: 'e1', occurrenceDate: DATE, eventType: 'skipped' }])).toBe(true);
+    expect(
+      hasSkipToUndo(DATE, [
+        { id: 'e1', occurrenceDate: DATE, eventType: 'skipped', supersededByEventId: 'e2' },
+        { id: 'e2', occurrenceDate: DATE, eventType: 'skip_undone' },
+      ]),
+    ).toBe(false);
   });
 });

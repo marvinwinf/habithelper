@@ -5,8 +5,7 @@ import { appendRoutineEvent, listRoutineEvents } from '../../data/repositories/r
 import { getRoutineStateCache } from '../../data/repositories/routineStateCacheRepository';
 import * as routineStateCacheRepo from '../../data/repositories/routineStateCacheRepository';
 import { getAppStreakCache } from '../../data/repositories/appStreakCacheRepository';
-import { ConsciousSkipNotAllowedError } from '../../domain/routines/completion';
-import { NoCompletionToUndoError } from '../../domain/routines/undo';
+import { ConsciousSkipNotAllowedError, classifyOccurrence } from '../../domain/routines/completion';
 import {
   RoutineNotFoundError,
   completeRoutineOccurrence,
@@ -19,6 +18,7 @@ import {
   retroactivelyCompleteOccurrence,
   skipRoutineOccurrence,
   undoRoutineCompletion,
+  undoRoutineSkip,
 } from '../routineService';
 
 jest.mock('expo-crypto', () => {
@@ -525,13 +525,34 @@ describe('routineService', () => {
       sqlite.close();
     });
 
-    it('throws when there is nothing active to undo', async () => {
+    // Idempotent rather than throwing: a rapid second tap on an
+    // already-undone card must not reject from a fire-and-forget promise (see
+    // undoRoutineCompletion).
+    it('is a no-op when there is nothing active to undo', async () => {
       const { db, sqlite } = await createDrizzleTestDb();
       const created = await createRoutine(db, baseInput);
 
-      await expect(undoRoutineCompletion(db, created.id, '2026-07-01')).rejects.toThrow(
-        NoCompletionToUndoError,
+      const result = await undoRoutineCompletion(db, created.id, '2026-07-01');
+
+      expect(result.writtenEvents).toEqual([]);
+      expect(await listRoutineEvents(db, created.id)).toEqual([]);
+
+      sqlite.close();
+    });
+
+    it('leaves a repeated undo of the same occurrence a no-op', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+      await completeRoutineOccurrence(db, created.id, '2026-07-01', '2026-07-01');
+
+      await undoRoutineCompletion(db, created.id, '2026-07-01', '2026-07-01');
+      const second = await undoRoutineCompletion(db, created.id, '2026-07-01', '2026-07-01');
+
+      expect(second.writtenEvents).toEqual([]);
+      const undoneMarkers = (await listRoutineEvents(db, created.id)).filter(
+        (event) => event.eventType === 'completion_undone',
       );
+      expect(undoneMarkers).toHaveLength(1);
 
       sqlite.close();
     });
@@ -723,6 +744,170 @@ describe('routineService', () => {
 
       const cache = await getRoutineStateCache(db, created.id);
       expect(cache).toMatchObject({ currentStreak: 1, totalCompletions: 1 });
+
+      sqlite.close();
+    });
+  });
+  describe('misclick recovery round trips', () => {
+    const daily = { type: 'daily' as const };
+
+    // The exact interaction the completion control offers: tap to complete,
+    // tap again to undo, tap a third time to complete after all. The undo
+    // marker stays in the log forever, so the re-completion has to remain
+    // visible past it — otherwise the card renders pending while the streak
+    // already counts the day, and further taps do nothing (the completion
+    // write is idempotent).
+    it('check, uncheck, check again leaves the occurrence completed exactly once', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      await completeRoutineOccurrence(db, created.id, '2026-07-01', '2026-07-01');
+      await undoRoutineCompletion(db, created.id, '2026-07-01', '2026-07-01');
+      await completeRoutineOccurrence(db, created.id, '2026-07-01', '2026-07-01');
+
+      const events = await listRoutineEvents(db, created.id);
+      expect(classifyOccurrence(daily, '2026-07-01', events, '2026-07-01')).toBe('completed');
+      expect(await getRoutineStateCache(db, created.id)).toMatchObject({
+        currentStreak: 1,
+        totalCompletions: 1,
+      });
+      expect(await getAppStreakCache(db)).toMatchObject({ currentStreak: 1 });
+
+      sqlite.close();
+    });
+
+    it('survives several check/uncheck rounds without accumulating state', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      for (let round = 0; round < 4; round++) {
+        await completeRoutineOccurrence(db, created.id, '2026-07-01', '2026-07-01');
+        await undoRoutineCompletion(db, created.id, '2026-07-01', '2026-07-01');
+      }
+      await completeRoutineOccurrence(db, created.id, '2026-07-01', '2026-07-01');
+
+      const events = await listRoutineEvents(db, created.id);
+      expect(classifyOccurrence(daily, '2026-07-01', events, '2026-07-01')).toBe('completed');
+      expect(await getRoutineStateCache(db, created.id)).toMatchObject({
+        currentStreak: 1,
+        totalCompletions: 1,
+        jokerProgress: 1,
+      });
+
+      sqlite.close();
+    });
+
+    it('an undone exceeded completion can be redone as a normal completion', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      await exceedRoutineOccurrence(db, created.id, '2026-07-01', '2026-07-01');
+      await undoRoutineCompletion(db, created.id, '2026-07-01', '2026-07-01');
+      await completeRoutineOccurrence(db, created.id, '2026-07-01', '2026-07-01');
+
+      const events = await listRoutineEvents(db, created.id);
+      expect(classifyOccurrence(daily, '2026-07-01', events, '2026-07-01')).toBe('completed');
+
+      sqlite.close();
+    });
+  });
+
+  describe('undoRoutineSkip', () => {
+    const daily = { type: 'daily' as const };
+    const skippable = { ...baseInput, allowConsciousSkip: true };
+
+    it('returns a mis-tapped conscious skip to pending so it can be completed', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, skippable);
+      await skipRoutineOccurrence(db, created.id, '2026-07-01');
+
+      await undoRoutineSkip(db, created.id, '2026-07-01', '2026-07-01');
+
+      const events = await listRoutineEvents(db, created.id);
+      expect(classifyOccurrence(daily, '2026-07-01', events, '2026-07-01')).toBe('pending');
+      expect(events.find((e) => e.eventType === 'skipped')?.supersededByEventId).toBe(
+        events.find((e) => e.eventType === 'skip_undone')?.id,
+      );
+
+      sqlite.close();
+    });
+
+    it('lets the occurrence be completed normally afterwards', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, skippable);
+      await skipRoutineOccurrence(db, created.id, '2026-07-01');
+      await undoRoutineSkip(db, created.id, '2026-07-01', '2026-07-01');
+
+      await completeRoutineOccurrence(db, created.id, '2026-07-01', '2026-07-01');
+
+      const events = await listRoutineEvents(db, created.id);
+      expect(classifyOccurrence(daily, '2026-07-01', events, '2026-07-01')).toBe('completed');
+      expect(await getRoutineStateCache(db, created.id)).toMatchObject({
+        currentStreak: 1,
+        totalCompletions: 1,
+      });
+
+      sqlite.close();
+    });
+
+    it('is a no-op when nothing is skipped', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, skippable);
+
+      const result = await undoRoutineSkip(db, created.id, '2026-07-01', '2026-07-01');
+
+      expect(result.writtenEvents).toEqual([]);
+      expect(await listRoutineEvents(db, created.id)).toEqual([]);
+
+      sqlite.close();
+    });
+  });
+
+  describe('joker earning', () => {
+    it('earns a joker on the fifth successful completion', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      for (let day = 1; day <= 5; day++) {
+        const date = `2026-07-0${day}`;
+        await completeRoutineOccurrence(db, created.id, date, date);
+      }
+
+      expect(await getRoutineStateCache(db, created.id)).toMatchObject({
+        jokerInventory: 1,
+        jokerProgress: 0,
+      });
+
+      sqlite.close();
+    });
+
+    // A retroactive completion adds to jokerProgress without ever writing the
+    // joker_earned that resets it, so the counter can overshoot 5. A strict
+    // `=== 5` check then never matched again and the routine stopped earning
+    // jokers permanently; the threshold check must heal instead.
+    it('still earns a joker after a retroactive completion pushed progress past the threshold', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      // 2026-07-01 is missed; 07-02..07-05 are completed directly.
+      await appendRoutineEvent(db, {
+        routineId: created.id,
+        occurrenceDate: '2026-07-01',
+        eventType: 'missed',
+      });
+      for (let day = 2; day <= 5; day++) {
+        const date = `2026-07-0${day}`;
+        await completeRoutineOccurrence(db, created.id, date, date);
+      }
+      // Filling the gap retroactively takes the run to five completions
+      // without a joker_earned event, so jokerProgress lands on 5 unreset.
+      await retroactivelyCompleteOccurrence(db, created.id, '2026-07-01', '2026-07-05');
+      expect(await getRoutineStateCache(db, created.id)).toMatchObject({ jokerInventory: 0 });
+
+      await completeRoutineOccurrence(db, created.id, '2026-07-06', '2026-07-06');
+
+      const cache = await getRoutineStateCache(db, created.id);
+      expect(cache).toMatchObject({ jokerInventory: 1, jokerProgress: 0 });
 
       sqlite.close();
     });

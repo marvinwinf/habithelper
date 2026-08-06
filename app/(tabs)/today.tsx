@@ -42,6 +42,7 @@ import {
   pauseRoutine,
   skipRoutineOccurrence,
   undoRoutineCompletion,
+  undoRoutineSkip,
 } from '../../src/services/routineService';
 import { deleteTask, moveTask, setTaskCompletion } from '../../src/services/taskService';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
@@ -640,6 +641,23 @@ export default function TodayScreen() {
                 })
               }
               testID="today-routine-menu-skip"
+            />
+          )}
+          {/* The way back out of a mis-tapped skip. A skipped occurrence
+              renders its completion control disabled, so without this the day
+              was locked: neither completable nor changeable. */}
+          {menuRoutineEntry.state === 'skipped' && (
+            <Button
+              label="Auslassen rückgängig machen"
+              variant="secondary"
+              onPress={() =>
+                closeRoutineMenuThen(() => {
+                  undoRoutineSkip(db, menuRoutineEntry.routine.id, todayDateString()).then(
+                    reloadWithListSettle,
+                  );
+                })
+              }
+              testID="today-routine-menu-undo-skip"
             />
           )}
           <Button

@@ -72,6 +72,7 @@ const INTRA_DAY_ORDER: Record<RoutineEventType, number> = {
   joker_earned: 2,
   joker_restored: 3,
   completion_undone: 3,
+  skip_undone: 3,
 };
 
 /**
@@ -119,9 +120,10 @@ function applyEvent(state: RoutineStreakState, event: StreakReplayEvent): Routin
     // Conscious skips and joker-protected occurrences count as neither a
     // completion nor a miss (docs/ROUTINE_RULES.md); moved/paused/reactivated
     // affect scheduling (src/domain/routines), not streak/joker/level state.
-    // completion_undone is the audit-trail marker for an undone misclick
-    // (src/domain/routines/undo.ts) — the completion it undoes is already
-    // excluded above as superseded, so this needs no numeric effect either.
+    // completion_undone / skip_undone are the audit-trail markers for an
+    // undone misclick (src/domain/routines/undo.ts) — the completion or skip
+    // each undoes is already excluded above as superseded, and a skip never
+    // had a numeric effect to begin with, so neither needs one here.
     case 'joker_restored':
     case 'skipped':
     case 'joker_protected':
@@ -129,6 +131,7 @@ function applyEvent(state: RoutineStreakState, event: StreakReplayEvent): Routin
     case 'paused':
     case 'reactivated':
     case 'completion_undone':
+    case 'skip_undone':
       return state;
   }
 }
