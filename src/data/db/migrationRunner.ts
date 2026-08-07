@@ -10,7 +10,12 @@
 
 export interface MigrationDriver {
   execAsync(sql: string): Promise<void>;
-  runAsync(sql: string, params: (string | number)[]): Promise<void>;
+  // `null` is a legitimate SQLite bind value and both implementations
+  // (expo-sqlite's SQLiteBindValue, better-sqlite3's run) already accept it.
+  // Backup import binds nullable columns through this same driver shape
+  // (src/data/backup/types.ts), so the parameter type states it explicitly
+  // rather than relying on method-parameter bivariance to let it through.
+  runAsync(sql: string, params: (string | number | null)[]): Promise<void>;
   getAllAsync<T>(sql: string): Promise<T[]>;
   withTransactionAsync(task: () => Promise<void>): Promise<void>;
 }

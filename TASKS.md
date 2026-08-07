@@ -10,6 +10,14 @@ complete historical specification lives in `docs/TASKS_ARCHIVE.md` — reference
 material, not required reading. Consult a phase there only when you change the
 area it built; you do not need to read the whole archive to start a task.
 
+Correction, recorded so the gap is not re-introduced: this line previously
+claimed completeness while **Phase 9 (Backup and Restore, T051–T055) had never
+been implemented** — `src/data/backup/` did not exist and the Settings screen
+carried a `TODO(T055)` placeholder. The app had no export path at all, so an
+uninstall, a lost device, or a failed migration destroyed the user's only copy
+of their data, contradicting `docs/DATA_PERSISTENCE.md`'s core requirement.
+Phase 9 is now implemented and the claim above is accurate.
+
 New work is added as new tasks under **Open tasks** below, in the same format.
 
 ## Global rules for every task

@@ -103,7 +103,15 @@ Any service action that writes to `routine_event` and then updates `routine_stat
 - **Validate:** on import, the manifest is checked first — unsupported/future `schemaVersion` is rejected with a clear error before touching the database. Structural validation (required tables/fields present) runs before any write.
 - **Automatic pre-import safety backup:** import always triggers an export-to-local-file step first (written to app-private storage, not user-facing), so a failed or unwanted import can be rolled back.
 - **Import:** builds an entirely separate, fully-populated temp SQLite file from the validated backup (writes never touch the live file). The "swap" is a single atomic filesystem rename of the temp file over the live database path, performed only after the temp file is completely written and re-verified — never a row-by-row copy into the live database. This means a crash at any point before the rename leaves the live database completely untouched by construction, not merely by transaction rollback; the pre-import safety backup remains a second line of defense for the (much smaller) window around the rename itself.
-- Backups are plain JSON (not a raw SQLite file copy) so they remain portable across schema migrations — an older backup can be upgraded through the same migration functions used for the live DB before being applied.
+- Backups are plain JSON (not a raw SQLite file copy) so they remain portable across schema migrations — an older backup can be upgraded through the same migration functions used for the live DB before being applied. Concretely, `populateFromBackup` migrates the *temp* database to the current schema first and then inserts the backup's rows into it, so columns added since the export take their schema defaults.
+
+Three implementation consequences of the swap, established when Phase 9 landed:
+
+- **The WAL sidecars must go with the old file.** The live connection runs in WAL mode (`src/data/db/client.ts`), so `habithelper.db-wal`/`-shm` hold committed pages belonging to the *old* database. Renaming a new file over `habithelper.db` while those survive would have SQLite reconcile the imported database against a stale write-ahead log. Both sidecars are deleted as part of the swap.
+- **A successful import requires an app restart.** The swap closes the singleton `expoDb` connection (SQLite must not hold either file open across the rename), and the app has no way to rebind that singleton mid-session. The Settings screen therefore enters a terminal "restart the app" state on success rather than continuing against a closed handle.
+- **Ordering is enforced in a port-injected orchestration** (`src/data/backup/import.ts`), deliberately free of native imports so the guarantees above — validate before anything, safety backup before any database work, swap only after verification — are unit-testable with fakes. `expoImport.ts` supplies the real ports and stays thin, covered by the manual on-device checklist instead.
+
+Validation runs *before* the safety backup, not after: validation is pure (it touches no database and no filesystem), so rejecting a malformed or future-schema file leaves everything untouched and avoids writing a safety backup for a file that was never importable. The safety backup is still written before any database work begins, which is what T053 requires.
 
 ## Testing Setup
 
