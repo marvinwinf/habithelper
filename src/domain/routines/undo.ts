@@ -10,7 +10,7 @@ export interface RecordedOccurrenceEvent {
 }
 
 export interface UndoEventToWrite {
-  readonly eventType: 'completion_undone';
+  readonly eventType: 'completion_undone' | 'skip_undone';
   readonly occurrenceDate: string;
   // IDs of prior active events this new event supersedes — the caller
   // writes the new event, then sets supersededByEventId to its id on each
@@ -34,6 +34,48 @@ export class NoCompletionToUndoError extends Error {
   }
 }
 
+export class NoSkipToUndoError extends Error {
+  constructor(occurrenceDate: string) {
+    super(`No active conscious skip to undo for ${occurrenceDate}`);
+    this.name = 'NoSkipToUndoError';
+  }
+}
+
+/** A routine's non-superseded events for one occurrence date. */
+function activeEventsOn(
+  occurrenceDate: string,
+  priorEvents: readonly RecordedOccurrenceEvent[],
+): RecordedOccurrenceEvent[] {
+  return priorEvents.filter(
+    (event) => !event.supersededByEventId && event.occurrenceDate === occurrenceDate,
+  );
+}
+
+/**
+ * Whether `occurrenceDate` currently holds an active `completed`/`exceeded`
+ * event — what makes an undo meaningful. Exported so the service can treat a
+ * repeated undo (a second tap landing before the screen reloads) as a no-op
+ * instead of throwing: the completion write is idempotent for exactly the same
+ * reason, and an unhandled rejection from a fire-and-forget undo left the row
+ * rendered as completed with no reload to correct it.
+ */
+export function hasCompletionToUndo(
+  occurrenceDate: string,
+  priorEvents: readonly RecordedOccurrenceEvent[],
+): boolean {
+  return activeEventsOn(occurrenceDate, priorEvents).some(
+    (event) => event.eventType === 'completed' || event.eventType === 'exceeded',
+  );
+}
+
+/** Whether `occurrenceDate` currently holds an active `skipped` event. */
+export function hasSkipToUndo(
+  occurrenceDate: string,
+  priorEvents: readonly RecordedOccurrenceEvent[],
+): boolean {
+  return activeEventsOn(occurrenceDate, priorEvents).some((event) => event.eventType === 'skipped');
+}
+
 /**
  * Plans undoing a misclicked completion on `occurrenceDate`: supersedes the
  * active `completed`/`exceeded` event for that date, and — since
@@ -48,9 +90,7 @@ export function planUndoCompletion(
   occurrenceDate: string,
   priorEvents: readonly RecordedOccurrenceEvent[],
 ): UndoCompletionPlan {
-  const activePriorEvents = priorEvents.filter(
-    (event) => !event.supersededByEventId && event.occurrenceDate === occurrenceDate,
-  );
+  const activePriorEvents = activeEventsOn(occurrenceDate, priorEvents);
 
   // Supersede *every* active completion for the day, not just the first.
   // Idempotent completion (src/services/routineService.ts) prevents new
@@ -78,6 +118,39 @@ export function planUndoCompletion(
           ...completionEvents.map((event) => event.id),
           ...jokerEarnedEvents.map((event) => event.id),
         ],
+      },
+    ],
+    requiresFullRecalculation: true,
+  };
+}
+
+/**
+ * Plans undoing a misclicked conscious skip on `occurrenceDate`: supersedes
+ * the active `skipped` event(s) for that date with a `skip_undone` marker, so
+ * the occurrence classifies as pending again and its completion control
+ * becomes tappable. A skip has no streak/joker effect of its own
+ * (docs/ROUTINE_RULES.md's Conscious Skip section), so nothing else has to be
+ * reverted — but the caller still recomputes from the full log, since an
+ * occurrence that stops being skipped becomes reconcilable again.
+ */
+export function planUndoSkip(
+  occurrenceDate: string,
+  priorEvents: readonly RecordedOccurrenceEvent[],
+): UndoCompletionPlan {
+  const skipEvents = activeEventsOn(occurrenceDate, priorEvents).filter(
+    (event) => event.eventType === 'skipped',
+  );
+  if (skipEvents.length === 0) {
+    throw new NoSkipToUndoError(occurrenceDate);
+  }
+
+  return {
+    occurrenceDate,
+    eventsToWrite: [
+      {
+        eventType: 'skip_undone',
+        occurrenceDate,
+        supersedesEventIds: skipEvents.map((event) => event.id),
       },
     ],
     requiresFullRecalculation: true,

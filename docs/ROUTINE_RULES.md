@@ -52,13 +52,15 @@ If the undone occurrence was the day's only actual completion, the overall app s
 
 Undo is only offered for the current day's occurrence, not for past history — retroactive edits to past days remain a separate concern (see Retroactive Completion below).
 
+Undoing is idempotent: repeating it on an occurrence that no longer has a completion does nothing, so a rapid double tap cannot fail.
+
 ## Retroactive Completion
 
 Past occurrences can be marked as completed later.
 
 Retroactive completion must use the original occurrence date and trigger a full recalculation of streaks, jokers, and progress.
 
-If a joker was previously consumed for that occurrence, the joker must be restored.
+If a joker was previously consumed for that occurrence, the joker must be restored. Joker-protected days are therefore offered for retroactive completion just like plainly missed ones.
 
 ## Move to Tomorrow
 
@@ -77,6 +79,8 @@ When allowed, conscious skipping:
 - does not consume a joker,
 - does not count as a missed occurrence,
 - may include an optional reason.
+
+A misclicked conscious skip can be undone from the routine's actions sheet, returning the occurrence to pending so it can still be completed. Without this the day would be locked: a skipped occurrence's completion control is deliberately not tappable.
 
 ## Pause
 
@@ -97,6 +101,8 @@ The routine streak counts consecutive successful planned occurrences.
 Non-scheduled days do not change the streak.
 
 For weekly-target routines, each successful completion increases the streak by one. Once the weekly target is reached, the routine remains visibly completed for the rest of the week.
+
+A weekly target is a count per Monday-to-Sunday week, not an obligation per suggested weekday — the two can diverge, since the suggested weekdays are freely editable. So once a week's target is met, that week's remaining suggested weekdays are never counted as missed, and any completion in the week counts towards the target regardless of whether that weekday was suggested.
 
 ## Overall App Streak
 

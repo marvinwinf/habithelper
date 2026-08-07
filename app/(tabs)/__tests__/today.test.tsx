@@ -25,6 +25,7 @@ import {
   completeRoutineOccurrence,
   moveRoutineOccurrence,
   undoRoutineCompletion,
+  undoRoutineSkip,
 } from '../../../src/services/routineService';
 import { deleteTask, moveTask, setTaskCompletion } from '../../../src/services/taskService';
 import { triggerFirstCompletionOfDayHaptic } from '../../../src/ui/animation/haptics';
@@ -63,6 +64,7 @@ jest.mock('../../../src/services/routineService', () => ({
   skipRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
   pauseRoutine: jest.fn().mockResolvedValue(undefined),
   undoRoutineCompletion: jest.fn().mockResolvedValue({ writtenEvents: [] }),
+  undoRoutineSkip: jest.fn().mockResolvedValue({ writtenEvents: [] }),
 }));
 jest.mock('../../../src/services/taskService', () => ({
   setTaskCompletion: jest.fn().mockResolvedValue(undefined),
@@ -425,6 +427,44 @@ describe('TodayScreen', () => {
 
     expect(screen.queryByTestId('today-routine-menu-skip')).toBeNull();
     expect(screen.getByTestId('today-routine-menu-move')).toBeTruthy();
+  });
+
+  // A skipped occurrence renders its completion control disabled, so without
+  // this entry a mis-tapped "Bewusst auslassen" locked the day: neither
+  // completable nor changeable.
+  it('offers undoing a conscious skip once the occurrence is skipped', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([
+      { ...dailyRoutine, allowConsciousSkip: true },
+    ]);
+    (listRoutineEventsInRange as jest.Mock).mockResolvedValue([
+      {
+        id: 'event-1',
+        routineId: dailyRoutine.id,
+        occurrenceDate: TODAY,
+        eventType: 'skipped',
+        recordedAt: TODAY,
+        movedToDate: null,
+        skipReason: null,
+        supersededByEventId: null,
+      },
+    ]);
+
+    await renderToday();
+    await fireEvent.press(await screen.findByTestId(`routine-card-${dailyRoutine.id}`));
+    await fireEvent.press(screen.getByTestId('today-routine-menu-undo-skip'));
+
+    expect(undoRoutineSkip).toHaveBeenCalledWith({}, dailyRoutine.id, TODAY);
+  });
+
+  it('does not offer undoing a skip while the occurrence is still pending', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([
+      { ...dailyRoutine, allowConsciousSkip: true },
+    ]);
+
+    await renderToday();
+    await fireEvent.press(await screen.findByTestId(`routine-card-${dailyRoutine.id}`));
+
+    expect(screen.queryByTestId('today-routine-menu-undo-skip')).toBeNull();
   });
 
   it('deletes a routine from the actions sheet only after confirmation', async () => {
