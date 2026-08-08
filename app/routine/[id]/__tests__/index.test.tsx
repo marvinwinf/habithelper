@@ -485,4 +485,75 @@ describe('RoutineDetailScreen', () => {
       'Wähle mindestens einen Wochentag aus.',
     );
   });
+
+  describe('compounding card', () => {
+    const completion = (occurrenceDate: string, overrides: Record<string, unknown> = {}) => ({
+      id: `event-${occurrenceDate}`,
+      routineId: routine.id,
+      occurrenceDate,
+      eventType: 'completed',
+      recordedAt: `${occurrenceDate}T09:00:00.000Z`,
+      movedToDate: null,
+      skipReason: null,
+      supersededByEventId: null,
+      ...overrides,
+    });
+
+    it('is hidden for a routine with no completions', async () => {
+      (listRoutineEvents as jest.Mock).mockResolvedValue([]);
+
+      await render(<RoutineDetailScreen />);
+      await screen.findByTestId('routine-detail-calendar');
+
+      expect(screen.queryByTestId('routine-detail-compounding')).toBeNull();
+    });
+
+    it('is hidden while there is only a single month of history', async () => {
+      // A one-month curve is a diagonal line that says nothing about
+      // accumulation, so the card waits until there is something to show.
+      (listRoutineEvents as jest.Mock).mockResolvedValue([
+        completion(`${TODAY.slice(0, 7)}-01`),
+        completion(`${TODAY.slice(0, 7)}-02`),
+      ]);
+
+      await render(<RoutineDetailScreen />);
+      await screen.findByTestId('routine-detail-calendar');
+
+      expect(screen.queryByTestId('routine-detail-compounding')).toBeNull();
+    });
+
+    it('shows the lifetime total and the month it started from', async () => {
+      const [year, month] = TODAY.split('-').map(Number);
+      const previousMonth =
+        month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, '0')}`;
+      (listRoutineEvents as jest.Mock).mockResolvedValue([
+        completion(`${previousMonth}-04`),
+        completion(`${previousMonth}-05`),
+        completion(`${TODAY.slice(0, 7)}-01`),
+      ]);
+
+      await render(<RoutineDetailScreen />);
+
+      const total = await screen.findByTestId('routine-detail-compounding-total');
+      expect(total).toHaveTextContent(/^3× seit \w+ \d{4}$/);
+      expect(screen.getByTestId('routine-detail-compounding-chart')).toBeTruthy();
+    });
+
+    it('excludes undone completions from the total', async () => {
+      const [year, month] = TODAY.split('-').map(Number);
+      const previousMonth =
+        month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, '0')}`;
+      (listRoutineEvents as jest.Mock).mockResolvedValue([
+        completion(`${previousMonth}-04`),
+        completion(`${previousMonth}-05`, { supersededByEventId: 'undo-1' }),
+        completion(`${TODAY.slice(0, 7)}-01`),
+      ]);
+
+      await render(<RoutineDetailScreen />);
+
+      expect(await screen.findByTestId('routine-detail-compounding-total')).toHaveTextContent(
+        /^2× seit /,
+      );
+    });
+  });
 });

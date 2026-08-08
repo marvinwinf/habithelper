@@ -27,6 +27,7 @@ import {
 import { reconcileRoutine } from '../../../src/services/reconciliationService';
 import { confirmRoutineDeletion } from '../../../src/ui/alerts';
 import { toLocalDateString, todayDateString } from '../../../src/domain/dates';
+import { buildCompoundingOverview } from '../../../src/domain/progress/compounding';
 import {
   getCalendarDayState,
   listMonthDates,
@@ -41,6 +42,7 @@ import {
 } from '../../../src/domain/streaks/levelProgress';
 import { triggerLevelMilestoneHaptic } from '../../../src/ui/animation/haptics';
 import { useLevelUpAnimation } from '../../../src/ui/animation/useLevelUpAnimation';
+import { AreaChart } from '../../../src/ui/components/AreaChart';
 import { Card } from '../../../src/ui/components/Card';
 import { CategoryBadge } from '../../../src/ui/components/CategoryBadge';
 import { IconBadge } from '../../../src/ui/components/IconBadge';
@@ -81,6 +83,12 @@ const PLAN_ROWS: {
   { key: 'pairing', label: 'Verknüpfung', icon: 'link-outline' },
   { key: 'reward', label: 'Belohnung', icon: 'gift-outline' },
 ];
+
+/** `2026-03` -> `März 2026`, for the compounding card's range labels. */
+function formatMonthLabel(month: string): string {
+  const [year, monthNumber] = month.split('-').map(Number);
+  return `${MONTH_NAMES[monthNumber - 1]} ${year}`;
+}
 
 // Calendar states an elapsed day can be corrected from by tapping it (see
 // handleDayPress). Deliberately excludes `skipped` (a conscious, recorded
@@ -201,6 +209,21 @@ export default function RoutineDetailScreen() {
     ]);
   }
 
+  // The long-horizon counterpart to the calendar above it: the calendar shows
+  // one month, this shows every month since the routine's first completion.
+  const compounding = useMemo(
+    () => buildCompoundingOverview(events, todayDateString().slice(0, 7)),
+    [events],
+  );
+  const compoundingPoints = useMemo(
+    () =>
+      compounding.series.map((point) => ({
+        label: point.month,
+        value: point.cumulative,
+      })),
+    [compounding],
+  );
+
   const heroOpacity = levelUpAnimation.progress.interpolate({
     inputRange: [0, 1],
     outputRange: [1, LEVEL_UP_FADE_OPACITY],
@@ -211,6 +234,7 @@ export default function RoutineDetailScreen() {
   }
 
   const planRows = PLAN_ROWS.filter(({ key }) => routine[key]);
+
 
   const totalCompletions = cache?.totalCompletions ?? 0;
   const levelRank = cache?.levelRank ?? 0;
@@ -404,6 +428,33 @@ export default function RoutineDetailScreen() {
         />
       </Card>
 
+      {/* "Kleine Schritte summieren sich" — the compounding view. Only shown
+          once there is more than one month of history: a single-month curve
+          says nothing about accumulation and would just be a diagonal line.
+          Everything here is derived from the event log (no stored values). */}
+      {compounding.series.length > 1 && (
+        <Card style={styles.compoundingCard} testID="routine-detail-compounding">
+          <Text style={styles.planCardTitle}>Kleine Schritte summieren sich</Text>
+          <Text style={styles.compoundingTotal} testID="routine-detail-compounding-total">
+            {compounding.totalCompletions}× seit {formatMonthLabel(compounding.series[0].month)}
+          </Text>
+          <AreaChart
+            data={compoundingPoints}
+            max={compounding.totalCompletions}
+            height={120}
+            testID="routine-detail-compounding-chart"
+          />
+          <View style={styles.compoundingAxis}>
+            <Text style={styles.compoundingAxisLabel}>
+              {formatMonthLabel(compounding.series[0].month)}
+            </Text>
+            <Text style={styles.compoundingAxisLabel}>
+              {formatMonthLabel(compounding.series[compounding.series.length - 1].month)}
+            </Text>
+          </View>
+        </Card>
+      )}
+
       <View style={styles.actionRow}>
         <Pressable
           accessibilityRole="button"
@@ -559,6 +610,24 @@ const styles = StyleSheet.create({
   },
   weekdayCircleSelected: {
     borderColor: colors.accent,
+  },
+  compoundingCard: {
+    gap: spacing.sm,
+  },
+  compoundingTotal: {
+    fontFamily: typography.streak.fontFamily,
+    fontSize: typography.heading.fontSize,
+    lineHeight: typography.heading.lineHeight,
+    color: colors.textPrimary,
+  },
+  compoundingAxis: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  compoundingAxisLabel: {
+    fontSize: typography.caption.fontSize,
+    lineHeight: typography.caption.lineHeight,
+    color: colors.textSecondary,
   },
   planCard: {
     gap: spacing.sm,

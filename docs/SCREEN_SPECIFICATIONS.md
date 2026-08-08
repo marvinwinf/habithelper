@@ -202,12 +202,15 @@ Top area shows:
 
 Additional content:
 
-- personal reason in a lower or collapsible section,
+- the routine plan ("Dein Plan") — identity (the personal reason), cue, pairing, reward; filled fields only, card hidden when all are empty,
 - available jokers before streak 66,
 - personal streak record,
 - total successful completions,
 - editable weekdays, for weekly-target ("X times a week") routines only,
-- monthly calendar history.
+- monthly calendar history,
+- the compounding view ("Kleine Schritte summieren sich") — lifetime completion count and a cumulative month-by-month curve, shown only once there is more than one month of history.
+
+The compounding view is the long-horizon counterpart to the calendar directly above it: the calendar shows one month, this shows every month since the routine's first completion. It exists because every other progress surface in the app is scoped to the current week or month, which leaves the app silent during the long flat stretch that "Die 1%-Methode" calls the plateau of latent potential. Everything in it is derived from `routine_event`; no new value is stored.
 
 Calendar states:
 
