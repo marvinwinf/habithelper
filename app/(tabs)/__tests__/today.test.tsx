@@ -3,7 +3,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import TodayScreen from '../today';
-import { todayDateString } from '../../../src/domain/dates';
+import { addDaysToDateString, todayDateString } from '../../../src/domain/dates';
 import { focusOfTheDay } from '../../../src/domain/focusOfTheDay';
 import { listCategories } from '../../../src/data/repositories/categoryRepository';
 import { listRoutines, softDeleteRoutine } from '../../../src/data/repositories/routineRepository';
@@ -701,5 +701,82 @@ describe('TodayScreen', () => {
     await fireEvent.press(await screen.findByTestId('today-notifications-button'));
 
     expect(screen.getByText('Benachrichtigungen sind noch nicht verfügbar.')).toBeTruthy();
+  });
+
+  describe('never-miss-twice note', () => {
+    const YESTERDAY = addDaysToDateString(TODAY, -1);
+
+    const yesterdayEvent = (eventType: string, overrides: Record<string, unknown> = {}) => ({
+      id: `event-${eventType}`,
+      routineId: dailyRoutine.id,
+      occurrenceDate: YESTERDAY,
+      eventType,
+      recordedAt: `${YESTERDAY}T23:00:00.000Z`,
+      movedToDate: null,
+      skipReason: null,
+      supersededByEventId: null,
+      ...overrides,
+    });
+
+    beforeEach(() => {
+      (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
+    });
+
+    it('acknowledges a missed day while today is still open', async () => {
+      mockEventsForAllRoutines([yesterdayEvent('missed')]);
+
+      await renderToday();
+
+      expect(await screen.findByTestId('today-recovery-note')).toBeTruthy();
+    });
+
+    it('acknowledges a joker-protected day too', async () => {
+      mockEventsForAllRoutines([yesterdayEvent('joker_protected')]);
+
+      await renderToday();
+
+      expect(await screen.findByTestId('today-recovery-note')).toBeTruthy();
+    });
+
+    it('says nothing after a conscious skip', async () => {
+      // A recorded decision is not a lapse; nagging would punish the very
+      // feature that exists to avoid punishment.
+      mockEventsForAllRoutines([yesterdayEvent('skipped')]);
+
+      await renderToday();
+      await screen.findByTestId('today-routine-progress');
+
+      expect(screen.queryByTestId('today-recovery-note')).toBeNull();
+    });
+
+    it('says nothing when yesterday went fine', async () => {
+      mockEventsForAllRoutines([yesterdayEvent('completed')]);
+
+      await renderToday();
+      await screen.findByTestId('today-routine-progress');
+
+      expect(screen.queryByTestId('today-recovery-note')).toBeNull();
+    });
+
+    it('disappears once today is fully done', async () => {
+      mockEventsForAllRoutines([
+        yesterdayEvent('missed'),
+        {
+          id: 'event-today',
+          routineId: dailyRoutine.id,
+          occurrenceDate: TODAY,
+          eventType: 'completed',
+          recordedAt: TODAY,
+          movedToDate: null,
+          skipReason: null,
+          supersededByEventId: null,
+        },
+      ]);
+
+      await renderToday();
+      await screen.findByTestId('today-routine-progress');
+
+      expect(screen.queryByTestId('today-recovery-note')).toBeNull();
+    });
   });
 });

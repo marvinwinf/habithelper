@@ -39,6 +39,7 @@ Sections must not all carry equal visual weight — spacing, type size/weight, a
 - Current date.
 - Subtle overall app streak.
 - Daily routine progress only. Once every due routine is completed, the count label fades into a quiet "Alle erledigt" acknowledgement — the day's one gentle milestone moment (see `docs/DESIGN_SYSTEM.md`'s Gamification).
+- A single-line recovery note below the progress bar, shown only when yesterday held an unfulfilled occurrence (`missed` or `joker_protected`) *and* today still has something open. This is the "never miss twice" idea from "Die 1%-Methode": the app already absorbs a first miss through jokers and the post-66 tolerance window, but said nothing, so a user who missed yesterday saw only a streak that had quietly stopped moving. A conscious skip never triggers it — that is a recorded decision, not a lapse — and it disappears once the missed day is completed retroactively or today's routines are all done. Secondary text, never the destructive or "missed" color: an off day is acknowledged, not flagged.
 
 ### Focus of the Day
 

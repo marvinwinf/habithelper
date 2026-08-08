@@ -49,6 +49,7 @@ import { subscribeToDayRollover } from '../../src/state/appDayRollover';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
 import { getGreeting } from '../../src/domain/greeting';
 import { classifyOccurrence, type OccurrenceState } from '../../src/domain/routines/completion';
+import { hasUnfulfilledOccurrence } from '../../src/domain/routines/recovery';
 import { applySubsetReorder } from '../../src/domain/routines/reorder';
 import { scheduleFromRoutineRow } from '../../src/domain/routines/schedule';
 import { isFirstCompletionOfDay } from '../../src/domain/streaks/appStreak';
@@ -88,6 +89,11 @@ interface DueRoutine {
 
 function isCardState(state: OccurrenceState): state is RoutineCardOccurrenceState {
   return state === 'pending' || state === 'completed' || state === 'exceeded' || state === 'skipped';
+}
+
+/** Whether every routine due today has been completed or exceeded. */
+function allRoutinesDoneFor(dueRoutines: DueRoutine[]): boolean {
+  return dueRoutines.every(({ state }) => state === 'completed' || state === 'exceeded');
 }
 
 export default function TodayScreen() {
@@ -231,6 +237,22 @@ export default function TodayScreen() {
         return a.routine.sortOrder - b.routine.sortOrder;
       });
   }, [routines, eventsByRoutineId]);
+
+  // "Never miss twice": the app already absorbs a first miss with jokers and
+  // the post-66 tolerance window (docs/ROUTINE_RULES.md), but never said so —
+  // a user who missed yesterday saw only a streak that had quietly stopped
+  // moving. This names it once, gently, and only while today is still open.
+  // The events map already covers yesterday (it is fetched for exactly this
+  // date range), so this costs no extra query.
+  const showRecoveryNote = useMemo(() => {
+    if (dueRoutines.length === 0 || allRoutinesDoneFor(dueRoutines)) {
+      return false;
+    }
+    const yesterday = addDaysToDateString(todayDateString(), -1);
+    return Object.values(eventsByRoutineId).some((events) =>
+      hasUnfulfilledOccurrence(events, yesterday),
+    );
+  }, [dueRoutines, eventsByRoutineId]);
 
   // The Today screen's Tasks section shows what needs attention now
   // (overdue + due today); For later holds everything else (upcoming +
@@ -490,6 +512,11 @@ export default function TodayScreen() {
             value={dueRoutines.length === 0 ? 0 : completedRoutineCount / dueRoutines.length}
             testID="today-routine-progress-bar"
           />
+          {showRecoveryNote && (
+            <Text style={styles.recoveryNote} testID="today-recovery-note">
+              Gestern hat es nicht geklappt. Einmal ist kein Muster — heute zählt wieder.
+            </Text>
+          )}
         </Animated.View>
       </View>
 
@@ -877,6 +904,15 @@ const styles = StyleSheet.create({
     fontSize: typography.bodySmall.fontSize,
     fontWeight: typography.bodySmall.fontWeight,
     color: colors.textPrimary,
+  },
+  // Secondary text, never the destructive or "missed" color: an off day is
+  // acknowledged, not flagged (docs/DESIGN_SYSTEM.md's Gamification section —
+  // no punishment for a missed day).
+  recoveryNote: {
+    fontSize: typography.bodySmall.fontSize,
+    lineHeight: typography.bodySmall.lineHeight,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
   progressCount: {
     fontSize: typography.bodySmall.fontSize,
