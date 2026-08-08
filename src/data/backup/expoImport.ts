@@ -97,7 +97,31 @@ async function swapIntoPlace(temp: TempDatabase): Promise<void> {
   deleteWalSidecars(tempPath);
 }
 
-export function createExpoImportPorts(): ImportPorts {
+export interface ExpoImportOptions {
+  /**
+   * Allows the import to proceed when the *live* database cannot be read.
+   *
+   * Normally reading the live database is a precondition: its applied schema
+   * version bounds what backups are acceptable, and it is the source of the
+   * pre-import safety backup. But the one moment a restore matters most is
+   * exactly when that database is broken — a failed migration or a corrupt
+   * file — and in that state both reads fail. Refusing to import then would
+   * make the backup useless precisely when it is needed.
+   *
+   * With this set, the schema check falls back to what this build supports,
+   * and a safety backup that cannot be produced is reported rather than
+   * thrown: there is no readable data left to protect, so failing the restore
+   * over its absence would protect nothing.
+   */
+  tolerateUnreadableLiveDatabase?: boolean;
+}
+
+/** Reported as the safety backup path when there was no readable data to save. */
+export const NO_SAFETY_BACKUP = 'none';
+
+export function createExpoImportPorts(options: ExpoImportOptions = {}): ImportPorts {
+  const tolerant = options.tolerateUnreadableLiveDatabase ?? false;
+
   return {
     readSourceText: async () => {
       const picked = await File.pickFileAsync({ mimeTypes: ['application/json'] });
@@ -110,10 +134,27 @@ export function createExpoImportPorts(): ImportPorts {
     // applied": a database somehow ahead of this build must not be told it can
     // accept an even newer backup.
     currentSchemaVersion: async () => {
-      const applied = await readSchemaVersion(createExpoBackupDriver(expoDb));
-      return Math.max(applied, supportedSchemaVersion());
+      const supported = supportedSchemaVersion();
+      try {
+        const applied = await readSchemaVersion(createExpoBackupDriver(expoDb));
+        return Math.max(applied, supported);
+      } catch (error) {
+        if (!tolerant) {
+          throw error;
+        }
+        return supported;
+      }
     },
-    writeSafetyBackup,
+    writeSafetyBackup: async () => {
+      try {
+        return await writeSafetyBackup();
+      } catch (error) {
+        if (!tolerant) {
+          throw error;
+        }
+        return NO_SAFETY_BACKUP;
+      }
+    },
     createTempDatabase: async () => createTempDatabase(),
     swapIntoPlace,
   };
@@ -124,6 +165,6 @@ export function createExpoImportPorts(): ImportPorts {
  * of the picker, otherwise with the safety backup's path. On success the app
  * must be restarted before any further database access.
  */
-export function importBackup(): Promise<ImportResult> {
-  return runImport(createExpoImportPorts());
+export function importBackup(options: ExpoImportOptions = {}): Promise<ImportResult> {
+  return runImport(createExpoImportPorts(options));
 }
