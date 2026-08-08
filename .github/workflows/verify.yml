@@ -1,0 +1,50 @@
+# Runs the project's quality gates on every push and pull request.
+#
+# `docs/PROJECT_PRINCIPLES.md` states the product owner does not systematically
+# review source code, which makes typecheck/lint/tests the primary defense
+# against regressions. Relying on whoever writes a commit to remember
+# `npm run verify` locally is not a defense — this workflow enforces it.
+#
+# Deliberately separate from `android-apk.yml`: that workflow builds a release
+# artifact and only runs on tags, dispatches, a commit-message marker, or main.
+# These checks must run on every branch and every pull request, before a build
+# is ever considered.
+name: Verify
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+
+# A second push to the same branch makes the previous run's result obsolete;
+# cancel it rather than paying for both.
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The three gates run as separate steps rather than via `npm run verify`
+      # so a failure names which gate broke in the job summary. `verify` chains
+      # the same three commands for local use.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test

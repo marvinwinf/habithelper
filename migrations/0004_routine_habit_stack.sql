@@ -1,0 +1,1 @@
+ALTER TABLE `routine` ADD `pairing_routine_id` text REFERENCES routine(id);

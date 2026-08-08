@@ -25,6 +25,10 @@ export interface RoutineInput {
   cue?: string | null;
   pairing?: string | null;
   reward?: string | null;
+  /** The "2-minute rule" version of the routine (migration 0003). */
+  miniVersion?: string | null;
+  /** The routine this one is stacked on — "after X, I will …" (migration 0004). */
+  pairingRoutineId?: string | null;
   allowConsciousSkip: boolean;
   sortOrder: number;
   colorVariantSeed: number;
@@ -54,6 +58,8 @@ export async function createRoutine(db: RoutineDb, input: RoutineInput): Promise
     cue: input.cue ?? null,
     pairing: input.pairing ?? null,
     reward: input.reward ?? null,
+    miniVersion: input.miniVersion ?? null,
+    pairingRoutineId: input.pairingRoutineId ?? null,
     allowConsciousSkip: input.allowConsciousSkip,
     isPaused: false,
     sortOrder: input.sortOrder,

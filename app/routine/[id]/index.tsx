@@ -7,6 +7,7 @@ import { db } from '../../../src/data/db/client';
 import { listCategories, type Category } from '../../../src/data/repositories/categoryRepository';
 import {
   getRoutine,
+  listRoutines,
   softDeleteRoutine,
   updateRoutine,
   type Routine,
@@ -27,6 +28,7 @@ import {
 import { reconcileRoutine } from '../../../src/services/reconciliationService';
 import { confirmRoutineDeletion } from '../../../src/ui/alerts';
 import { toLocalDateString, todayDateString } from '../../../src/domain/dates';
+import { buildCompoundingOverview } from '../../../src/domain/progress/compounding';
 import {
   getCalendarDayState,
   listMonthDates,
@@ -41,6 +43,7 @@ import {
 } from '../../../src/domain/streaks/levelProgress';
 import { triggerLevelMilestoneHaptic } from '../../../src/ui/animation/haptics';
 import { useLevelUpAnimation } from '../../../src/ui/animation/useLevelUpAnimation';
+import { AreaChart } from '../../../src/ui/components/AreaChart';
 import { Card } from '../../../src/ui/components/Card';
 import { CategoryBadge } from '../../../src/ui/components/CategoryBadge';
 import { IconBadge } from '../../../src/ui/components/IconBadge';
@@ -67,18 +70,31 @@ const WEEKDAY_LABELS: { day: IsoWeekday; label: string }[] = [
   { day: 7, label: 'So' },
 ];
 
-// "Dein Plan" rows (docs/DATA_MODEL.md's routine plan fields), in habit-loop
-// order. Purely informational on the statistics screen — each row renders
-// only when its value is set; the whole card hides when all three are empty.
+// "Dein Plan" rows (docs/DATA_MODEL.md's routine plan fields): identity
+// first, then the habit loop in order. Purely informational on the statistics
+// screen — each row renders only when its value is set; the whole card hides
+// when every field is empty.
 const PLAN_ROWS: {
-  key: 'cue' | 'pairing' | 'reward';
+  key: PlanRowKey;
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
 }[] = [
+  { key: 'reason', label: 'Identität', icon: 'person-outline' },
   { key: 'cue', label: 'Auslöser', icon: 'arrow-forward-outline' },
   { key: 'pairing', label: 'Verknüpfung', icon: 'link-outline' },
+  { key: 'stackPartner', label: 'Nach', icon: 'git-merge-outline' },
+  { key: 'miniVersion', label: 'Mini-Version', icon: 'flash-outline' },
   { key: 'reward', label: 'Belohnung', icon: 'gift-outline' },
 ];
+
+/** Plan rows come from the routine row, except the resolved stack partner. */
+type PlanRowKey = 'reason' | 'cue' | 'pairing' | 'stackPartner' | 'miniVersion' | 'reward';
+
+/** `2026-03` -> `März 2026`, for the compounding card's range labels. */
+function formatMonthLabel(month: string): string {
+  const [year, monthNumber] = month.split('-').map(Number);
+  return `${MONTH_NAMES[monthNumber - 1]} ${year}`;
+}
 
 // Calendar states an elapsed day can be corrected from by tapping it (see
 // handleDayPress). Deliberately excludes `skipped` (a conscious, recorded
@@ -106,6 +122,7 @@ export default function RoutineDetailScreen() {
   const [routine, setRoutine] = useState<Routine | undefined>(undefined);
   const [categories, setCategories] = useState<Category[]>([]);
   const [events, setEvents] = useState<RoutineEvent[]>([]);
+  const [stackPartnerName, setStackPartnerName] = useState<string | undefined>(undefined);
   const [cache, setCache] = useState<RoutineStateCache | undefined>(undefined);
   const levelUpAnimation = useLevelUpAnimation();
   const [visibleMonth, setVisibleMonth] = useState(() => {
@@ -117,6 +134,19 @@ export default function RoutineDetailScreen() {
     getRoutine(db, id).then(setRoutine);
     listCategories(db).then(setCategories);
     listRoutineEvents(db, id).then(setEvents);
+    // Resolved by lookup rather than stored: renaming the partner updates
+    // this automatically, and a soft-deleted partner drops out of
+    // listRoutines, so the row simply disappears instead of naming a routine
+    // that no longer exists.
+    getRoutine(db, id).then((found) => {
+      if (!found?.pairingRoutineId) {
+        setStackPartnerName(undefined);
+        return;
+      }
+      listRoutines(db).then((all) => {
+        setStackPartnerName(all.find((r) => r.id === found.pairingRoutineId)?.name);
+      });
+    });
     getRoutineStateCache(db, id).then(setCache);
   }, [id]);
 
@@ -199,6 +229,21 @@ export default function RoutineDetailScreen() {
     ]);
   }
 
+  // The long-horizon counterpart to the calendar above it: the calendar shows
+  // one month, this shows every month since the routine's first completion.
+  const compounding = useMemo(
+    () => buildCompoundingOverview(events, todayDateString().slice(0, 7)),
+    [events],
+  );
+  const compoundingPoints = useMemo(
+    () =>
+      compounding.series.map((point) => ({
+        label: point.month,
+        value: point.cumulative,
+      })),
+    [compounding],
+  );
+
   const heroOpacity = levelUpAnimation.progress.interpolate({
     inputRange: [0, 1],
     outputRange: [1, LEVEL_UP_FADE_OPACITY],
@@ -208,7 +253,16 @@ export default function RoutineDetailScreen() {
     return <View style={styles.screen} testID="routine-detail-loading" />;
   }
 
-  const planRows = PLAN_ROWS.filter(({ key }) => routine[key]);
+  const planValues: Record<PlanRowKey, string | null | undefined> = {
+    reason: routine.reason,
+    cue: routine.cue,
+    pairing: routine.pairing,
+    stackPartner: stackPartnerName,
+    miniVersion: routine.miniVersion,
+    reward: routine.reward,
+  };
+  const planRows = PLAN_ROWS.filter(({ key }) => planValues[key]);
+
 
   const totalCompletions = cache?.totalCompletions ?? 0;
   const levelRank = cache?.levelRank ?? 0;
@@ -383,7 +437,7 @@ export default function RoutineDetailScreen() {
               <Ionicons name={icon} size={typography.body.fontSize} color={colors.accent} />
               <View style={styles.planRowText}>
                 <Text style={styles.planRowLabel}>{label}</Text>
-                <Text style={styles.planRowValue}>{routine[key]}</Text>
+                <Text style={styles.planRowValue}>{planValues[key]}</Text>
               </View>
             </View>
           ))}
@@ -401,6 +455,33 @@ export default function RoutineDetailScreen() {
           testID="routine-detail-calendar"
         />
       </Card>
+
+      {/* "Kleine Schritte summieren sich" — the compounding view. Only shown
+          once there is more than one month of history: a single-month curve
+          says nothing about accumulation and would just be a diagonal line.
+          Everything here is derived from the event log (no stored values). */}
+      {compounding.series.length > 1 && (
+        <Card style={styles.compoundingCard} testID="routine-detail-compounding">
+          <Text style={styles.planCardTitle}>Kleine Schritte summieren sich</Text>
+          <Text style={styles.compoundingTotal} testID="routine-detail-compounding-total">
+            {compounding.totalCompletions}× seit {formatMonthLabel(compounding.series[0].month)}
+          </Text>
+          <AreaChart
+            data={compoundingPoints}
+            max={compounding.totalCompletions}
+            height={120}
+            testID="routine-detail-compounding-chart"
+          />
+          <View style={styles.compoundingAxis}>
+            <Text style={styles.compoundingAxisLabel}>
+              {formatMonthLabel(compounding.series[0].month)}
+            </Text>
+            <Text style={styles.compoundingAxisLabel}>
+              {formatMonthLabel(compounding.series[compounding.series.length - 1].month)}
+            </Text>
+          </View>
+        </Card>
+      )}
 
       <View style={styles.actionRow}>
         <Pressable
@@ -557,6 +638,24 @@ const styles = StyleSheet.create({
   },
   weekdayCircleSelected: {
     borderColor: colors.accent,
+  },
+  compoundingCard: {
+    gap: spacing.sm,
+  },
+  compoundingTotal: {
+    fontFamily: typography.streak.fontFamily,
+    fontSize: typography.heading.fontSize,
+    lineHeight: typography.heading.lineHeight,
+    color: colors.textPrimary,
+  },
+  compoundingAxis: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  compoundingAxisLabel: {
+    fontSize: typography.caption.fontSize,
+    lineHeight: typography.caption.lineHeight,
+    color: colors.textSecondary,
   },
   planCard: {
     gap: spacing.sm,

@@ -31,25 +31,21 @@ describe('runMigrations startup wiring', () => {
     const mockOpenDatabaseSync = openDatabaseSync as jest.Mock;
     const mockDb = mockOpenDatabaseSync.mock.results[0].value;
 
-    const realSql = migrations.migrations.m0000;
-    const [firstStatement] = realSql.split('--> statement-breakpoint');
-    expect(mockDb.execAsync).toHaveBeenCalledWith(firstStatement.trim());
-    expect(mockDb.execAsync).toHaveBeenCalledWith(migrations.migrations.m0001.trim());
-    const [firstPlanStatement] = migrations.migrations.m0002.split('--> statement-breakpoint');
-    expect(mockDb.execAsync).toHaveBeenCalledWith(firstPlanStatement.trim());
-    expect(mockDb.runAsync).toHaveBeenCalledWith(
-      'INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)',
-      [0, expect.any(String)],
-    );
-    expect(mockDb.runAsync).toHaveBeenCalledWith(
-      'INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)',
-      [1, expect.any(String)],
-    );
-    expect(mockDb.runAsync).toHaveBeenCalledWith(
-      'INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)',
-      [2, expect.any(String)],
-    );
+    // Driven off the real journal rather than a hardcoded list, so adding a
+    // migration does not require editing this test to keep it honest.
+    const entries = [...migrations.journal.entries].sort((a, b) => a.idx - b.idx);
+    expect(entries.length).toBeGreaterThan(0);
+
+    for (const entry of entries) {
+      const key = `m${String(entry.idx).padStart(4, '0')}` as keyof typeof migrations.migrations;
+      const [firstStatement] = migrations.migrations[key].split('--> statement-breakpoint');
+      expect(mockDb.execAsync).toHaveBeenCalledWith(firstStatement.trim());
+      expect(mockDb.runAsync).toHaveBeenCalledWith(
+        'INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)',
+        [entry.idx, expect.any(String)],
+      );
+    }
     // One transaction per migration (see migrationRunner.ts).
-    expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(3);
+    expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(entries.length);
   });
 });

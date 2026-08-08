@@ -3,11 +3,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import TodayScreen from '../today';
-import { todayDateString } from '../../../src/domain/dates';
+import { addDaysToDateString, todayDateString } from '../../../src/domain/dates';
 import { focusOfTheDay } from '../../../src/domain/focusOfTheDay';
 import { listCategories } from '../../../src/data/repositories/categoryRepository';
 import { listRoutines, softDeleteRoutine } from '../../../src/data/repositories/routineRepository';
-import { listRoutineEventsInRange } from '../../../src/data/repositories/routineEventRepository';
+import { listRoutineEventsInRangeForRoutines } from '../../../src/data/repositories/routineEventRepository';
 import {
   getAppStreakCache,
   type AppStreakCache,
@@ -42,7 +42,7 @@ jest.mock('../../../src/data/repositories/routineRepository', () => ({
   softDeleteRoutine: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('../../../src/data/repositories/routineEventRepository', () => ({
-  listRoutineEventsInRange: jest.fn().mockResolvedValue([]),
+  listRoutineEventsInRangeForRoutines: jest.fn().mockResolvedValue({}),
 }));
 jest.mock('../../../src/data/repositories/appStreakCacheRepository', () => ({
   getAppStreakCache: jest.fn(),
@@ -89,6 +89,21 @@ jest.mock('expo-router', () => ({
 }));
 
 const TODAY = todayDateString();
+
+// Today fetches every routine's events in one batched query keyed by routine
+// id, so these helpers shape the mock the same way the repository does.
+function mockEventsByRoutine(byRoutineId: Record<string, unknown[]>) {
+  (listRoutineEventsInRangeForRoutines as jest.Mock).mockImplementation((_db, ids: string[]) =>
+    Promise.resolve(Object.fromEntries(ids.map((id) => [id, byRoutineId[id] ?? []]))),
+  );
+}
+
+/** Gives every routine the same events — the common case in these tests. */
+function mockEventsForAllRoutines(events: unknown[]) {
+  (listRoutineEventsInRangeForRoutines as jest.Mock).mockImplementation((_db, ids: string[]) =>
+    Promise.resolve(Object.fromEntries(ids.map((id) => [id, events]))),
+  );
+}
 
 // The routines section's ReorderableList uses a GestureDetector, which
 // requires a GestureHandlerRootView ancestor (mirrors the Routines screen's
@@ -154,7 +169,7 @@ describe('TodayScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (listCategories as jest.Mock).mockResolvedValue([]);
-    (listRoutineEventsInRange as jest.Mock).mockResolvedValue([]);
+    mockEventsForAllRoutines([]);
     (getAppStreakCache as jest.Mock).mockResolvedValue(undefined);
     (ensureProfile as jest.Mock).mockResolvedValue({
       id: 'profile-1',
@@ -212,24 +227,20 @@ describe('TodayScreen', () => {
   it('shows the daily routine progress as completed/total with a partly filled progress bar', async () => {
     const secondRoutine = { ...dailyRoutine, id: 'routine-daily-2', name: 'Lesen', sortOrder: 1 };
     (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine, secondRoutine]);
-    (listRoutineEventsInRange as jest.Mock).mockImplementation((_db, routineId: string) =>
-      Promise.resolve(
-        routineId === dailyRoutine.id
-          ? [
-              {
-                id: 'event-1',
-                routineId: dailyRoutine.id,
-                occurrenceDate: TODAY,
-                eventType: 'completed',
-                recordedAt: TODAY,
-                movedToDate: null,
-                skipReason: null,
-                supersededByEventId: null,
-              },
-            ]
-          : [],
-      ),
-    );
+    mockEventsByRoutine({
+      [dailyRoutine.id]: [
+        {
+          id: 'event-1',
+          routineId: dailyRoutine.id,
+          occurrenceDate: TODAY,
+          eventType: 'completed',
+          recordedAt: TODAY,
+          movedToDate: null,
+          skipReason: null,
+          supersededByEventId: null,
+        },
+      ],
+    });
 
     await renderToday();
 
@@ -245,7 +256,7 @@ describe('TodayScreen', () => {
 
   it('acknowledges the day once every due routine is completed', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
-    (listRoutineEventsInRange as jest.Mock).mockResolvedValue([
+    mockEventsForAllRoutines([
       {
         id: 'event-1',
         routineId: dailyRoutine.id,
@@ -311,7 +322,7 @@ describe('TodayScreen', () => {
 
   it('shows a completed routine in a subdued, checked state, tappable only to undo', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
-    (listRoutineEventsInRange as jest.Mock).mockResolvedValue([
+    mockEventsForAllRoutines([
       {
         id: 'event-1',
         routineId: dailyRoutine.id,
@@ -394,7 +405,7 @@ describe('TodayScreen', () => {
     (listRoutines as jest.Mock).mockResolvedValue([
       { ...dailyRoutine, allowConsciousSkip: true },
     ]);
-    (listRoutineEventsInRange as jest.Mock).mockResolvedValue([
+    mockEventsForAllRoutines([
       {
         id: 'event-1',
         routineId: dailyRoutine.id,
@@ -436,7 +447,7 @@ describe('TodayScreen', () => {
     (listRoutines as jest.Mock).mockResolvedValue([
       { ...dailyRoutine, allowConsciousSkip: true },
     ]);
-    (listRoutineEventsInRange as jest.Mock).mockResolvedValue([
+    mockEventsForAllRoutines([
       {
         id: 'event-1',
         routineId: dailyRoutine.id,
@@ -690,5 +701,82 @@ describe('TodayScreen', () => {
     await fireEvent.press(await screen.findByTestId('today-notifications-button'));
 
     expect(screen.getByText('Benachrichtigungen sind noch nicht verfügbar.')).toBeTruthy();
+  });
+
+  describe('never-miss-twice note', () => {
+    const YESTERDAY = addDaysToDateString(TODAY, -1);
+
+    const yesterdayEvent = (eventType: string, overrides: Record<string, unknown> = {}) => ({
+      id: `event-${eventType}`,
+      routineId: dailyRoutine.id,
+      occurrenceDate: YESTERDAY,
+      eventType,
+      recordedAt: `${YESTERDAY}T23:00:00.000Z`,
+      movedToDate: null,
+      skipReason: null,
+      supersededByEventId: null,
+      ...overrides,
+    });
+
+    beforeEach(() => {
+      (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
+    });
+
+    it('acknowledges a missed day while today is still open', async () => {
+      mockEventsForAllRoutines([yesterdayEvent('missed')]);
+
+      await renderToday();
+
+      expect(await screen.findByTestId('today-recovery-note')).toBeTruthy();
+    });
+
+    it('acknowledges a joker-protected day too', async () => {
+      mockEventsForAllRoutines([yesterdayEvent('joker_protected')]);
+
+      await renderToday();
+
+      expect(await screen.findByTestId('today-recovery-note')).toBeTruthy();
+    });
+
+    it('says nothing after a conscious skip', async () => {
+      // A recorded decision is not a lapse; nagging would punish the very
+      // feature that exists to avoid punishment.
+      mockEventsForAllRoutines([yesterdayEvent('skipped')]);
+
+      await renderToday();
+      await screen.findByTestId('today-routine-progress');
+
+      expect(screen.queryByTestId('today-recovery-note')).toBeNull();
+    });
+
+    it('says nothing when yesterday went fine', async () => {
+      mockEventsForAllRoutines([yesterdayEvent('completed')]);
+
+      await renderToday();
+      await screen.findByTestId('today-routine-progress');
+
+      expect(screen.queryByTestId('today-recovery-note')).toBeNull();
+    });
+
+    it('disappears once today is fully done', async () => {
+      mockEventsForAllRoutines([
+        yesterdayEvent('missed'),
+        {
+          id: 'event-today',
+          routineId: dailyRoutine.id,
+          occurrenceDate: TODAY,
+          eventType: 'completed',
+          recordedAt: TODAY,
+          movedToDate: null,
+          skipReason: null,
+          supersededByEventId: null,
+        },
+      ]);
+
+      await renderToday();
+      await screen.findByTestId('today-routine-progress');
+
+      expect(screen.queryByTestId('today-recovery-note')).toBeNull();
+    });
   });
 });

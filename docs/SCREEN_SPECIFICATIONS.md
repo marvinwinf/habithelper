@@ -39,6 +39,7 @@ Sections must not all carry equal visual weight — spacing, type size/weight, a
 - Current date.
 - Subtle overall app streak.
 - Daily routine progress only. Once every due routine is completed, the count label fades into a quiet "Alle erledigt" acknowledgement — the day's one gentle milestone moment (see `docs/DESIGN_SYSTEM.md`'s Gamification).
+- A single-line recovery note below the progress bar, shown only when yesterday held an unfulfilled occurrence (`missed` or `joker_protected`) *and* today still has something open. This is the "never miss twice" idea from "Die 1%-Methode": the app already absorbs a first miss through jokers and the post-66 tolerance window, but said nothing, so a user who missed yesterday saw only a streak that had quietly stopped moving. A conscious skip never triggers it — that is a recorded decision, not a lapse — and it disappears once the missed day is completed retroactively or today's routines are all done. Secondary text, never the destructive or "missed" color: an off day is acknowledged, not flagged.
 
 ### Focus of the Day
 
@@ -202,12 +203,15 @@ Top area shows:
 
 Additional content:
 
-- personal reason in a lower or collapsible section,
+- the routine plan ("Dein Plan") — identity (the personal reason), cue, pairing, reward; filled fields only, card hidden when all are empty,
 - available jokers before streak 66,
 - personal streak record,
 - total successful completions,
 - editable weekdays, for weekly-target ("X times a week") routines only,
-- monthly calendar history.
+- monthly calendar history,
+- the compounding view ("Kleine Schritte summieren sich") — lifetime completion count and a cumulative month-by-month curve, shown only once there is more than one month of history.
+
+The compounding view is the long-horizon counterpart to the calendar directly above it: the calendar shows one month, this shows every month since the routine's first completion. It exists because every other progress surface in the app is scoped to the current week or month, which leaves the app silent during the long flat stretch that "Die 1%-Methode" calls the plateau of latent potential. Everything in it is derived from `routine_event`; no new value is stored.
 
 Calendar states:
 

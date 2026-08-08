@@ -27,14 +27,28 @@ export interface RoutineFormValues {
   timeOfDay: string | null;
   // Optional "Atomic Habits" planning aids ("Routine leichter machen"), free
   // text only, no effect on streak/progress/completion — see docs/DATA_MODEL.md.
+  // `reason` is the identity prompt ("Wer willst du werden?"); it reuses the
+  // column that has existed since 0000_init.
+  reason: string | null;
   cue: string | null;
   pairing: string | null;
+  miniVersion: string | null;
+  /** The routine this one is stacked on ("Nach X"), or null. */
+  pairingRoutineId: string | null;
   reward: string | null;
   allowConsciousSkip: boolean;
 }
 
+/** A routine this one can be stacked on — the current routine is excluded. */
+export interface RoutineFormStackOption {
+  id: string;
+  name: string;
+}
+
 export interface RoutineFormProps {
   categories: readonly RoutineFormCategory[];
+  /** Candidates for the habit-stacking picker. Omit to hide the picker. */
+  stackableRoutines?: readonly RoutineFormStackOption[];
   initialValues?: Partial<RoutineFormValues>;
   submitLabel?: string;
   onSubmit: (values: RoutineFormValues) => void;
@@ -67,26 +81,67 @@ const DEFAULT_TARGET_COUNT = 3;
 // "Dein Plan" card layout on the statistics screen without feeling limiting.
 const PLAN_FIELD_MAX_LENGTH = 140;
 
-// The three "Routine leichter machen" fields, in habit-loop order
-// (before / during / after). Kept in one list so the form and its labels
-// stay in sync and the block is trivial to reorder.
+type PlanFieldKey = 'reason' | 'cue' | 'pairing' | 'miniVersion' | 'reward';
+
+// The "Routine leichter machen" fields: identity first, then the four laws of
+// "Die 1%-Methode" in order — obvious (Auslöser), attractive (Verknüpfung),
+// easy (Mini-Version), satisfying (Belohnung). Kept in one list so the form
+// and its labels stay in sync and the block is trivial to reorder.
 const PLAN_FIELDS: {
-  key: 'cue' | 'pairing' | 'reward';
+  key: PlanFieldKey;
   label: string;
   placeholder: string;
 }[] = [
+  // Identity first: in "Die 1%-Methode" the question of who you want to become
+  // is what the concrete cue/pairing/reward hang off, not an afterthought.
+  {
+    key: 'reason',
+    label: 'Identität',
+    placeholder: 'z. B. Ich bin jemand, der sich jeden Tag bewegt.',
+  },
   { key: 'cue', label: 'Auslöser', placeholder: 'z. B. Nach dem Zähneputzen' },
   {
     key: 'pairing',
     label: 'Verknüpfung',
     placeholder: 'z. B. Dabei höre ich meinen Lieblingspodcast.',
   },
+  {
+    key: 'miniVersion',
+    label: 'Mini-Version',
+    placeholder: 'z. B. Nur die Laufschuhe anziehen.',
+  },
   { key: 'reward', label: 'Belohnung', placeholder: 'z. B. Danach trinke ich entspannt einen Kaffee.' },
 ];
+
+/**
+ * Decides which habit-stack reference to submit.
+ *
+ * `pairing_routine_id` carries a real foreign key (migration 0004), so a
+ * deliberate choice is validated against the routines actually on offer — a
+ * partner deleted while the form was open must not be written back as a
+ * dangling reference.
+ *
+ * An *untouched* picker submits the existing value unchanged, which is the
+ * part that is easy to get wrong: `stackableRoutines` is loaded
+ * asynchronously and starts empty, so validating unconditionally silently
+ * erased a link whenever the user saved before that load finished.
+ */
+export function resolveStackPartner(
+  touched: boolean,
+  selected: string | null,
+  offered: readonly RoutineFormStackOption[],
+  initial: string | null | undefined,
+): string | null {
+  if (!touched) {
+    return initial ?? null;
+  }
+  return offered.some((option) => option.id === selected) ? selected : null;
+}
 
 /** Shared create/edit form for routines, per docs/SCREEN_SPECIFICATIONS.md's Create Routine Screen. */
 export function RoutineForm({
   categories,
+  stackableRoutines = [],
   initialValues,
   submitLabel = 'Speichern',
   onSubmit,
@@ -104,13 +159,30 @@ export function RoutineForm({
     initialValues?.weeklyTargetCount ?? DEFAULT_TARGET_COUNT,
   );
   const [timeOfDay, setTimeOfDay] = useState(initialValues?.timeOfDay ?? '');
+  const [reason, setReason] = useState(initialValues?.reason ?? '');
   const [cue, setCue] = useState(initialValues?.cue ?? '');
   const [pairing, setPairing] = useState(initialValues?.pairing ?? '');
+  const [miniVersion, setMiniVersion] = useState(initialValues?.miniVersion ?? '');
+  const [pairingRoutineId, setPairingRoutineId] = useState<string | null>(
+    initialValues?.pairingRoutineId ?? null,
+  );
+  // Whether the user actually touched the stack picker. Without this the
+  // submit handler could only decide by checking the selection against
+  // `stackableRoutines` — which loads asynchronously and starts empty, so
+  // saving quickly (or saving a routine whose partner is merely paused or
+  // soft-deleted) silently erased an existing link the user never touched.
+  const [stackPickerTouched, setStackPickerTouched] = useState(false);
+
   const [reward, setReward] = useState(initialValues?.reward ?? '');
   const [allowConsciousSkip, setAllowConsciousSkip] = useState(
     initialValues?.allowConsciousSkip ?? false,
   );
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
+
+  function chooseStackPartner(id: string | null) {
+    setStackPickerTouched(true);
+    setPairingRoutineId(id);
+  }
 
   function handleSelectFrequency(type: ScheduleType) {
     setScheduleType(type);
@@ -138,10 +210,12 @@ export function RoutineForm({
   const scheduleValid = !needsWeekdaySelection || scheduledWeekdays.length > 0;
   const canSave = trimmedName.length > 0 && scheduleValid;
 
-  const planValues: Record<'cue' | 'pairing' | 'reward', string> = { cue, pairing, reward };
-  const planSetters: Record<'cue' | 'pairing' | 'reward', (value: string) => void> = {
+  const planValues: Record<PlanFieldKey, string> = { reason, cue, pairing, miniVersion, reward };
+  const planSetters: Record<PlanFieldKey, (value: string) => void> = {
+    reason: setReason,
     cue: setCue,
     pairing: setPairing,
+    miniVersion: setMiniVersion,
     reward: setReward,
   };
 
@@ -159,8 +233,16 @@ export function RoutineForm({
       scheduledWeekdays: needsWeekdaySelection ? scheduledWeekdays : null,
       weeklyTargetCount: scheduleType === 'weekly_target' ? weeklyTargetCount : null,
       timeOfDay: trimmedTime.length > 0 ? trimmedTime : null,
+      reason: nullIfEmpty(reason),
       cue: nullIfEmpty(cue),
       pairing: nullIfEmpty(pairing),
+      miniVersion: nullIfEmpty(miniVersion),
+      pairingRoutineId: resolveStackPartner(
+        stackPickerTouched,
+        pairingRoutineId,
+        stackableRoutines,
+        initialValues?.pairingRoutineId,
+      ),
       reward: nullIfEmpty(reward),
       allowConsciousSkip,
     });
@@ -373,6 +455,47 @@ export function RoutineForm({
                 style={styles.planInput}
                 testID={`routine-form-${key}-input`}
               />
+              {/* Habit stacking, structured: "Nach X, mache ich Y". Sits under
+                  the free-text Verknüpfung note because it is the same idea
+                  made concrete — picking a real routine means a rename follows
+                  automatically and a deleted routine cannot leave a stale name
+                  behind. */}
+              {key === 'pairing' && stackableRoutines.length > 0 && (
+                <View style={styles.planField} testID="routine-form-stack-picker">
+                  <Text style={styles.label}>Nach welcher Routine?</Text>
+                  <View style={styles.chipRow}>
+                    <Pressable
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: pairingRoutineId === null }}
+                      testID="routine-form-stack-none"
+                      onPress={() => chooseStackPartner(null)}
+                      style={({ pressed }) => [
+                        styles.chip,
+                        pairingRoutineId === null && styles.chipSelected,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={styles.chipLabel}>Keine</Text>
+                    </Pressable>
+                    {stackableRoutines.map((option) => (
+                      <Pressable
+                        key={option.id}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: pairingRoutineId === option.id }}
+                        testID={`routine-form-stack-${option.id}`}
+                        onPress={() => chooseStackPartner(option.id)}
+                        style={({ pressed }) => [
+                          styles.chip,
+                          pairingRoutineId === option.id && styles.chipSelected,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Text style={styles.chipLabel}>{option.name}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              )}
             </View>
           ))}
         </View>

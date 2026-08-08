@@ -15,7 +15,7 @@ import {
   type Routine,
 } from '../../src/data/repositories/routineRepository';
 import {
-  listRoutineEventsInRange,
+  listRoutineEventsInRangeForRoutines,
   type RoutineEvent,
 } from '../../src/data/repositories/routineEventRepository';
 import {
@@ -45,9 +45,12 @@ import {
   undoRoutineSkip,
 } from '../../src/services/routineService';
 import { deleteTask, moveTask, setTaskCompletion } from '../../src/services/taskService';
+import { subscribeToDayRollover } from '../../src/state/appDayRollover';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
 import { getGreeting } from '../../src/domain/greeting';
 import { classifyOccurrence, type OccurrenceState } from '../../src/domain/routines/completion';
+import { hasUnfulfilledOccurrence } from '../../src/domain/routines/recovery';
+import { applySubsetReorder } from '../../src/domain/routines/reorder';
 import { scheduleFromRoutineRow } from '../../src/domain/routines/schedule';
 import { isFirstCompletionOfDay } from '../../src/domain/streaks/appStreak';
 import { compareByDateThenTime } from '../../src/domain/tasks/ordering';
@@ -86,6 +89,11 @@ interface DueRoutine {
 
 function isCardState(state: OccurrenceState): state is RoutineCardOccurrenceState {
   return state === 'pending' || state === 'completed' || state === 'exceeded' || state === 'skipped';
+}
+
+/** Whether every routine due today has been completed or exceeded. */
+function allRoutinesDoneFor(dueRoutines: DueRoutine[]): boolean {
+  return dueRoutines.every(({ state }) => state === 'completed' || state === 'exceeded');
 }
 
 export default function TodayScreen() {
@@ -165,6 +173,13 @@ export default function TodayScreen() {
     }, [loadData]),
   );
 
+  // Focus alone is not enough across a day boundary: resuming a backgrounded
+  // app does not re-fire useFocusEffect, so this screen would keep rendering
+  // yesterday's date, greeting, and due list until something else refocused
+  // it. The rollover watcher (src/state/appDayRollover.ts) reconciles first,
+  // then notifies — so the reload here reads already-current state.
+  useEffect(() => subscribeToDayRollover(loadData), [loadData]);
+
   // Separate from the effect above: this one re-fetches events whenever the
   // active routine list changes (including after loadData() re-runs post-
   // action). Yesterday+today is sufficient for classifying today: an
@@ -172,6 +187,13 @@ export default function TodayScreen() {
   // (moves are strictly "to tomorrow", docs/ROUTINE_RULES.md), and every
   // other relevant event carries today's occurrence_date — so the query
   // stays bounded no matter how much history a routine accumulates.
+  //
+  // One query for all routines, not one per routine: the per-routine version
+  // issued N queries and called setState N times per reload, so every
+  // completion re-rendered the whole list once per routine the user owns.
+  // Replacing the map wholesale (rather than merging into it) also drops
+  // entries for routines that were deleted or paused, which the old merge
+  // kept forever.
   useEffect(() => {
     // `cancelled` drops any in-flight event fetch from a superseded run of
     // this effect, so a stale result can't overwrite a routine's events after
@@ -179,12 +201,15 @@ export default function TodayScreen() {
     let cancelled = false;
     const today = todayDateString();
     const yesterday = addDaysToDateString(today, -1);
-    routines.forEach((r) => {
-      listRoutineEventsInRange(db, r.id, yesterday, today).then((events) => {
-        if (!cancelled) {
-          setEventsByRoutineId((prev) => ({ ...prev, [r.id]: events }));
-        }
-      });
+    listRoutineEventsInRangeForRoutines(
+      db,
+      routines.map((r) => r.id),
+      yesterday,
+      today,
+    ).then((eventsByRoutine) => {
+      if (!cancelled) {
+        setEventsByRoutineId(eventsByRoutine);
+      }
     });
     return () => {
       cancelled = true;
@@ -212,6 +237,22 @@ export default function TodayScreen() {
         return a.routine.sortOrder - b.routine.sortOrder;
       });
   }, [routines, eventsByRoutineId]);
+
+  // "Never miss twice": the app already absorbs a first miss with jokers and
+  // the post-66 tolerance window (docs/ROUTINE_RULES.md), but never said so —
+  // a user who missed yesterday saw only a streak that had quietly stopped
+  // moving. This names it once, gently, and only while today is still open.
+  // The events map already covers yesterday (it is fetched for exactly this
+  // date range), so this costs no extra query.
+  const showRecoveryNote = useMemo(() => {
+    if (dueRoutines.length === 0 || allRoutinesDoneFor(dueRoutines)) {
+      return false;
+    }
+    const yesterday = addDaysToDateString(todayDateString(), -1);
+    return Object.values(eventsByRoutineId).some((events) =>
+      hasUnfulfilledOccurrence(events, yesterday),
+    );
+  }, [dueRoutines, eventsByRoutineId]);
 
   // The Today screen's Tasks section shows what needs attention now
   // (overdue + due today); For later holds everything else (upcoming +
@@ -263,16 +304,24 @@ export default function TodayScreen() {
   // order is written back as each routine's sortOrder; the pending/resolved
   // grouping re-applies on top of it, matching the Routines screen's
   // semantics.
+  //
+  // Today lists only the routines due today, but sortOrder is one global
+  // ordering shared with the Routines screen. Reindexing just the dragged
+  // routines to 0..n-1 left every other active routine on its old value, so
+  // the two sets collided and the Routines screen's order — which is nothing
+  // but a sortOrder sort — became arbitrary. The drag is therefore applied
+  // back onto the full active list, which is then reindexed as a whole; that
+  // matches what the Routines screen does with its own list.
   async function handleReorderRoutines(newOrder: DueRoutine[]) {
-    const sortById = new Map(newOrder.map((entry, index) => [entry.routine.id, index]));
-    setRoutines((prev) =>
-      prev.map((r) => {
-        const sortOrder = sortById.get(r.id);
-        return sortOrder === undefined ? r : { ...r, sortOrder };
-      }),
-    );
+    const currentOrder = [...routines].sort((a, b) => a.sortOrder - b.sortOrder);
+    const reordered = applySubsetReorder(
+      currentOrder,
+      newOrder.map((entry) => entry.routine.id),
+    ).map((routine, index) => ({ ...routine, sortOrder: index }));
+
+    setRoutines(reordered);
     await Promise.all(
-      newOrder.map((entry, index) => updateRoutine(db, entry.routine.id, { sortOrder: index })),
+      reordered.map((routine) => updateRoutine(db, routine.id, { sortOrder: routine.sortOrder })),
     );
   }
 
@@ -463,6 +512,11 @@ export default function TodayScreen() {
             value={dueRoutines.length === 0 ? 0 : completedRoutineCount / dueRoutines.length}
             testID="today-routine-progress-bar"
           />
+          {showRecoveryNote && (
+            <Text style={styles.recoveryNote} testID="today-recovery-note">
+              Gestern hat es nicht geklappt. Einmal ist kein Muster — heute zählt wieder.
+            </Text>
+          )}
         </Animated.View>
       </View>
 
@@ -850,6 +904,15 @@ const styles = StyleSheet.create({
     fontSize: typography.bodySmall.fontSize,
     fontWeight: typography.bodySmall.fontWeight,
     color: colors.textPrimary,
+  },
+  // Secondary text, never the destructive or "missed" color: an off day is
+  // acknowledged, not flagged (docs/DESIGN_SYSTEM.md's Gamification section —
+  // no punishment for a missed day).
+  recoveryNote: {
+    fontSize: typography.bodySmall.fontSize,
+    lineHeight: typography.bodySmall.lineHeight,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
   progressCount: {
     fontSize: typography.bodySmall.fontSize,

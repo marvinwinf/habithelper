@@ -22,6 +22,20 @@
       "when": 1784061596036,
       "tag": "0002_routine_plan",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1786148814035,
+      "tag": "0003_routine_mini_version",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1786148996015,
+      "tag": "0004_routine_habit_stack",
+      "breakpoints": true
     }
   ]
 }
