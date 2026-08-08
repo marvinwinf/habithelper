@@ -65,6 +65,7 @@ export default function EditRoutineScreen() {
           scheduledWeekdays: (routine.scheduledWeekdays as IsoWeekday[] | null) ?? undefined,
           weeklyTargetCount: routine.weeklyTargetCount,
           timeOfDay: routine.timeOfDay,
+          reason: routine.reason,
           cue: routine.cue,
           pairing: routine.pairing,
           reward: routine.reward,

@@ -67,14 +67,16 @@ const WEEKDAY_LABELS: { day: IsoWeekday; label: string }[] = [
   { day: 7, label: 'So' },
 ];
 
-// "Dein Plan" rows (docs/DATA_MODEL.md's routine plan fields), in habit-loop
-// order. Purely informational on the statistics screen — each row renders
-// only when its value is set; the whole card hides when all three are empty.
+// "Dein Plan" rows (docs/DATA_MODEL.md's routine plan fields): identity
+// first, then the habit loop in order. Purely informational on the statistics
+// screen — each row renders only when its value is set; the whole card hides
+// when every field is empty.
 const PLAN_ROWS: {
-  key: 'cue' | 'pairing' | 'reward';
+  key: 'reason' | 'cue' | 'pairing' | 'reward';
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
 }[] = [
+  { key: 'reason', label: 'Identität', icon: 'person-outline' },
   { key: 'cue', label: 'Auslöser', icon: 'arrow-forward-outline' },
   { key: 'pairing', label: 'Verknüpfung', icon: 'link-outline' },
   { key: 'reward', label: 'Belohnung', icon: 'gift-outline' },

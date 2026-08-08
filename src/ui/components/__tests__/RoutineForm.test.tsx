@@ -100,6 +100,7 @@ describe('RoutineForm', () => {
       scheduledWeekdays: null,
       weeklyTargetCount: null,
       timeOfDay: null,
+      reason: null,
       cue: null,
       pairing: null,
       reward: null,
@@ -114,6 +115,10 @@ describe('RoutineForm', () => {
 
     await fireEvent.press(screen.getByTestId('routine-form-advanced-toggle'));
     await fireEvent.changeText(
+      screen.getByTestId('routine-form-reason-input'),
+      '  Ich bin jemand, der sich bewegt.  ',
+    );
+    await fireEvent.changeText(
       screen.getByTestId('routine-form-cue-input'),
       '  Nach dem Aufstehen  ',
     );
@@ -127,6 +132,7 @@ describe('RoutineForm', () => {
 
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
+        reason: 'Ich bin jemand, der sich bewegt.',
         cue: 'Nach dem Aufstehen',
         pairing: 'Dabei höre ich einen Podcast',
         reward: 'Danach ein Kaffee',

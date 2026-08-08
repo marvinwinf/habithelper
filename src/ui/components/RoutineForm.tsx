@@ -27,6 +27,9 @@ export interface RoutineFormValues {
   timeOfDay: string | null;
   // Optional "Atomic Habits" planning aids ("Routine leichter machen"), free
   // text only, no effect on streak/progress/completion — see docs/DATA_MODEL.md.
+  // `reason` is the identity prompt ("Wer willst du werden?"); it reuses the
+  // column that has existed since 0000_init.
+  reason: string | null;
   cue: string | null;
   pairing: string | null;
   reward: string | null;
@@ -67,14 +70,23 @@ const DEFAULT_TARGET_COUNT = 3;
 // "Dein Plan" card layout on the statistics screen without feeling limiting.
 const PLAN_FIELD_MAX_LENGTH = 140;
 
-// The three "Routine leichter machen" fields, in habit-loop order
-// (before / during / after). Kept in one list so the form and its labels
-// stay in sync and the block is trivial to reorder.
+type PlanFieldKey = 'reason' | 'cue' | 'pairing' | 'reward';
+
+// The "Routine leichter machen" fields: identity first, then the habit loop
+// in order (before / during / after). Kept in one list so the form and its
+// labels stay in sync and the block is trivial to reorder.
 const PLAN_FIELDS: {
-  key: 'cue' | 'pairing' | 'reward';
+  key: PlanFieldKey;
   label: string;
   placeholder: string;
 }[] = [
+  // Identity first: in "Die 1%-Methode" the question of who you want to become
+  // is what the concrete cue/pairing/reward hang off, not an afterthought.
+  {
+    key: 'reason',
+    label: 'Identität',
+    placeholder: 'z. B. Ich bin jemand, der sich jeden Tag bewegt.',
+  },
   { key: 'cue', label: 'Auslöser', placeholder: 'z. B. Nach dem Zähneputzen' },
   {
     key: 'pairing',
@@ -104,6 +116,7 @@ export function RoutineForm({
     initialValues?.weeklyTargetCount ?? DEFAULT_TARGET_COUNT,
   );
   const [timeOfDay, setTimeOfDay] = useState(initialValues?.timeOfDay ?? '');
+  const [reason, setReason] = useState(initialValues?.reason ?? '');
   const [cue, setCue] = useState(initialValues?.cue ?? '');
   const [pairing, setPairing] = useState(initialValues?.pairing ?? '');
   const [reward, setReward] = useState(initialValues?.reward ?? '');
@@ -138,8 +151,9 @@ export function RoutineForm({
   const scheduleValid = !needsWeekdaySelection || scheduledWeekdays.length > 0;
   const canSave = trimmedName.length > 0 && scheduleValid;
 
-  const planValues: Record<'cue' | 'pairing' | 'reward', string> = { cue, pairing, reward };
-  const planSetters: Record<'cue' | 'pairing' | 'reward', (value: string) => void> = {
+  const planValues: Record<PlanFieldKey, string> = { reason, cue, pairing, reward };
+  const planSetters: Record<PlanFieldKey, (value: string) => void> = {
+    reason: setReason,
     cue: setCue,
     pairing: setPairing,
     reward: setReward,
@@ -159,6 +173,7 @@ export function RoutineForm({
       scheduledWeekdays: needsWeekdaySelection ? scheduledWeekdays : null,
       weeklyTargetCount: scheduleType === 'weekly_target' ? weeklyTargetCount : null,
       timeOfDay: trimmedTime.length > 0 ? trimmedTime : null,
+      reason: nullIfEmpty(reason),
       cue: nullIfEmpty(cue),
       pairing: nullIfEmpty(pairing),
       reward: nullIfEmpty(reward),

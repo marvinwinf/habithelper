@@ -49,7 +49,7 @@ Note: `docs/DATA_PERSISTENCE.md` lists "settings" as its own persistent-data cat
 | `scheduled_weekdays` | TEXT NULL | JSON array of ISO weekday ints (1–7); used for `weekdays`, and stores the *current* (possibly user-adjusted) suggested days for `weekly_target` |
 | `weekly_target_count` | INTEGER NULL | only for `weekly_target` |
 | `time_of_day` | TEXT NULL | `HH:mm`, optional, sort-only per `ROUTINE_RULES.md` (never required for completion) |
-| `reason` | TEXT NULL | personal reason, optional (no longer surfaced in the UI as of migration `0002`; column retained, not dropped) |
+| `reason` | TEXT NULL | personal reason, optional — surfaced as the **identity** prompt of the routine plan (see note below) |
 | `cue` | TEXT NULL | optional "Atomic Habits" planning aid — Auslöser (added by migration `0002_routine_plan`) |
 | `pairing` | TEXT NULL | optional planning aid — Verknüpfung (`0002`) |
 | `reward` | TEXT NULL | optional planning aid — Belohnung (`0002`) |
@@ -61,7 +61,9 @@ Note: `docs/DATA_PERSISTENCE.md` lists "settings" as its own persistent-data cat
 | `updated_at` | TEXT | |
 | `deleted_at` | TEXT NULL | soft delete, preserves history for any prior events referencing this routine |
 
-Note: `cue`, `pairing`, and `reward` are optional free-text planning prompts (per "Die 1%-Methode" / *Atomic Habits*). They are purely a thinking/planning aid: never read by streak, joker, level, progress, reconciliation, or completion logic. They are edited in the routine's create/edit form ("Weitere Einstellungen" → "Routine leichter machen") and displayed on its statistics screen ("Dein Plan", filled fields only). One deliberate exception to the "statistics screen only" rule: `reward` is also shown as a brief, non-interactive toast on the Today screen when the routine is completed ("make it satisfying") — a gentle acknowledgement that still measures/confirms nothing. `cue` and `pairing` are never surfaced on the Today screen, routines list, or routine card. Existing routines predating `0002` keep `NULL` and behave unchanged. When export/import lands (T055), they travel with the routine like any other column.
+Note: `reason`, `cue`, `pairing`, and `reward` are optional free-text planning prompts (per "Die 1%-Methode" / *Atomic Habits*). They are purely a thinking/planning aid: never read by streak, joker, level, progress, reconciliation, or completion logic. They are edited in the routine's create/edit form ("Weitere Einstellungen" → "Routine leichter machen") and displayed on its statistics screen ("Dein Plan", filled fields only), identity first and then the habit loop in order.
+
+`reason` predates the others (it is in `0000_init`) and was left unsurfaced when `0002` added the planning fields, which left `docs/MVP_SCOPE.md`'s "personal reason" listed as in-scope but unreachable — the column was written by the repository and readable by nobody. It is now the identity field ("Ich bin jemand, der…"), which is the distinct fourth concept in the method rather than a duplicate of the other three: identity is what the cue, pairing, and reward hang off. No migration was needed; existing values simply became visible again. One deliberate exception to the "statistics screen only" rule: `reward` is also shown as a brief, non-interactive toast on the Today screen when the routine is completed ("make it satisfying") — a gentle acknowledgement that still measures/confirms nothing. `reason`, `cue`, and `pairing` are never surfaced on the Today screen, routines list, or routine card. Existing routines predating `0002` keep `NULL` and behave unchanged. They travel with the routine in a backup like any other column (`src/data/backup/`).
 
 Note: `scheduled_weekdays` for `weekly_target` is *derived-then-persisted* — the app computes a suggestion, but once created (or edited), the stored value is authoritative until the user changes it again. This is a persisted value, not recomputed on every read (see Derived vs Persisted).
 
