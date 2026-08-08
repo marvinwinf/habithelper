@@ -1,5 +1,5 @@
 import { randomUUID } from 'expo-crypto';
-import { and, asc, eq, gte, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 import { routineEvent, type RoutineEventType } from '../db/schema';
 
@@ -79,6 +79,52 @@ export async function listRoutineEvents(
     .from(routineEvent)
     .where(eq(routineEvent.routineId, routineId))
     .orderBy(asc(routineEvent.occurrenceDate));
+}
+
+/**
+ * Events for *several* routines in one query, grouped by routine id, whose
+ * `occurrenceDate` falls within `[startDate, endDate]` (inclusive).
+ *
+ * The Today screen classifies every due routine's occurrence and previously
+ * ran `listRoutineEventsInRange` once per routine, each resolving into its own
+ * `setState` — so a single reload cost N queries and N renders, repeated on
+ * every completion. One `IN` query keeps that at one of each regardless of how
+ * many routines the user keeps.
+ *
+ * Every requested id is present in the result (empty array when a routine has
+ * no events in range), so callers need no separate existence check.
+ */
+export async function listRoutineEventsInRangeForRoutines(
+  db: RoutineEventDb,
+  routineIds: string[],
+  startDate: string,
+  endDate: string,
+): Promise<Record<string, RoutineEvent[]>> {
+  const grouped: Record<string, RoutineEvent[]> = Object.fromEntries(
+    routineIds.map((id) => [id, [] as RoutineEvent[]]),
+  );
+  if (routineIds.length === 0) {
+    return grouped;
+  }
+
+  const rows = await db
+    .select()
+    .from(routineEvent)
+    .where(
+      and(
+        inArray(routineEvent.routineId, routineIds),
+        gte(routineEvent.occurrenceDate, startDate),
+        lte(routineEvent.occurrenceDate, endDate),
+      ),
+    )
+    .orderBy(asc(routineEvent.occurrenceDate));
+
+  for (const row of rows) {
+    // A row for an id that was not requested cannot occur (the IN clause is
+    // built from the same list), but guard rather than create a stray key.
+    grouped[row.routineId]?.push(row);
+  }
+  return grouped;
 }
 
 /** A routine's events whose `occurrenceDate` falls within `[startDate, endDate]` (inclusive), ordered ascending. */

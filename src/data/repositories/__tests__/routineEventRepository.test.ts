@@ -4,6 +4,7 @@ import {
   appendRoutineEvent,
   listRoutineEvents,
   listRoutineEventsInRange,
+  listRoutineEventsInRangeForRoutines,
   supersedeRoutineEvent,
 } from '../routineEventRepository';
 
@@ -171,5 +172,110 @@ describe('routineEventRepository', () => {
     expect(supersededRow).toEqual({ ...original, supersededByEventId: supersedingEvent.id });
 
     sqlite.close();
+  });
+
+  describe('listRoutineEventsInRangeForRoutines', () => {
+    it('groups events by routine in a single query', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const first = await createRoutine(db, routineInput);
+      const second = await createRoutine(db, { ...routineInput, name: 'Laufen' });
+
+      await appendRoutineEvent(db, {
+        routineId: first.id,
+        occurrenceDate: '2026-07-02',
+        eventType: 'completed',
+      });
+      await appendRoutineEvent(db, {
+        routineId: second.id,
+        occurrenceDate: '2026-07-02',
+        eventType: 'skipped',
+      });
+
+      const grouped = await listRoutineEventsInRangeForRoutines(
+        db,
+        [first.id, second.id],
+        '2026-07-01',
+        '2026-07-03',
+      );
+
+      expect(grouped[first.id].map((e) => e.eventType)).toEqual(['completed']);
+      expect(grouped[second.id].map((e) => e.eventType)).toEqual(['skipped']);
+
+      sqlite.close();
+    });
+
+    it('returns an empty array for a routine with no events in range', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const routine = await createRoutine(db, routineInput);
+      await appendRoutineEvent(db, {
+        routineId: routine.id,
+        occurrenceDate: '2026-06-01',
+        eventType: 'completed',
+      });
+
+      const grouped = await listRoutineEventsInRangeForRoutines(
+        db,
+        [routine.id],
+        '2026-07-01',
+        '2026-07-03',
+      );
+
+      // Callers index straight into the result, so every requested id must be
+      // present even when it has nothing in range.
+      expect(grouped[routine.id]).toEqual([]);
+
+      sqlite.close();
+    });
+
+    it('excludes routines that were not requested', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const requested = await createRoutine(db, routineInput);
+      const other = await createRoutine(db, { ...routineInput, name: 'Laufen' });
+      await appendRoutineEvent(db, {
+        routineId: other.id,
+        occurrenceDate: '2026-07-02',
+        eventType: 'completed',
+      });
+
+      const grouped = await listRoutineEventsInRangeForRoutines(
+        db,
+        [requested.id],
+        '2026-07-01',
+        '2026-07-03',
+      );
+
+      expect(Object.keys(grouped)).toEqual([requested.id]);
+
+      sqlite.close();
+    });
+
+    it('respects the date range boundaries inclusively', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const routine = await createRoutine(db, routineInput);
+      for (const occurrenceDate of ['2026-06-30', '2026-07-01', '2026-07-03', '2026-07-04']) {
+        await appendRoutineEvent(db, { routineId: routine.id, occurrenceDate, eventType: 'completed' });
+      }
+
+      const grouped = await listRoutineEventsInRangeForRoutines(
+        db,
+        [routine.id],
+        '2026-07-01',
+        '2026-07-03',
+      );
+
+      expect(grouped[routine.id].map((e) => e.occurrenceDate)).toEqual(['2026-07-01', '2026-07-03']);
+
+      sqlite.close();
+    });
+
+    it('returns an empty grouping without querying for an empty id list', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+
+      expect(await listRoutineEventsInRangeForRoutines(db, [], '2026-07-01', '2026-07-03')).toEqual(
+        {},
+      );
+
+      sqlite.close();
+    });
   });
 });

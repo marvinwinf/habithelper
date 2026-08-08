@@ -24,7 +24,7 @@ jest.mock('../../../src/data/repositories/routineRepository', () => ({
   softDeleteRoutine: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('../../../src/data/repositories/routineEventRepository', () => ({
-  listRoutineEventsInRange: jest.fn().mockResolvedValue([]),
+  listRoutineEventsInRangeForRoutines: jest.fn().mockResolvedValue({}),
 }));
 jest.mock('../../../src/data/repositories/appStreakCacheRepository', () => ({
   getAppStreakCache: jest.fn().mockResolvedValue(undefined),

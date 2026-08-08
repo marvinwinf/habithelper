@@ -15,7 +15,7 @@ import {
   type Routine,
 } from '../../src/data/repositories/routineRepository';
 import {
-  listRoutineEventsInRange,
+  listRoutineEventsInRangeForRoutines,
   type RoutineEvent,
 } from '../../src/data/repositories/routineEventRepository';
 import {
@@ -181,6 +181,13 @@ export default function TodayScreen() {
   // (moves are strictly "to tomorrow", docs/ROUTINE_RULES.md), and every
   // other relevant event carries today's occurrence_date — so the query
   // stays bounded no matter how much history a routine accumulates.
+  //
+  // One query for all routines, not one per routine: the per-routine version
+  // issued N queries and called setState N times per reload, so every
+  // completion re-rendered the whole list once per routine the user owns.
+  // Replacing the map wholesale (rather than merging into it) also drops
+  // entries for routines that were deleted or paused, which the old merge
+  // kept forever.
   useEffect(() => {
     // `cancelled` drops any in-flight event fetch from a superseded run of
     // this effect, so a stale result can't overwrite a routine's events after
@@ -188,12 +195,15 @@ export default function TodayScreen() {
     let cancelled = false;
     const today = todayDateString();
     const yesterday = addDaysToDateString(today, -1);
-    routines.forEach((r) => {
-      listRoutineEventsInRange(db, r.id, yesterday, today).then((events) => {
-        if (!cancelled) {
-          setEventsByRoutineId((prev) => ({ ...prev, [r.id]: events }));
-        }
-      });
+    listRoutineEventsInRangeForRoutines(
+      db,
+      routines.map((r) => r.id),
+      yesterday,
+      today,
+    ).then((eventsByRoutine) => {
+      if (!cancelled) {
+        setEventsByRoutineId(eventsByRoutine);
+      }
     });
     return () => {
       cancelled = true;
