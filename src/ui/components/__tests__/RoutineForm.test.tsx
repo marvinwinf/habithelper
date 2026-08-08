@@ -104,6 +104,7 @@ describe('RoutineForm', () => {
       cue: null,
       pairing: null,
       miniVersion: null,
+      pairingRoutineId: null,
       reward: null,
       allowConsciousSkip: false,
     });
@@ -168,5 +169,95 @@ describe('RoutineForm', () => {
     );
     expect(screen.getByTestId('routine-form-weekday-1').props.accessibilityState.checked).toBe(true);
     expect(screen.getByTestId('routine-form-weekday-2').props.accessibilityState.checked).toBe(false);
+  });
+
+  describe('habit stacking', () => {
+    const stackable = [
+      { id: 'routine-1', name: 'Zähneputzen' },
+      { id: 'routine-2', name: 'Kaffee kochen' },
+    ];
+
+    it('is hidden when there are no other routines to stack on', async () => {
+      await render(<RoutineForm categories={categories} onSubmit={jest.fn()} />);
+      await fireEvent.press(screen.getByTestId('routine-form-advanced-toggle'));
+
+      expect(screen.queryByTestId('routine-form-stack-picker')).toBeNull();
+    });
+
+    it('submits the chosen routine as a reference, not a name', async () => {
+      const onSubmit = jest.fn();
+      await render(
+        <RoutineForm
+          categories={categories}
+          stackableRoutines={stackable}
+          onSubmit={onSubmit}
+        />,
+      );
+      await fireEvent.changeText(screen.getByTestId('routine-form-name-input'), 'Lesen');
+      await fireEvent.press(screen.getByTestId('routine-form-advanced-toggle'));
+
+      await fireEvent.press(screen.getByTestId('routine-form-stack-routine-1'));
+      await fireEvent.press(screen.getByTestId('routine-form-save'));
+
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ pairingRoutineId: 'routine-1' }),
+      );
+    });
+
+    it('pre-selects the existing stack partner when editing', async () => {
+      await render(
+        <RoutineForm
+          categories={categories}
+          stackableRoutines={stackable}
+          initialValues={{ name: 'Lesen', pairingRoutineId: 'routine-2' }}
+          onSubmit={jest.fn()}
+        />,
+      );
+      await fireEvent.press(screen.getByTestId('routine-form-advanced-toggle'));
+
+      expect(
+        screen.getByTestId('routine-form-stack-routine-2').props.accessibilityState.selected,
+      ).toBe(true);
+    });
+
+    it('clears the reference again', async () => {
+      const onSubmit = jest.fn();
+      await render(
+        <RoutineForm
+          categories={categories}
+          stackableRoutines={stackable}
+          initialValues={{ name: 'Lesen', pairingRoutineId: 'routine-2' }}
+          onSubmit={onSubmit}
+        />,
+      );
+      await fireEvent.press(screen.getByTestId('routine-form-advanced-toggle'));
+
+      await fireEvent.press(screen.getByTestId('routine-form-stack-none'));
+      await fireEvent.press(screen.getByTestId('routine-form-save'));
+
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ pairingRoutineId: null }),
+      );
+    });
+
+    it('drops a reference to a routine that is no longer offered', async () => {
+      const onSubmit = jest.fn();
+      // The partner was deleted while this form was open. The column carries a
+      // real foreign key (migration 0004), so writing the stale id back would
+      // fail the constraint.
+      await render(
+        <RoutineForm
+          categories={categories}
+          stackableRoutines={stackable}
+          initialValues={{ name: 'Lesen', pairingRoutineId: 'routine-deleted' }}
+          onSubmit={onSubmit}
+        />,
+      );
+      await fireEvent.press(screen.getByTestId('routine-form-save'));
+
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ pairingRoutineId: null }),
+      );
+    });
   });
 });

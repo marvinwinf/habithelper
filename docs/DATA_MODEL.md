@@ -54,6 +54,7 @@ Note: `docs/DATA_PERSISTENCE.md` lists "settings" as its own persistent-data cat
 | `pairing` | TEXT NULL | optional planning aid — Verknüpfung (`0002`) |
 | `reward` | TEXT NULL | optional planning aid — Belohnung (`0002`) |
 | `mini_version` | TEXT NULL | optional planning aid — the "2-minute rule" version (added by migration `0003_routine_mini_version`) |
+| `pairing_routine_id` | TEXT NULL FK → routine.id | structured habit stacking: the routine this one follows (added by migration `0004_routine_habit_stack`) |
 | `allow_conscious_skip` | INTEGER (bool) | default true or false per creation flow |
 | `is_paused` | INTEGER (bool) | see Pause below |
 | `sort_order` | REAL | for manual drag-and-drop reorder on the Routines screen; independent of `id`, safe to rewrite freely |
@@ -65,6 +66,10 @@ Note: `docs/DATA_PERSISTENCE.md` lists "settings" as its own persistent-data cat
 Note: `reason`, `cue`, `pairing`, `mini_version`, and `reward` are optional free-text planning prompts (per "Die 1%-Methode" / *Atomic Habits*). They are purely a thinking/planning aid: never read by streak, joker, level, progress, reconciliation, or completion logic. They are edited in the routine's create/edit form ("Weitere Einstellungen" → "Routine leichter machen") and displayed on its statistics screen ("Dein Plan", filled fields only), identity first and then the habit loop in order.
 
 `reason` predates the others (it is in `0000_init`) and was left unsurfaced when `0002` added the planning fields, which left `docs/MVP_SCOPE.md`'s "personal reason" listed as in-scope but unreachable — the column was written by the repository and readable by nobody. It is now the identity field ("Ich bin jemand, der…"), which is the distinct fourth concept in the method rather than a duplicate of the other three: identity is what the cue, pairing, and reward hang off. No migration was needed; existing values simply became visible again. One deliberate exception to the "statistics screen only" rule: `reward` is also shown as a brief, non-interactive toast on the Today screen when the routine is completed ("make it satisfying") — a gentle acknowledgement that still measures/confirms nothing. `reason`, `cue`, `pairing`, and `mini_version` are never surfaced on the Today screen, routines list, or routine card. Existing routines predating `0002` keep `NULL` and behave unchanged. They travel with the routine in a backup like any other column (`src/data/backup/`).
+
+**`pairing_routine_id` is habit stacking made structural.** `pairing` stays the free-text note ("Dabei höre ich einen Podcast"); `pairing_routine_id` captures the "after X" half as a real reference, so renaming X updates every display automatically and a stale name can never be left behind. The routine detail screen resolves it by lookup against non-deleted routines, which means a soft-deleted partner simply drops the row rather than naming a routine that no longer exists. The form excludes the routine itself from the picker, and drops a reference that is no longer offered before submitting, since the column carries a real foreign key.
+
+Cycles (A after B, B after A) are permitted and harmless: nothing traverses the chain. It is a label, deliberately **not** an ordering input — the Today screen's order stays owned by `sort_order` and its drag-reorder. Making a stack reorder Today automatically would put two sources of truth on the same list and fight the manual drag the user already has.
 
 **`mini_version` is a planning prompt, not a completion path.** Completing the mini version is recorded as an ordinary `completed` event, so no streak, joker, level, or replay logic reads this column and migration `0003` needed no changes to `src/domain`. Making a mini completion its own event type — so "showing up in the smallest possible way" were distinguishable from a full completion in the history — is a genuine product option, but it changes what a streak *means* and would require a decision in `docs/ROUTINE_RULES.md` before any code: does a mini completion carry the streak (the method says yes, showing up is the unit), does it count toward the 66-completion level segments, and how do already-recorded completions compare against it? That decision is deliberately not made here.
 
@@ -150,6 +155,7 @@ Tasks are a single mutable row (unlike routines) because `MVP_SCOPE.md` requires
 profile 1─┐ (implicit single-profile ownership, no FK in MVP)
 category 1───* routine        (category_id, nullable)
 category 1───* task           (category_id, nullable)
+routine  *───1 routine        (pairing_routine_id, nullable self-reference)
 routine  1───* routine_event  (routine_id)
 routine  1───1 routine_state_cache (routine_id)
 routine_event *─1 routine_event (superseded_by_event_id, self-referential)

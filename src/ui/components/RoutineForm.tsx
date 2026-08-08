@@ -33,12 +33,22 @@ export interface RoutineFormValues {
   cue: string | null;
   pairing: string | null;
   miniVersion: string | null;
+  /** The routine this one is stacked on ("Nach X"), or null. */
+  pairingRoutineId: string | null;
   reward: string | null;
   allowConsciousSkip: boolean;
 }
 
+/** A routine this one can be stacked on — the current routine is excluded. */
+export interface RoutineFormStackOption {
+  id: string;
+  name: string;
+}
+
 export interface RoutineFormProps {
   categories: readonly RoutineFormCategory[];
+  /** Candidates for the habit-stacking picker. Omit to hide the picker. */
+  stackableRoutines?: readonly RoutineFormStackOption[];
   initialValues?: Partial<RoutineFormValues>;
   submitLabel?: string;
   onSubmit: (values: RoutineFormValues) => void;
@@ -106,6 +116,7 @@ const PLAN_FIELDS: {
 /** Shared create/edit form for routines, per docs/SCREEN_SPECIFICATIONS.md's Create Routine Screen. */
 export function RoutineForm({
   categories,
+  stackableRoutines = [],
   initialValues,
   submitLabel = 'Speichern',
   onSubmit,
@@ -127,6 +138,9 @@ export function RoutineForm({
   const [cue, setCue] = useState(initialValues?.cue ?? '');
   const [pairing, setPairing] = useState(initialValues?.pairing ?? '');
   const [miniVersion, setMiniVersion] = useState(initialValues?.miniVersion ?? '');
+  const [pairingRoutineId, setPairingRoutineId] = useState<string | null>(
+    initialValues?.pairingRoutineId ?? null,
+  );
   const [reward, setReward] = useState(initialValues?.reward ?? '');
   const [allowConsciousSkip, setAllowConsciousSkip] = useState(
     initialValues?.allowConsciousSkip ?? false,
@@ -186,6 +200,12 @@ export function RoutineForm({
       cue: nullIfEmpty(cue),
       pairing: nullIfEmpty(pairing),
       miniVersion: nullIfEmpty(miniVersion),
+      // Only keep a reference that is still offered: a routine deleted while
+      // this form was open must not be written back as a dangling stack
+      // partner (the column carries a real foreign key, migration 0004).
+      pairingRoutineId: stackableRoutines.some((r) => r.id === pairingRoutineId)
+        ? pairingRoutineId
+        : null,
       reward: nullIfEmpty(reward),
       allowConsciousSkip,
     });
@@ -398,6 +418,47 @@ export function RoutineForm({
                 style={styles.planInput}
                 testID={`routine-form-${key}-input`}
               />
+              {/* Habit stacking, structured: "Nach X, mache ich Y". Sits under
+                  the free-text Verknüpfung note because it is the same idea
+                  made concrete — picking a real routine means a rename follows
+                  automatically and a deleted routine cannot leave a stale name
+                  behind. */}
+              {key === 'pairing' && stackableRoutines.length > 0 && (
+                <View style={styles.planField} testID="routine-form-stack-picker">
+                  <Text style={styles.label}>Nach welcher Routine?</Text>
+                  <View style={styles.chipRow}>
+                    <Pressable
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: pairingRoutineId === null }}
+                      testID="routine-form-stack-none"
+                      onPress={() => setPairingRoutineId(null)}
+                      style={({ pressed }) => [
+                        styles.chip,
+                        pairingRoutineId === null && styles.chipSelected,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={styles.chipLabel}>Keine</Text>
+                    </Pressable>
+                    {stackableRoutines.map((option) => (
+                      <Pressable
+                        key={option.id}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: pairingRoutineId === option.id }}
+                        testID={`routine-form-stack-${option.id}`}
+                        onPress={() => setPairingRoutineId(option.id)}
+                        style={({ pressed }) => [
+                          styles.chip,
+                          pairingRoutineId === option.id && styles.chipSelected,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Text style={styles.chipLabel}>{option.name}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              )}
             </View>
           ))}
         </View>

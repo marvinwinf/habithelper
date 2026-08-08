@@ -93,7 +93,7 @@ describe('database schema shape (docs/DATA_MODEL.md)', () => {
     });
   });
 
-  it('defines the routine table columns and its category FK', () => {
+  it('defines the routine table columns and its category and self FKs', () => {
     expect(tableColumns(sqlite, 'routine')).toEqual({
       id: { notnull: 1, pk: 1 },
       name: { notnull: 1, pk: 0 },
@@ -107,6 +107,7 @@ describe('database schema shape (docs/DATA_MODEL.md)', () => {
       pairing: { notnull: 0, pk: 0 },
       reward: { notnull: 0, pk: 0 },
       mini_version: { notnull: 0, pk: 0 },
+      pairing_routine_id: { notnull: 0, pk: 0 },
       allow_conscious_skip: { notnull: 1, pk: 0 },
       is_paused: { notnull: 1, pk: 0 },
       sort_order: { notnull: 1, pk: 0 },
@@ -115,7 +116,9 @@ describe('database schema shape (docs/DATA_MODEL.md)', () => {
       updated_at: { notnull: 1, pk: 0 },
       deleted_at: { notnull: 0, pk: 0 },
     });
-    expect(foreignKeyTargets(sqlite, 'routine')).toEqual(['category']);
+    // `routine` self-references since migration 0004 (habit stacking:
+    // pairing_routine_id points at another routine).
+    expect(foreignKeyTargets(sqlite, 'routine')).toEqual(['category', 'routine']);
   });
 
   it('defines the routine_event table columns and its FKs, including self-reference', () => {

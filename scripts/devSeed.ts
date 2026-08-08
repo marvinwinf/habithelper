@@ -94,6 +94,7 @@ interface RoutineSeed {
   pairing?: string | null;
   reward?: string | null;
   miniVersion?: string | null;
+  pairingRoutineId?: string | null;
   isPaused?: boolean;
   createdAt: string;
 }
@@ -112,6 +113,7 @@ function insertRoutine(db: SeedDb, seed: RoutineSeed): typeof schema.routine.$in
     cue: seed.cue ?? null,
     pairing: seed.pairing ?? null,
     miniVersion: seed.miniVersion ?? null,
+    pairingRoutineId: seed.pairingRoutineId ?? null,
     reward: seed.reward ?? null,
     allowConsciousSkip: true,
     isPaused: seed.isPaused ?? false,

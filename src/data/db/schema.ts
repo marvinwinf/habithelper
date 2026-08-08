@@ -82,6 +82,14 @@ export const routine = sqliteTable('routine', {
   // ordinary completion, so no streak, joker, level, or replay logic reads
   // this column. See docs/DATA_MODEL.md for why it is not its own event type.
   miniVersion: text('mini_version'),
+  // Structured habit stacking (migration 0004): the routine this one follows.
+  // `pairing` above stays the free-text note; this makes the "after X" part a
+  // real reference, so renaming X updates the display and deleting X cannot
+  // leave a stale name behind. Self-referential and nullable — a routine
+  // without a stack partner simply has NULL. Nothing traverses the chain, so
+  // a cycle (A after B, B after A) is harmless; the form only prevents a
+  // routine from being stacked on itself.
+  pairingRoutineId: text('pairing_routine_id').references((): AnySQLiteColumn => routine.id),
   allowConsciousSkip: integer('allow_conscious_skip', { mode: 'boolean' }).notNull(),
   isPaused: integer('is_paused', { mode: 'boolean' }).notNull(),
   sortOrder: real('sort_order').notNull(),

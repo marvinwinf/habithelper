@@ -8,6 +8,8 @@ jest.mock('../../../../src/data/db/client', () => ({ db: {} }));
 jest.mock('../../../../src/data/repositories/routineRepository', () => ({
   getRoutine: jest.fn(),
   updateRoutine: jest.fn().mockResolvedValue(undefined),
+  // Candidates for the habit-stacking picker (migration 0004).
+  listRoutines: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('../../../../src/data/repositories/categoryRepository', () => ({
   listCategories: jest.fn().mockResolvedValue([]),

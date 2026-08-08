@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { createRoutine } from '../../src/services/routineService';
 import { listCategories, type Category } from '../../src/data/repositories/categoryRepository';
+import { listRoutines, type Routine } from '../../src/data/repositories/routineRepository';
 import { db } from '../../src/data/db/client';
 import { RoutineForm, type RoutineFormValues } from '../../src/ui/components/RoutineForm';
 import { ScreenHeader } from '../../src/ui/components/ScreenHeader';
@@ -12,6 +13,7 @@ import { colors, spacing } from '../../src/ui/theme';
 export default function CreateRoutineScreen() {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [stackableRoutines, setStackableRoutines] = useState<Routine[]>([]);
 
   // Reload on focus, not just mount: the form's "+ Neue Kategorie
   // erstellen" pushes the category-create screen over this one, and the
@@ -19,6 +21,8 @@ export default function CreateRoutineScreen() {
   useFocusEffect(
     useCallback(() => {
       listCategories(db).then(setCategories);
+      // Existing routines this new one can be stacked on.
+      listRoutines(db).then(setStackableRoutines);
     }, []),
   );
 
@@ -37,6 +41,7 @@ export default function CreateRoutineScreen() {
       <ScreenHeader title="Neue Routine" testID="create-routine-header" />
       <RoutineForm
         categories={categories}
+        stackableRoutines={stackableRoutines}
         onSubmit={handleSubmit}
         submitLabel="Erstellen"
         testID="create-routine-form"

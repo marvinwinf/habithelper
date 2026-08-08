@@ -11,6 +11,10 @@ jest.mock('../../../src/services/routineService', () => ({
 jest.mock('../../../src/data/repositories/categoryRepository', () => ({
   listCategories: jest.fn().mockResolvedValue([]),
 }));
+jest.mock('../../../src/data/repositories/routineRepository', () => ({
+  // Candidates for the habit-stacking picker (migration 0004).
+  listRoutines: jest.fn().mockResolvedValue([]),
+}));
 
 const mockBack = jest.fn();
 jest.mock('expo-router', () => ({

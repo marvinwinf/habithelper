@@ -7,6 +7,7 @@ import { db } from '../../../src/data/db/client';
 import { listCategories, type Category } from '../../../src/data/repositories/categoryRepository';
 import {
   getRoutine,
+  listRoutines,
   softDeleteRoutine,
   updateRoutine,
   type Routine,
@@ -74,16 +75,20 @@ const WEEKDAY_LABELS: { day: IsoWeekday; label: string }[] = [
 // screen — each row renders only when its value is set; the whole card hides
 // when every field is empty.
 const PLAN_ROWS: {
-  key: 'reason' | 'cue' | 'pairing' | 'miniVersion' | 'reward';
+  key: PlanRowKey;
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
 }[] = [
   { key: 'reason', label: 'Identität', icon: 'person-outline' },
   { key: 'cue', label: 'Auslöser', icon: 'arrow-forward-outline' },
   { key: 'pairing', label: 'Verknüpfung', icon: 'link-outline' },
+  { key: 'stackPartner', label: 'Nach', icon: 'git-merge-outline' },
   { key: 'miniVersion', label: 'Mini-Version', icon: 'flash-outline' },
   { key: 'reward', label: 'Belohnung', icon: 'gift-outline' },
 ];
+
+/** Plan rows come from the routine row, except the resolved stack partner. */
+type PlanRowKey = 'reason' | 'cue' | 'pairing' | 'stackPartner' | 'miniVersion' | 'reward';
 
 /** `2026-03` -> `März 2026`, for the compounding card's range labels. */
 function formatMonthLabel(month: string): string {
@@ -117,6 +122,7 @@ export default function RoutineDetailScreen() {
   const [routine, setRoutine] = useState<Routine | undefined>(undefined);
   const [categories, setCategories] = useState<Category[]>([]);
   const [events, setEvents] = useState<RoutineEvent[]>([]);
+  const [stackPartnerName, setStackPartnerName] = useState<string | undefined>(undefined);
   const [cache, setCache] = useState<RoutineStateCache | undefined>(undefined);
   const levelUpAnimation = useLevelUpAnimation();
   const [visibleMonth, setVisibleMonth] = useState(() => {
@@ -128,6 +134,19 @@ export default function RoutineDetailScreen() {
     getRoutine(db, id).then(setRoutine);
     listCategories(db).then(setCategories);
     listRoutineEvents(db, id).then(setEvents);
+    // Resolved by lookup rather than stored: renaming the partner updates
+    // this automatically, and a soft-deleted partner drops out of
+    // listRoutines, so the row simply disappears instead of naming a routine
+    // that no longer exists.
+    getRoutine(db, id).then((found) => {
+      if (!found?.pairingRoutineId) {
+        setStackPartnerName(undefined);
+        return;
+      }
+      listRoutines(db).then((all) => {
+        setStackPartnerName(all.find((r) => r.id === found.pairingRoutineId)?.name);
+      });
+    });
     getRoutineStateCache(db, id).then(setCache);
   }, [id]);
 
@@ -234,7 +253,15 @@ export default function RoutineDetailScreen() {
     return <View style={styles.screen} testID="routine-detail-loading" />;
   }
 
-  const planRows = PLAN_ROWS.filter(({ key }) => routine[key]);
+  const planValues: Record<PlanRowKey, string | null | undefined> = {
+    reason: routine.reason,
+    cue: routine.cue,
+    pairing: routine.pairing,
+    stackPartner: stackPartnerName,
+    miniVersion: routine.miniVersion,
+    reward: routine.reward,
+  };
+  const planRows = PLAN_ROWS.filter(({ key }) => planValues[key]);
 
 
   const totalCompletions = cache?.totalCompletions ?? 0;
@@ -410,7 +437,7 @@ export default function RoutineDetailScreen() {
               <Ionicons name={icon} size={typography.body.fontSize} color={colors.accent} />
               <View style={styles.planRowText}>
                 <Text style={styles.planRowLabel}>{label}</Text>
-                <Text style={styles.planRowValue}>{routine[key]}</Text>
+                <Text style={styles.planRowValue}>{planValues[key]}</Text>
               </View>
             </View>
           ))}

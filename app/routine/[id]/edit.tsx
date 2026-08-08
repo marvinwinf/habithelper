@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import {
   getRoutine,
+  listRoutines,
   updateRoutine,
   type Routine,
 } from '../../../src/data/repositories/routineRepository';
@@ -19,6 +20,7 @@ export default function EditRoutineScreen() {
   const router = useRouter();
   const [routine, setRoutine] = useState<Routine | undefined>(undefined);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [stackableRoutines, setStackableRoutines] = useState<Routine[]>([]);
 
   // Focus-based (not mount-based) so the category-create screen pushed from
   // the form's dashed button feeds its fresh category back into the chips.
@@ -33,6 +35,13 @@ export default function EditRoutineScreen() {
       listCategories(db).then((found) => {
         if (!cancelled) {
           setCategories(found);
+        }
+      });
+      // Candidates for the habit-stacking picker. A routine cannot be stacked
+      // on itself, so it is excluded from its own list.
+      listRoutines(db).then((found) => {
+        if (!cancelled) {
+          setStackableRoutines(found.filter((candidate) => candidate.id !== id));
         }
       });
       return () => {
@@ -58,6 +67,7 @@ export default function EditRoutineScreen() {
       <ScreenHeader title="Routine bearbeiten" testID="edit-routine-header" />
       <RoutineForm
         categories={categories}
+        stackableRoutines={stackableRoutines}
         initialValues={{
           name: routine.name,
           categoryId: routine.categoryId,
@@ -69,6 +79,7 @@ export default function EditRoutineScreen() {
           cue: routine.cue,
           pairing: routine.pairing,
           miniVersion: routine.miniVersion,
+          pairingRoutineId: routine.pairingRoutineId,
           reward: routine.reward,
           allowConsciousSkip: routine.allowConsciousSkip,
         }}
