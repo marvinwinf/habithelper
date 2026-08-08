@@ -49,6 +49,7 @@ import { subscribeToDayRollover } from '../../src/state/appDayRollover';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
 import { getGreeting } from '../../src/domain/greeting';
 import { classifyOccurrence, type OccurrenceState } from '../../src/domain/routines/completion';
+import { applySubsetReorder } from '../../src/domain/routines/reorder';
 import { scheduleFromRoutineRow } from '../../src/domain/routines/schedule';
 import { isFirstCompletionOfDay } from '../../src/domain/streaks/appStreak';
 import { compareByDateThenTime } from '../../src/domain/tasks/ordering';
@@ -271,16 +272,24 @@ export default function TodayScreen() {
   // order is written back as each routine's sortOrder; the pending/resolved
   // grouping re-applies on top of it, matching the Routines screen's
   // semantics.
+  //
+  // Today lists only the routines due today, but sortOrder is one global
+  // ordering shared with the Routines screen. Reindexing just the dragged
+  // routines to 0..n-1 left every other active routine on its old value, so
+  // the two sets collided and the Routines screen's order — which is nothing
+  // but a sortOrder sort — became arbitrary. The drag is therefore applied
+  // back onto the full active list, which is then reindexed as a whole; that
+  // matches what the Routines screen does with its own list.
   async function handleReorderRoutines(newOrder: DueRoutine[]) {
-    const sortById = new Map(newOrder.map((entry, index) => [entry.routine.id, index]));
-    setRoutines((prev) =>
-      prev.map((r) => {
-        const sortOrder = sortById.get(r.id);
-        return sortOrder === undefined ? r : { ...r, sortOrder };
-      }),
-    );
+    const currentOrder = [...routines].sort((a, b) => a.sortOrder - b.sortOrder);
+    const reordered = applySubsetReorder(
+      currentOrder,
+      newOrder.map((entry) => entry.routine.id),
+    ).map((routine, index) => ({ ...routine, sortOrder: index }));
+
+    setRoutines(reordered);
     await Promise.all(
-      newOrder.map((entry, index) => updateRoutine(db, entry.routine.id, { sortOrder: index })),
+      reordered.map((routine) => updateRoutine(db, routine.id, { sortOrder: routine.sortOrder })),
     );
   }
 
