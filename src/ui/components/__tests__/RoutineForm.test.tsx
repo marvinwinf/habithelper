@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import { RoutineForm } from '../RoutineForm';
+import { RoutineForm, resolveStackPartner } from '../RoutineForm';
 import { generateSuggestedWeeklyTargetWeekdays } from '../../../domain/routines/schedule';
 
 const categories = [
@@ -240,24 +240,53 @@ describe('RoutineForm', () => {
       );
     });
 
-    it('drops a reference to a routine that is no longer offered', async () => {
+    it('keeps an existing link when the picker is never touched', async () => {
       const onSubmit = jest.fn();
-      // The partner was deleted while this form was open. The column carries a
-      // real foreign key (migration 0004), so writing the stale id back would
-      // fail the constraint.
+      // stackableRoutines loads asynchronously and starts empty, so saving
+      // before it resolves used to erase a link the user never touched.
       await render(
         <RoutineForm
           categories={categories}
-          stackableRoutines={stackable}
-          initialValues={{ name: 'Lesen', pairingRoutineId: 'routine-deleted' }}
+          initialValues={{ name: 'Lesen', pairingRoutineId: 'routine-2' }}
           onSubmit={onSubmit}
         />,
       );
       await fireEvent.press(screen.getByTestId('routine-form-save'));
 
       expect(onSubmit).toHaveBeenCalledWith(
-        expect.objectContaining({ pairingRoutineId: null }),
+        expect.objectContaining({ pairingRoutineId: 'routine-2' }),
       );
+    });
+  });
+
+  // The submit-time decision, unit-tested directly: driving it through the UI
+  // needs a mid-test prop change, and rerendering leaves RNTL's `screen`
+  // pointing at a stale tree, which breaks whichever test runs next.
+  describe('resolveStackPartner', () => {
+    const offered = [{ id: 'routine-1', name: 'Zähneputzen' }];
+
+    it('keeps the initial value when the picker was never touched', () => {
+      // stackableRoutines loads asynchronously and starts empty, so validating
+      // an untouched picker would erase a link the user never touched.
+      expect(resolveStackPartner(false, null, [], 'routine-1')).toBe('routine-1');
+    });
+
+    it('treats a missing initial value as no partner', () => {
+      expect(resolveStackPartner(false, null, [], undefined)).toBeNull();
+    });
+
+    it('keeps a deliberate choice that is still offered', () => {
+      expect(resolveStackPartner(true, 'routine-1', offered, null)).toBe('routine-1');
+    });
+
+    it('drops a deliberate choice that is no longer offered', () => {
+      // The column carries a real foreign key (migration 0004), so writing a
+      // stale id back would fail the constraint.
+      expect(resolveStackPartner(true, 'routine-gone', offered, 'routine-gone')).toBeNull();
+    });
+
+    it('honours an explicit "Keine" over the initial value', () => {
+      expect(resolveStackPartner(true, null, offered, 'routine-1')).toBeNull();
     });
   });
 });

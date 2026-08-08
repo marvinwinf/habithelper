@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 
 import SettingsScreen from '../settings';
 import { ensureProfile, updateDisplayName } from '../../../src/data/repositories/profileRepository';
-import { exportBackup } from '../../../src/data/backup/export';
+import { exportBackup, shareLatestSafetyBackup } from '../../../src/data/backup/export';
 import { importBackup } from '../../../src/data/backup/expoImport';
 import { BackupParseError } from '../../../src/data/backup/validate';
 
@@ -15,7 +15,10 @@ jest.mock('../../../src/data/repositories/profileRepository', () => ({
 // Both backup entry points reach expo-sqlite/expo-file-system native modules,
 // which cannot load under Jest (docs/TEST_STRATEGY.md) — the screen's own
 // wiring is what these tests cover.
-jest.mock('../../../src/data/backup/export', () => ({ exportBackup: jest.fn() }));
+jest.mock('../../../src/data/backup/export', () => ({
+  exportBackup: jest.fn(),
+  shareLatestSafetyBackup: jest.fn(),
+}));
 jest.mock('../../../src/data/backup/expoImport', () => ({ importBackup: jest.fn() }));
 
 const existingProfile = { id: 'profile-1', displayName: 'Nutzer', createdAt: 'x' };
@@ -36,6 +39,7 @@ describe('SettingsScreen', () => {
     jest.clearAllMocks();
     (ensureProfile as jest.Mock).mockResolvedValue(existingProfile);
     (exportBackup as jest.Mock).mockResolvedValue({ uri: 'file:///backup.json', shared: true });
+    (shareLatestSafetyBackup as jest.Mock).mockResolvedValue(true);
     (importBackup as jest.Mock).mockResolvedValue({
       status: 'imported',
       safetyBackupPath: '/private/safety.json',
@@ -129,16 +133,37 @@ describe('SettingsScreen', () => {
       expect(importBackup).not.toHaveBeenCalled();
     });
 
-    it('shows the restart-required state after a successful import', async () => {
+    it('reports no error after a successful import', async () => {
       await render(<SettingsScreen />);
 
       await fireEvent.press(screen.getByTestId('settings-import-backup'));
       await confirmAlert();
 
-      // The live database connection is closed by the swap, so the screen
-      // must stop offering actions that would query it.
-      expect(await screen.findByTestId('settings-restart-required')).toBeTruthy();
-      expect(screen.queryByTestId('settings-export-backup')).toBeNull();
+      // The "restart required" state is app-wide, owned by the root layout via
+      // src/state/databaseLifecycle.ts — this screen is about to be unmounted
+      // with the whole navigator, so it only has to not claim a failure.
+      expect(importBackup).toHaveBeenCalled();
+      expect(screen.queryByTestId('settings-backup-error')).toBeNull();
+    });
+
+    it('shares the latest safety backup', async () => {
+      await render(<SettingsScreen />);
+
+      await fireEvent.press(screen.getByTestId('settings-share-safety-backup'));
+
+      await waitFor(() => expect(shareLatestSafetyBackup).toHaveBeenCalled());
+      expect(screen.queryByTestId('settings-backup-error')).toBeNull();
+    });
+
+    it('explains when there is no safety backup yet', async () => {
+      (shareLatestSafetyBackup as jest.Mock).mockResolvedValue(false);
+      await render(<SettingsScreen />);
+
+      await fireEvent.press(screen.getByTestId('settings-share-safety-backup'));
+
+      expect((await screen.findByTestId('settings-backup-message')).props.children).toContain(
+        'noch keine Sicherungskopie',
+      );
     });
 
     it('stays usable and reports the reason when an import fails', async () => {
@@ -150,7 +175,6 @@ describe('SettingsScreen', () => {
 
       const error = await screen.findByTestId('settings-backup-error');
       expect(error.props.children).toContain('Deine Daten wurden nicht verändert.');
-      expect(screen.queryByTestId('settings-restart-required')).toBeNull();
       expect(screen.getByTestId('settings-export-backup')).toBeTruthy();
     });
 
@@ -166,7 +190,6 @@ describe('SettingsScreen', () => {
           false,
         ),
       );
-      expect(screen.queryByTestId('settings-restart-required')).toBeNull();
       expect(screen.queryByTestId('settings-backup-error')).toBeNull();
     });
   });

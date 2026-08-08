@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { importBackup } from '../src/data/backup/expoImport';
 import { db } from '../src/data/db/client';
@@ -8,6 +8,11 @@ import { runMigrations } from '../src/data/db/migrate';
 import { ensureProfile } from '../src/data/repositories/profileRepository';
 import { reconcileAllActiveRoutines } from '../src/services/reconciliationService';
 import { dayRolloverWatcher } from '../src/state/appDayRollover';
+import {
+  isDatabaseClosed,
+  subscribeToDatabaseClosed,
+} from '../src/state/databaseLifecycle';
+import { RestartRequired } from '../src/ui/components/RestartRequired';
 import { StartupRecovery } from '../src/ui/components/StartupRecovery';
 import { colors } from '../src/ui/theme';
 
@@ -22,6 +27,14 @@ export default function RootLayout() {
   // Bumping this re-runs the startup effect, so "Erneut versuchen" retries a
   // transient failure without the user force-quitting the app.
   const [attempt, setAttempt] = useState(0);
+  // A successful import closes the database connection and swaps the file
+  // underneath it, and the singleton cannot be rebound mid-session. Blocking
+  // here rather than inside Settings is what actually stops the tab bar: the
+  // tabs live below this layout, so a screen-local block left "Heute" one tap
+  // away from querying a closed handle.
+  const [databaseClosed, setDatabaseClosed] = useState(isDatabaseClosed);
+
+  useEffect(() => subscribeToDatabaseClosed(() => setDatabaseClosed(true)), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,9 +99,17 @@ export default function RootLayout() {
     return result.status === 'imported';
   }, []);
 
+  if (databaseClosed) {
+    return (
+      <View style={styles.fill} testID="app-restart-required">
+        <RestartRequired />
+      </View>
+    );
+  }
+
   if (state === 'failed') {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View style={styles.fill}>
         <StartupRecovery
           onRetry={handleRetry}
           onRestoreBackup={handleRestoreBackup}
@@ -99,7 +120,7 @@ export default function RootLayout() {
   }
 
   if (state === 'loading') {
-    return <View style={{ flex: 1, backgroundColor: colors.background }} />;
+    return <View style={styles.fill} />;
   }
 
   return (
@@ -111,3 +132,10 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  fill: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+});

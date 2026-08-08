@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text } from 'react-native';
 
 import { colors, spacing, typography } from '../theme';
 import { Button } from './Button';
 import { Card } from './Card';
+import { RestartRequired } from './RestartRequired';
 
 export interface StartupRecoveryProps {
   /** Retries the whole startup sequence (migrations, profile, reconciliation). */
@@ -50,17 +51,7 @@ export function StartupRecovery({ onRetry, onRestoreBackup, testID }: StartupRec
   }
 
   if (restored) {
-    return (
-      <View style={styles.screen} testID={testID ? `${testID}-restored` : undefined}>
-        <Card style={styles.card}>
-          <Text style={styles.title}>Backup wiederhergestellt</Text>
-          <Text style={styles.body}>
-            Bitte schließe die App vollständig und öffne sie erneut, damit die wiederhergestellten
-            Daten geladen werden.
-          </Text>
-        </Card>
-      </View>
-    );
+    return <RestartRequired testID={testID ? `${testID}-restored` : undefined} />;
   }
 
   return (

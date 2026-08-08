@@ -9,8 +9,8 @@ import migrations from '../../../migrations/migrations';
 import { expoDb } from '../db/client';
 import { createExpoBackupDriver, deleteWalSidecars, toFileUri } from './expoDriver';
 import { writeSafetyBackup } from './export';
-import { readSchemaVersion } from './serialize';
 import { runImport, type ImportPorts, type ImportResult, type TempDatabase } from './import';
+import { markDatabaseClosed } from '../../state/databaseLifecycle';
 
 /** Name of the scratch database that import populates before the swap. */
 const TEMP_DATABASE_NAME = 'habithelper-import.db';
@@ -83,35 +83,62 @@ function createTempDatabase(): TempDatabase {
 async function swapIntoPlace(temp: TempDatabase): Promise<void> {
   const livePath = expoDb.databasePath;
   const tempPath = tempDatabasePath();
+  const supersededPath = `${livePath}.superseded`;
 
   await temp.close();
   expoDb.closeSync();
-
+  // Flagged the moment the connection closes, not after the swap succeeds:
+  // from here on every query in this process would throw, whichever way the
+  // rest of this function goes.
+  markDatabaseClosed();
   deleteWalSidecars(livePath);
-  const liveFile = new File(toFileUri(livePath));
-  if (liveFile.exists) {
-    liveFile.delete();
+
+  // The old database is stepped aside, not deleted. Deleting it first left a
+  // window with no database at all: if the move below then failed (no space,
+  // I/O error, denied rename), runImport's cleanup discarded the populated
+  // temp file too and the user lost everything — while the UI still told them
+  // their data was untouched. Moving it aside means that window has a
+  // recovery path, taken below.
+  if (new File(toFileUri(supersededPath)).exists) {
+    new File(toFileUri(supersededPath)).delete();
+  }
+  const hadLiveFile = new File(toFileUri(livePath)).exists;
+  if (hadLiveFile) {
+    await new File(toFileUri(livePath)).move(new File(toFileUri(supersededPath)));
   }
 
-  await new File(toFileUri(tempPath)).move(new File(toFileUri(livePath)));
+  try {
+    await new File(toFileUri(tempPath)).move(new File(toFileUri(livePath)));
+  } catch (error) {
+    // Put the original back before reporting the failure, so "your data was
+    // not changed" stays true.
+    if (hadLiveFile && new File(toFileUri(supersededPath)).exists) {
+      await new File(toFileUri(supersededPath)).move(new File(toFileUri(livePath)));
+    }
+    throw error;
+  }
+
   deleteWalSidecars(tempPath);
+  if (new File(toFileUri(supersededPath)).exists) {
+    new File(toFileUri(supersededPath)).delete();
+  }
 }
 
 export interface ExpoImportOptions {
   /**
    * Allows the import to proceed when the *live* database cannot be read.
    *
-   * Normally reading the live database is a precondition: its applied schema
-   * version bounds what backups are acceptable, and it is the source of the
-   * pre-import safety backup. But the one moment a restore matters most is
-   * exactly when that database is broken — a failed migration or a corrupt
-   * file — and in that state both reads fail. Refusing to import then would
-   * make the backup useless precisely when it is needed.
+   * Normally the pre-import safety backup is a precondition — it is the
+   * rollback path for an unwanted import. But the one moment a restore
+   * matters most is exactly when the live database is broken (a failed
+   * migration, a corrupt file), and in that state it cannot be read to back
+   * it up. Refusing to import then would make the backup useless precisely
+   * when it is needed.
    *
-   * With this set, the schema check falls back to what this build supports,
-   * and a safety backup that cannot be produced is reported rather than
-   * thrown: there is no readable data left to protect, so failing the restore
-   * over its absence would protect nothing.
+   * With this set, a safety backup that cannot be produced is reported
+   * (`NO_SAFETY_BACKUP`) rather than thrown: there is no readable data left
+   * to protect, so failing the restore over its absence would protect
+   * nothing.
    */
   tolerateUnreadableLiveDatabase?: boolean;
 }
@@ -130,21 +157,14 @@ export function createExpoImportPorts(options: ExpoImportOptions = {}): ImportPo
       }
       return picked.result.text();
     },
-    // The higher of "what this build ships" and "what the live database has
-    // applied": a database somehow ahead of this build must not be told it can
-    // accept an even newer backup.
-    currentSchemaVersion: async () => {
-      const supported = supportedSchemaVersion();
-      try {
-        const applied = await readSchemaVersion(createExpoBackupDriver(expoDb));
-        return Math.max(applied, supported);
-      } catch (error) {
-        if (!tolerant) {
-          throw error;
-        }
-        return supported;
-      }
-    },
+    // Strictly what *this build* can apply. An import is replayed into a
+    // fresh database that this build migrates (populate.ts), so the live
+    // database's own applied version has no bearing on which backups are
+    // acceptable. Mixing it in was actively wrong: after an APK rollback the
+    // live database can sit at a higher version than the build supports, and
+    // taking the maximum let a too-new backup past the gate only to fail deep
+    // inside populate with a generic error.
+    currentSchemaVersion: async () => supportedSchemaVersion(),
     writeSafetyBackup: async () => {
       try {
         return await writeSafetyBackup();

@@ -113,6 +113,31 @@ const PLAN_FIELDS: {
   { key: 'reward', label: 'Belohnung', placeholder: 'z. B. Danach trinke ich entspannt einen Kaffee.' },
 ];
 
+/**
+ * Decides which habit-stack reference to submit.
+ *
+ * `pairing_routine_id` carries a real foreign key (migration 0004), so a
+ * deliberate choice is validated against the routines actually on offer — a
+ * partner deleted while the form was open must not be written back as a
+ * dangling reference.
+ *
+ * An *untouched* picker submits the existing value unchanged, which is the
+ * part that is easy to get wrong: `stackableRoutines` is loaded
+ * asynchronously and starts empty, so validating unconditionally silently
+ * erased a link whenever the user saved before that load finished.
+ */
+export function resolveStackPartner(
+  touched: boolean,
+  selected: string | null,
+  offered: readonly RoutineFormStackOption[],
+  initial: string | null | undefined,
+): string | null {
+  if (!touched) {
+    return initial ?? null;
+  }
+  return offered.some((option) => option.id === selected) ? selected : null;
+}
+
 /** Shared create/edit form for routines, per docs/SCREEN_SPECIFICATIONS.md's Create Routine Screen. */
 export function RoutineForm({
   categories,
@@ -141,11 +166,23 @@ export function RoutineForm({
   const [pairingRoutineId, setPairingRoutineId] = useState<string | null>(
     initialValues?.pairingRoutineId ?? null,
   );
+  // Whether the user actually touched the stack picker. Without this the
+  // submit handler could only decide by checking the selection against
+  // `stackableRoutines` — which loads asynchronously and starts empty, so
+  // saving quickly (or saving a routine whose partner is merely paused or
+  // soft-deleted) silently erased an existing link the user never touched.
+  const [stackPickerTouched, setStackPickerTouched] = useState(false);
+
   const [reward, setReward] = useState(initialValues?.reward ?? '');
   const [allowConsciousSkip, setAllowConsciousSkip] = useState(
     initialValues?.allowConsciousSkip ?? false,
   );
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
+
+  function chooseStackPartner(id: string | null) {
+    setStackPickerTouched(true);
+    setPairingRoutineId(id);
+  }
 
   function handleSelectFrequency(type: ScheduleType) {
     setScheduleType(type);
@@ -200,12 +237,12 @@ export function RoutineForm({
       cue: nullIfEmpty(cue),
       pairing: nullIfEmpty(pairing),
       miniVersion: nullIfEmpty(miniVersion),
-      // Only keep a reference that is still offered: a routine deleted while
-      // this form was open must not be written back as a dangling stack
-      // partner (the column carries a real foreign key, migration 0004).
-      pairingRoutineId: stackableRoutines.some((r) => r.id === pairingRoutineId)
-        ? pairingRoutineId
-        : null,
+      pairingRoutineId: resolveStackPartner(
+        stackPickerTouched,
+        pairingRoutineId,
+        stackableRoutines,
+        initialValues?.pairingRoutineId,
+      ),
       reward: nullIfEmpty(reward),
       allowConsciousSkip,
     });
@@ -431,7 +468,7 @@ export function RoutineForm({
                       accessibilityRole="radio"
                       accessibilityState={{ selected: pairingRoutineId === null }}
                       testID="routine-form-stack-none"
-                      onPress={() => setPairingRoutineId(null)}
+                      onPress={() => chooseStackPartner(null)}
                       style={({ pressed }) => [
                         styles.chip,
                         pairingRoutineId === null && styles.chipSelected,
@@ -446,7 +483,7 @@ export function RoutineForm({
                         accessibilityRole="radio"
                         accessibilityState={{ selected: pairingRoutineId === option.id }}
                         testID={`routine-form-stack-${option.id}`}
-                        onPress={() => setPairingRoutineId(option.id)}
+                        onPress={() => chooseStackPartner(option.id)}
                         style={({ pressed }) => [
                           styles.chip,
                           pairingRoutineId === option.id && styles.chipSelected,

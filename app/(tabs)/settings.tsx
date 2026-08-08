@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'expo-router';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput } from 'react-native';
 
-import { exportBackup } from '../../src/data/backup/export';
+import { exportBackup, shareLatestSafetyBackup } from '../../src/data/backup/export';
 import { importBackup } from '../../src/data/backup/expoImport';
 import { db } from '../../src/data/db/client';
 import { ensureProfile, updateDisplayName } from '../../src/data/repositories/profileRepository';
@@ -14,7 +14,7 @@ import { NavRow } from '../../src/ui/components/NavRow';
 import { colors, radius, spacing, typography } from '../../src/ui/theme';
 
 /** Which long-running backup action is in flight, if any. */
-type BackupBusy = 'export' | 'import' | null;
+type BackupBusy = 'export' | 'import' | 'safety' | null;
 
 export default function SettingsScreen() {
   const [profileId, setProfileId] = useState<string | undefined>(undefined);
@@ -23,11 +23,6 @@ export default function SettingsScreen() {
   const [busy, setBusy] = useState<BackupBusy>(null);
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
   const [backupError, setBackupError] = useState<string | null>(null);
-  // A completed import has closed the live database connection and swapped
-  // the file underneath it (src/data/backup/expoImport.ts). Every further
-  // query in this process would throw, so the screen switches to a terminal
-  // "restart the app" state rather than pretending it can keep working.
-  const [restartRequired, setRestartRequired] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,36 +72,41 @@ export default function SettingsScreen() {
     }
   }
 
+  // The pre-import safety backup lives in app-private storage, which the
+  // system file picker cannot browse — so without a way to share it out, the
+  // rollback path the import confirmation promises could never actually be
+  // used. Sharing turns it into a file the user can re-import.
+  async function handleShareSafetyBackup() {
+    clearBackupFeedback();
+    setBusy('safety');
+    try {
+      const shared = await shareLatestSafetyBackup();
+      if (!shared) {
+        setBackupMessage('Es gibt noch keine Sicherungskopie — sie entsteht beim ersten Import.');
+      }
+    } catch (error) {
+      setBackupError(describeExportError(error));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   function handleImport() {
     confirmBackupImport(async () => {
       clearBackupFeedback();
       setBusy('import');
       try {
-        const result = await importBackup();
-        if (result.status === 'cancelled') {
-          return;
-        }
-        setRestartRequired(true);
+        // A successful import closes the live database connection, which the
+        // root layout observes and turns into an app-wide "restart required"
+        // state (src/state/databaseLifecycle.ts). Nothing to do here: this
+        // screen is about to be unmounted along with the whole navigator.
+        await importBackup();
       } catch (error) {
         setBackupError(describeImportError(error));
       } finally {
         setBusy(null);
       }
     });
-  }
-
-  if (restartRequired) {
-    return (
-      <View style={styles.screen} testID="settings-restart-required">
-        <Card style={styles.section}>
-          <Text style={styles.label}>Import abgeschlossen</Text>
-          <Text style={styles.body}>
-            Deine Daten wurden aus dem Backup wiederhergestellt. Bitte schließe die App vollständig
-            und öffne sie erneut, damit die wiederhergestellten Daten geladen werden.
-          </Text>
-        </Card>
-      </View>
-    );
   }
 
   return (
@@ -143,7 +143,8 @@ export default function SettingsScreen() {
       <Card style={styles.section}>
         <Text style={styles.label}>Datensicherung</Text>
         <Text style={styles.hint}>
-          Ein Backup enthält alle Routinen, Aufgaben, Kategorien und den vollständigen Verlauf.
+          Ein Backup enthält alle Routinen, Aufgaben, Kategorien und den vollständigen Verlauf. Vor
+          jedem Import wird automatisch eine Sicherungskopie deiner bisherigen Daten angelegt.
         </Text>
         <Button
           label={busy === 'export' ? 'Backup wird erstellt…' : 'Backup exportieren'}
@@ -157,6 +158,13 @@ export default function SettingsScreen() {
           onPress={handleImport}
           disabled={busy !== null}
           testID="settings-import-backup"
+        />
+        <Button
+          label={busy === 'safety' ? 'Wird geteilt…' : 'Letzte Sicherungskopie teilen'}
+          variant="secondary"
+          onPress={handleShareSafetyBackup}
+          disabled={busy !== null}
+          testID="settings-share-safety-backup"
         />
         {backupMessage && (
           <Text style={styles.success} testID="settings-backup-message">
