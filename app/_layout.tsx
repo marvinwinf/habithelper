@@ -7,6 +7,7 @@ import { db } from '../src/data/db/client';
 import { runMigrations } from '../src/data/db/migrate';
 import { ensureProfile } from '../src/data/repositories/profileRepository';
 import { reconcileAllActiveRoutines } from '../src/services/reconciliationService';
+import { dayRolloverWatcher } from '../src/state/appDayRollover';
 import { StartupRecovery } from '../src/ui/components/StartupRecovery';
 import { colors } from '../src/ui/theme';
 
@@ -34,7 +35,6 @@ export default function RootLayout() {
       await reconcileAllActiveRoutines(db);
     }
 
-    setState('loading');
     initialize()
       .then(() => {
         if (!cancelled) {
@@ -58,7 +58,25 @@ export default function RootLayout() {
     };
   }, [attempt]);
 
-  const handleRetry = useCallback(() => setAttempt((current) => current + 1), []);
+  // Startup reconciliation only covers the day the app happened to launch on.
+  // Android keeps processes alive for days, so the watcher re-runs it whenever
+  // the app is foregrounded on a later calendar day — otherwise a backgrounded
+  // app resumes showing a new date next to yesterday's streaks.
+  useEffect(() => {
+    if (state !== 'ready') {
+      return;
+    }
+    return dayRolloverWatcher.start();
+  }, [state]);
+
+  // Resets to the loading state here rather than in the effect body: a
+  // synchronous setState inside an effect triggers a cascading render (and is
+  // rejected by react-hooks/set-state-in-effect). An event handler is the
+  // right place for it, and `attempt` changing re-runs the startup effect.
+  const handleRetry = useCallback(() => {
+    setState('loading');
+    setAttempt((current) => current + 1);
+  }, []);
 
   // Restoring is allowed to proceed even though the live database is the
   // thing that just failed — see ExpoImportOptions in expoImport.ts for why

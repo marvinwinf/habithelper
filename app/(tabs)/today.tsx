@@ -45,6 +45,7 @@ import {
   undoRoutineSkip,
 } from '../../src/services/routineService';
 import { deleteTask, moveTask, setTaskCompletion } from '../../src/services/taskService';
+import { subscribeToDayRollover } from '../../src/state/appDayRollover';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
 import { getGreeting } from '../../src/domain/greeting';
 import { classifyOccurrence, type OccurrenceState } from '../../src/domain/routines/completion';
@@ -164,6 +165,13 @@ export default function TodayScreen() {
       loadData();
     }, [loadData]),
   );
+
+  // Focus alone is not enough across a day boundary: resuming a backgrounded
+  // app does not re-fire useFocusEffect, so this screen would keep rendering
+  // yesterday's date, greeting, and due list until something else refocused
+  // it. The rollover watcher (src/state/appDayRollover.ts) reconciles first,
+  // then notifies — so the reload here reads already-current state.
+  useEffect(() => subscribeToDayRollover(loadData), [loadData]);
 
   // Separate from the effect above: this one re-fetches events whenever the
   // active routine list changes (including after loadData() re-runs post-
