@@ -68,6 +68,7 @@ export default function EditRoutineScreen() {
           reason: routine.reason,
           cue: routine.cue,
           pairing: routine.pairing,
+          miniVersion: routine.miniVersion,
           reward: routine.reward,
           allowConsciousSkip: routine.allowConsciousSkip,
         }}

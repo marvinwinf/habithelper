@@ -32,6 +32,7 @@ export interface RoutineFormValues {
   reason: string | null;
   cue: string | null;
   pairing: string | null;
+  miniVersion: string | null;
   reward: string | null;
   allowConsciousSkip: boolean;
 }
@@ -70,11 +71,12 @@ const DEFAULT_TARGET_COUNT = 3;
 // "Dein Plan" card layout on the statistics screen without feeling limiting.
 const PLAN_FIELD_MAX_LENGTH = 140;
 
-type PlanFieldKey = 'reason' | 'cue' | 'pairing' | 'reward';
+type PlanFieldKey = 'reason' | 'cue' | 'pairing' | 'miniVersion' | 'reward';
 
-// The "Routine leichter machen" fields: identity first, then the habit loop
-// in order (before / during / after). Kept in one list so the form and its
-// labels stay in sync and the block is trivial to reorder.
+// The "Routine leichter machen" fields: identity first, then the four laws of
+// "Die 1%-Methode" in order — obvious (Auslöser), attractive (Verknüpfung),
+// easy (Mini-Version), satisfying (Belohnung). Kept in one list so the form
+// and its labels stay in sync and the block is trivial to reorder.
 const PLAN_FIELDS: {
   key: PlanFieldKey;
   label: string;
@@ -92,6 +94,11 @@ const PLAN_FIELDS: {
     key: 'pairing',
     label: 'Verknüpfung',
     placeholder: 'z. B. Dabei höre ich meinen Lieblingspodcast.',
+  },
+  {
+    key: 'miniVersion',
+    label: 'Mini-Version',
+    placeholder: 'z. B. Nur die Laufschuhe anziehen.',
   },
   { key: 'reward', label: 'Belohnung', placeholder: 'z. B. Danach trinke ich entspannt einen Kaffee.' },
 ];
@@ -119,6 +126,7 @@ export function RoutineForm({
   const [reason, setReason] = useState(initialValues?.reason ?? '');
   const [cue, setCue] = useState(initialValues?.cue ?? '');
   const [pairing, setPairing] = useState(initialValues?.pairing ?? '');
+  const [miniVersion, setMiniVersion] = useState(initialValues?.miniVersion ?? '');
   const [reward, setReward] = useState(initialValues?.reward ?? '');
   const [allowConsciousSkip, setAllowConsciousSkip] = useState(
     initialValues?.allowConsciousSkip ?? false,
@@ -151,11 +159,12 @@ export function RoutineForm({
   const scheduleValid = !needsWeekdaySelection || scheduledWeekdays.length > 0;
   const canSave = trimmedName.length > 0 && scheduleValid;
 
-  const planValues: Record<PlanFieldKey, string> = { reason, cue, pairing, reward };
+  const planValues: Record<PlanFieldKey, string> = { reason, cue, pairing, miniVersion, reward };
   const planSetters: Record<PlanFieldKey, (value: string) => void> = {
     reason: setReason,
     cue: setCue,
     pairing: setPairing,
+    miniVersion: setMiniVersion,
     reward: setReward,
   };
 
@@ -176,6 +185,7 @@ export function RoutineForm({
       reason: nullIfEmpty(reason),
       cue: nullIfEmpty(cue),
       pairing: nullIfEmpty(pairing),
+      miniVersion: nullIfEmpty(miniVersion),
       reward: nullIfEmpty(reward),
       allowConsciousSkip,
     });

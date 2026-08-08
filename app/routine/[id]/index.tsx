@@ -74,13 +74,14 @@ const WEEKDAY_LABELS: { day: IsoWeekday; label: string }[] = [
 // screen — each row renders only when its value is set; the whole card hides
 // when every field is empty.
 const PLAN_ROWS: {
-  key: 'reason' | 'cue' | 'pairing' | 'reward';
+  key: 'reason' | 'cue' | 'pairing' | 'miniVersion' | 'reward';
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
 }[] = [
   { key: 'reason', label: 'Identität', icon: 'person-outline' },
   { key: 'cue', label: 'Auslöser', icon: 'arrow-forward-outline' },
   { key: 'pairing', label: 'Verknüpfung', icon: 'link-outline' },
+  { key: 'miniVersion', label: 'Mini-Version', icon: 'flash-outline' },
   { key: 'reward', label: 'Belohnung', icon: 'gift-outline' },
 ];
 

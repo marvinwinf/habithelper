@@ -103,6 +103,7 @@ describe('RoutineForm', () => {
       reason: null,
       cue: null,
       pairing: null,
+      miniVersion: null,
       reward: null,
       allowConsciousSkip: false,
     });
@@ -126,6 +127,10 @@ describe('RoutineForm', () => {
       screen.getByTestId('routine-form-pairing-input'),
       'Dabei höre ich einen Podcast',
     );
+    await fireEvent.changeText(
+      screen.getByTestId('routine-form-miniVersion-input'),
+      'Nur die Schuhe anziehen',
+    );
     await fireEvent.changeText(screen.getByTestId('routine-form-reward-input'), 'Danach ein Kaffee');
     await fireEvent(screen.getByTestId('routine-form-allow-skip-switch'), 'valueChange', true);
     await fireEvent.press(screen.getByTestId('routine-form-save'));
@@ -135,6 +140,7 @@ describe('RoutineForm', () => {
         reason: 'Ich bin jemand, der sich bewegt.',
         cue: 'Nach dem Aufstehen',
         pairing: 'Dabei höre ich einen Podcast',
+        miniVersion: 'Nur die Schuhe anziehen',
         reward: 'Danach ein Kaffee',
         allowConsciousSkip: true,
       }),

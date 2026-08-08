@@ -1,0 +1,1 @@
+ALTER TABLE `routine` ADD `mini_version` text;

@@ -106,6 +106,7 @@ describe('database schema shape (docs/DATA_MODEL.md)', () => {
       cue: { notnull: 0, pk: 0 },
       pairing: { notnull: 0, pk: 0 },
       reward: { notnull: 0, pk: 0 },
+      mini_version: { notnull: 0, pk: 0 },
       allow_conscious_skip: { notnull: 1, pk: 0 },
       is_paused: { notnull: 1, pk: 0 },
       sort_order: { notnull: 1, pk: 0 },

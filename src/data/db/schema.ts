@@ -76,6 +76,12 @@ export const routine = sqliteTable('routine', {
   cue: text('cue'),
   pairing: text('pairing'),
   reward: text('reward'),
+  // The "2-minute rule" version of the routine (migration 0003) — the
+  // smallest form that still counts as showing up. Like the fields above it
+  // is a planning prompt only: completing the mini version is recorded as an
+  // ordinary completion, so no streak, joker, level, or replay logic reads
+  // this column. See docs/DATA_MODEL.md for why it is not its own event type.
+  miniVersion: text('mini_version'),
   allowConsciousSkip: integer('allow_conscious_skip', { mode: 'boolean' }).notNull(),
   isPaused: integer('is_paused', { mode: 'boolean' }).notNull(),
   sortOrder: real('sort_order').notNull(),
