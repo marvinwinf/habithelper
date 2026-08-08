@@ -10,6 +10,7 @@ import { createInMemoryFixture, createMigratedFixture } from '../../db/testUtils
 import { runImport, type ImportPorts, type TempDatabase } from '../import';
 import { buildBackup, serializeBackup } from '../serialize';
 import { seedBackupFixture } from '../testFixtures';
+import { BackupImportError } from '../populate';
 import { BackupFutureSchemaError, BackupParseError } from '../validate';
 
 async function backupText(): Promise<string> {
@@ -146,7 +147,7 @@ describe('runImport', () => {
     });
     const harness = createHarness({ text: JSON.stringify(broken) });
 
-    await expect(runImport(harness.ports)).rejects.toThrow(/FOREIGN KEY/i);
+    await expect(runImport(harness.ports)).rejects.toThrow(BackupImportError);
 
     expect(harness.calls).not.toContain('swap');
     expect(harness.temp.discarded).toBe(true);

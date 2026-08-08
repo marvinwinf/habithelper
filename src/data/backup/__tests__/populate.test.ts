@@ -88,8 +88,16 @@ describe('populateFromBackup', () => {
     const target = createInMemoryFixture();
 
     // Deferred, not disabled: referential integrity is still checked, just at
-    // COMMIT rather than per statement.
-    await expect(populateFromBackup(target.driver, backup)).rejects.toThrow(/FOREIGN KEY/i);
+    // COMMIT rather than per statement. The driver's SqliteError is wrapped as
+    // a BackupImportError before it leaves the data layer
+    // (docs/ARCHITECTURE.md's Error Handling), with the constraint named in
+    // the message and the original kept as `cause` so the failure stays
+    // diagnosable.
+    const error = await populateFromBackup(target.driver, backup).catch((thrown) => thrown);
+
+    expect(error).toBeInstanceOf(BackupImportError);
+    expect((error as Error).message).toMatch(/FOREIGN KEY/i);
+    expect((error as Error).cause).toBeDefined();
   });
 
   it('rejects a row with an invalid column name instead of building SQL from it', async () => {

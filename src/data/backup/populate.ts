@@ -9,10 +9,31 @@ import { runPendingMigrations } from '../db/migrationRunner';
 import { BACKUP_TABLE_NAMES, type BackupFile, type BackupWriteDriver, type BackupRow } from './types';
 
 export class BackupImportError extends Error {
-  constructor(message: string) {
+  constructor(message: string, options?: { cause?: unknown }) {
     super(message);
     this.name = 'BackupImportError';
+    if (options && 'cause' in options) {
+      this.cause = options.cause;
+    }
   }
+}
+
+/**
+ * Wraps a raw SQLite failure as a `BackupImportError`, keeping the driver's
+ * message (it names the actual constraint) and the original as `cause`.
+ *
+ * docs/ARCHITECTURE.md's Error Handling requires the data layer to wrap
+ * driver errors into typed errors rather than leak them upward: without this
+ * a failed import surfaced a raw SqliteError, which the UI's error mapping
+ * (src/ui/backupMessages.ts) could only describe with its generic fallback —
+ * so a foreign-key failure and an out-of-disk failure read identically.
+ */
+function asImportError(error: unknown, context: string): BackupImportError {
+  if (error instanceof BackupImportError) {
+    return error;
+  }
+  const detail = error instanceof Error ? error.message : String(error);
+  return new BackupImportError(`${context}: ${detail}`, { cause: error });
 }
 
 function buildInsert(table: string, row: BackupRow): { sql: string; params: (string | number | null)[] } {
@@ -58,17 +79,25 @@ export async function populateFromBackup(
   driver: BackupWriteDriver,
   backup: BackupFile,
 ): Promise<void> {
-  await runPendingMigrations(driver, migrations);
+  try {
+    await runPendingMigrations(driver, migrations);
+  } catch (error) {
+    throw asImportError(error, 'Could not prepare the imported database');
+  }
 
-  await driver.withTransactionAsync(async () => {
-    await driver.execAsync('PRAGMA defer_foreign_keys = ON');
-    for (const table of BACKUP_TABLE_NAMES) {
-      for (const row of backup.tables[table]) {
-        const { sql, params } = buildInsert(table, row);
-        await driver.runAsync(sql, params);
+  try {
+    await driver.withTransactionAsync(async () => {
+      await driver.execAsync('PRAGMA defer_foreign_keys = ON');
+      for (const table of BACKUP_TABLE_NAMES) {
+        for (const row of backup.tables[table]) {
+          const { sql, params } = buildInsert(table, row);
+          await driver.runAsync(sql, params);
+        }
       }
-    }
-  });
+    });
+  } catch (error) {
+    throw asImportError(error, 'Could not restore the backup contents');
+  }
 }
 
 /**
@@ -82,9 +111,12 @@ export async function verifyPopulated(
   backup: BackupFile,
 ): Promise<void> {
   for (const table of BACKUP_TABLE_NAMES) {
-    const rows = await driver.getAllAsync<{ count: number }>(
-      `SELECT COUNT(*) AS count FROM ${table}`,
-    );
+    let rows: { count: number }[];
+    try {
+      rows = await driver.getAllAsync<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table}`);
+    } catch (error) {
+      throw asImportError(error, 'Could not verify the imported database');
+    }
     const actual = rows[0]?.count ?? 0;
     const expected = backup.tables[table].length;
     if (actual !== expected) {
