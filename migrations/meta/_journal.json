@@ -36,6 +36,13 @@
       "when": 1786148996015,
       "tag": "0004_routine_habit_stack",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1786643599784,
+      "tag": "0005_profile_reminder",
+      "breakpoints": true
     }
   ]
 }

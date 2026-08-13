@@ -6,6 +6,7 @@ import m0001 from './0001_category_icon.sql';
 import m0002 from './0002_routine_plan.sql';
 import m0003 from './0003_routine_mini_version.sql';
 import m0004 from './0004_routine_habit_stack.sql';
+import m0005 from './0005_profile_reminder.sql';
 
   export default {
     journal,
@@ -14,7 +15,8 @@ import m0004 from './0004_routine_habit_stack.sql';
 m0001,
 m0002,
 m0003,
-m0004
+m0004,
+m0005
     }
   }
   

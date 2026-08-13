@@ -16,7 +16,13 @@ jest.mock('../../../src/data/repositories/categoryRepository', () => ({
   listCategories: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('../../../src/data/repositories/profileRepository', () => ({
-  ensureProfile: jest.fn().mockResolvedValue({ id: 'p', displayName: 'Marvin', createdAt: 'x' }),
+  ensureProfile: jest.fn().mockResolvedValue({
+    id: 'p',
+    displayName: 'Marvin',
+    reminderEnabled: false,
+    reminderTime: '08:00',
+    createdAt: 'x',
+  }),
 }));
 jest.mock('../../../src/data/repositories/routineRepository', () => ({
   listRoutines: jest.fn(),

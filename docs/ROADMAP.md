@@ -85,9 +85,17 @@
 - Progress screen: streak ring, stat tiles, completion-over-time chart, habit-breakdown donut.
 - Settings screen relabeled "Me".
 
+## Phase 13: Daily Reminder
+
+- One local daily reminder at a user-chosen time (opt-in), scheduled on the device via `expo-notifications`.
+- Android notification permission requested at the moment the user enables it.
+- Reminder settings stored on the profile (migration `0005`) and re-synced to the OS schedule on every app start.
+- The Phase 12 bell icon stops being a placeholder: it reports the reminder and links to its setting.
+
 ## Future Phases
 
-- Real push notifications (the Phase 12 bell icon stays a visual placeholder).
+- Remote push notifications (a server, push tokens, delivery the app did not schedule itself).
+- Per-routine reminders, and a reminder whose text reflects what is still open that day.
 - Morning and evening reports.
 - Focus sessions (distinct from the Phase 12 "Focus of the day" static card).
 - Search.

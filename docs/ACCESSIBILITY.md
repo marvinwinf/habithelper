@@ -88,6 +88,7 @@ set so the palette is ready.
 | Calendar month nav (`‹`/`›`) | 48×48 | `spacing.xl` box |
 | Calendar day cell | ~48dp cell, 86% visual | full cell allocation ≥44dp |
 | Bottom tab items | 64dp bar | see `app/(tabs)/_layout.tsx` |
+| Reminder time row (Me) | ≥44 tall | `minHeight: 44`; the whole row opens the time picker |
 
 ## Non-color signals per state
 

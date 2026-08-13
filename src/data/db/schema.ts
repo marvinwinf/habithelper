@@ -43,6 +43,13 @@ export type RoutineEventType =
 export const profile = sqliteTable('profile', {
   id: text('id').primaryKey(),
   displayName: text('display_name').notNull(),
+  // Daily reminder settings (migration 0005). The first real stored setting
+  // beyond the display name, added as its own columns exactly as
+  // docs/DATA_MODEL.md's profile note prescribes — no settings blob. Both are
+  // NOT NULL with a default so existing rows migrate to "reminder off at the
+  // default time" rather than to an ambiguous NULL.
+  reminderEnabled: integer('reminder_enabled', { mode: 'boolean' }).notNull().default(false),
+  reminderTime: text('reminder_time').notNull().default('08:00'),
   createdAt: text('created_at').notNull(),
 });
 

@@ -174,6 +174,8 @@ describe('TodayScreen', () => {
     (ensureProfile as jest.Mock).mockResolvedValue({
       id: 'profile-1',
       displayName: 'Marvin',
+      reminderEnabled: false,
+      reminderTime: '08:00',
       createdAt: 'x',
     });
     (listOverdueTasks as jest.Mock).mockResolvedValue([]);
@@ -693,14 +695,44 @@ describe('TodayScreen', () => {
     await waitFor(() => expect(screen.queryByTestId('today-shortcuts-categories')).toBeNull());
   });
 
-  it('opens the notifications placeholder sheet from the header icon', async () => {
+  it('reports that no reminder is active from the header bell', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([]);
 
     await renderToday();
 
     await fireEvent.press(await screen.findByTestId('today-notifications-button'));
 
-    expect(screen.getByText('Benachrichtigungen sind noch nicht verfügbar.')).toBeTruthy();
+    expect(screen.getByTestId('today-notifications-status')).toHaveTextContent(
+      /keine Erinnerung aktiv/,
+    );
+  });
+
+  it('reports the active reminder time from the header bell', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([]);
+    (ensureProfile as jest.Mock).mockResolvedValue({
+      id: 'profile-1',
+      displayName: 'Marvin',
+      reminderEnabled: true,
+      reminderTime: '21:15',
+      createdAt: 'x',
+    });
+
+    await renderToday();
+
+    await fireEvent.press(await screen.findByTestId('today-notifications-button'));
+
+    expect(screen.getByTestId('today-notifications-status')).toHaveTextContent(/21:15 Uhr/);
+  });
+
+  it('sends the user to the reminder settings from the bell sheet', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([]);
+
+    await renderToday();
+
+    await fireEvent.press(await screen.findByTestId('today-notifications-button'));
+    await fireEvent.press(screen.getByTestId('today-notifications-settings'));
+
+    await waitFor(() => expect(screen.queryByTestId('today-notifications-settings')).toBeNull());
   });
 
   describe('never-miss-twice note', () => {

@@ -15,7 +15,7 @@ The architecture must avoid unnecessary Android-specific decisions that would bl
 - subtle overall app streak,
 - routine progress for the current day,
 - a "Focus of the day" card (static rotating prompt, placeholder illustration only — no personalization/backend),
-- a header shortcuts icon and a notifications-placeholder icon (visual only; no push-notification delivery, see Explicitly Excluded below),
+- a header shortcuts icon and a bell icon (a placeholder during the MVP; it now reports the daily reminder and links to its setting — see Added After the MVP),
 - routines displayed before tasks,
 - visible completion controls,
 - completed items remain visible in a subdued completed state,
@@ -112,7 +112,7 @@ The architecture must avoid unnecessary Android-specific decisions that would bl
 ## Explicitly Excluded from the MVP
 
 - iOS release,
-- push notifications (the Today header's bell icon is a visual placeholder only — no delivery mechanism, permission request, or scheduling exists),
+- push notifications — meaning *remote* push: no server, no push token, no notification the app did not schedule on the device itself. A local daily reminder was added after the MVP (see below); remote delivery remains out of scope,
 - morning report,
 - evening report,
 - focus sessions,
@@ -131,3 +131,16 @@ The architecture must avoid unnecessary Android-specific decisions that would bl
 - subtasks,
 - projects,
 - task dependencies.
+
+## Added After the MVP
+
+### Daily Reminder
+
+One local notification, scheduled on the device by the app itself:
+
+- a single daily reminder at a user-chosen time, off by default,
+- switched on and timed on the Me screen; the Today header's bell reports its state,
+- the Android notification permission is requested when the user turns the reminder on,
+- the reminder is re-applied to the OS schedule on every app start, so a reinstall, a restored backup, or a revoked permission cannot leave it silently gone.
+
+Still excluded, deliberately: remote/push delivery, per-routine reminders, notifications that reflect what is actually still open today (a scheduled notification's text is fixed when it is scheduled, so that would need background work), and reminders for tasks.

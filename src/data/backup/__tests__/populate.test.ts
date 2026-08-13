@@ -137,6 +137,47 @@ describe('populateFromBackup', () => {
       .get('routine-1') as { cue: string | null; pairing: string | null; reward: string | null };
     expect(restored).toEqual({ cue: null, pairing: null, reward: null });
   });
+
+  it('restores a pre-0005 profile with the reminder switched off', async () => {
+    // A backup taken before the reminder columns existed carries a profile
+    // row without them. Restoring it must not turn a reminder on for a user
+    // who never asked for one — the schema defaults decide, not the file.
+    const backup = await exportedFixtureBackup();
+    backup.tables.profile = backup.tables.profile.map((row) => {
+      const { reminder_enabled, reminder_time, ...rest } = row;
+      void reminder_enabled;
+      void reminder_time;
+      return rest;
+    });
+    backup.manifest.schemaVersion = 4;
+    const target = createInMemoryFixture();
+
+    await populateFromBackup(target.driver, backup);
+
+    expect(target.sqlite.prepare('SELECT * FROM profile').get()).toMatchObject({
+      display_name: 'Marvin',
+      reminder_enabled: 0,
+      reminder_time: '08:00',
+    });
+  });
+
+  it('carries the reminder settings across a full export/import round trip', async () => {
+    const source = await createMigratedFixture();
+    await seedBackupFixture(source.driver);
+    await source.driver.runAsync(
+      'UPDATE profile SET reminder_enabled = 1, reminder_time = ? WHERE id = ?',
+      ['21:15', 'profile-1'],
+    );
+    const backup = await buildBackup(source.driver, { appVersion: '1.0.0' });
+    const target = createInMemoryFixture();
+
+    await populateFromBackup(target.driver, backup);
+
+    expect(target.sqlite.prepare('SELECT * FROM profile').get()).toMatchObject({
+      reminder_enabled: 1,
+      reminder_time: '21:15',
+    });
+  });
 });
 
 describe('verifyPopulated', () => {

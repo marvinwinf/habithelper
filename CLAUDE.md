@@ -51,7 +51,7 @@ image — open it only for pixel-level design work, never as routine reading.
 - Add or update tests with every logic change.
 - Keep external dependencies minimal.
 - Prefer maintained Expo-compatible libraries.
-- Do not add cloud services, authentication, social features, notifications, or iOS-specific work unless explicitly requested.
+- Do not add cloud services, authentication, social features, notifications, or iOS-specific work unless explicitly requested. (One local daily reminder exists, added on explicit request — see `docs/ARCHITECTURE.md`'s Local Reminder Notifications. Remote push is still out.)
 - Do not treat timers as required for routine completion.
 
 ## Release Process

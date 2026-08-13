@@ -34,7 +34,7 @@ Sections must not all carry equal visual weight — spacing, type size/weight, a
 
 ### Header
 
-- Leading shortcuts icon (opens a small sheet linking to Kategorien verwalten and Me); trailing bell icon (placeholder only — opens a small sheet noting notifications aren't available yet; carries no push-notification functionality, per `docs/MVP_SCOPE.md`).
+- Leading shortcuts icon (opens a small sheet linking to Kategorien verwalten and Me); trailing bell icon, which opens a small sheet reporting the current daily reminder ("Tägliche Erinnerung um HH:mm Uhr" or "Es ist keine Erinnerung aktiv") with a link into Me. The bell reports state and hands off — the switch and the time picker live on the Me screen only, never duplicated here.
 - Time-based greeting, for example "Guten Morgen, Marvin", with a short static subtitle line under it.
 - Current date.
 - Subtle overall app streak.
@@ -274,6 +274,17 @@ Reachable from the bottom navigation. A read-only dashboard, built entirely from
 Reachable from the bottom navigation as **Me**. Contains:
 
 - display name,
+- daily reminder,
 - category management,
 - export backup,
 - import backup.
+
+### Daily Reminder
+
+One card, in this order: a switch ("Tägliche Erinnerung"), a row showing the time that opens Android's time picker, and a short line stating the reminder is planned on the device itself — no account, no internet.
+
+- Off by default; a fresh profile says nothing about notifications until the user asks for one.
+- Switching it on requests the Android notification permission at that moment — never at app start, where the system prompt would arrive with no context.
+- Both the switch and the time apply immediately (no separate save button), and both are stored before they are scheduled.
+- If the OS refuses notifications, the card says so and offers "Android-Einstellungen öffnen". The switch keeps the user's choice: granting the permission later restores the reminder on the next app start, with nothing to re-enter.
+- Copy stays gentle and never accusing, per `docs/DESIGN_SYSTEM.md`'s Gamification — the notification invites ("Zeit für deine Routinen · Ein kleiner Schritt zählt schon."), it does not reprimand. It also cannot name what is still open: the text is fixed when the reminder is scheduled, not when it fires.

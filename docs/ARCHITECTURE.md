@@ -116,6 +116,16 @@ Three implementation consequences of the swap, established when Phase 9 landed:
 
 Validation runs *before* the safety backup, not after: validation is pure (it touches no database and no filesystem), so rejecting a malformed or future-schema file leaves everything untouched and avoids writing a safety backup for a file that was never importable. The safety backup is still written before any database work begins, which is what T053 requires.
 
+## Local Reminder Notifications
+
+The daily reminder (post-MVP) is **local only**: `expo-notifications` schedules one repeating notification on the device. There is no server, no push token, and no network call — enabling a reminder must not break the offline-first guarantee (`PROJECT_PRINCIPLES.md`).
+
+- **Truth lives in the database, the schedule lives in the OS.** `profile.reminder_enabled` / `profile.reminder_time` (migration `0005`) are what the user chose; the scheduled notification is a consequence of that, held outside the app's storage and absent from every backup. `syncStoredReminder` (`src/services/reminderService.ts`) reconciles the two at app start, which is what heals the schedule after a reinstall, a restored backup, or a revoked permission.
+- **One notification, one stable identifier.** `DAILY_REMINDER_IDENTIFIER` means a re-sync replaces the existing schedule rather than stacking a second reminder on top of it, so the sync path is safe to run on every launch.
+- **The decisions are port-injected and unit-tested; the native calls are not.** `src/services/notifications/reminderScheduler.ts` holds every rule (when to schedule, when to cancel, when to ask for permission) behind a `ReminderPorts` interface and imports nothing native, so it is tested with fakes. `expoReminders.ts` supplies the real ports and stays decision-free, covered by the manual checklist — the same split as `import.ts` / `expoImport.ts` above.
+- **The permission prompt belongs to the user's action, not to startup.** The startup sync never requests a permission; only enabling the reminder does. A permission the user already refused is not re-requested (Android would resolve it denied without showing anything) — the Me screen points at the system settings instead.
+- Notifications are posted to their own Android channel (`daily-reminder`, importance DEFAULT) so the reminder can be silenced without silencing the app, and so it reads as an invitation rather than an alarm.
+
 ## Testing Setup
 
 - **Unit tests (domain + services):** Jest (`jest-expo` preset). Pure `src/domain` logic is the highest-value, easiest-to-test layer — no mocking required.
