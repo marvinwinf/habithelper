@@ -22,7 +22,10 @@ import {
   getAppStreakCache,
   type AppStreakCache,
 } from '../../src/data/repositories/appStreakCacheRepository';
-import { ensureProfile } from '../../src/data/repositories/profileRepository';
+import {
+  ensureProfile,
+  type ReminderSettings,
+} from '../../src/data/repositories/profileRepository';
 import {
   listRoutineStateCaches,
   type RoutineStateCache,
@@ -48,6 +51,7 @@ import { deleteTask, moveTask, setTaskCompletion } from '../../src/services/task
 import { subscribeToDayRollover } from '../../src/state/appDayRollover';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
 import { getGreeting } from '../../src/domain/greeting';
+import { normalizeReminderTime } from '../../src/domain/notifications/reminderTime';
 import { classifyOccurrence, type OccurrenceState } from '../../src/domain/routines/completion';
 import { hasUnfulfilledOccurrence } from '../../src/domain/routines/recovery';
 import { applySubsetReorder } from '../../src/domain/routines/reorder';
@@ -104,6 +108,7 @@ export default function TodayScreen() {
   const [appStreak, setAppStreak] = useState<AppStreakCache | undefined>(undefined);
   const [routineStreaks, setRoutineStreaks] = useState<Record<string, RoutineStateCache>>({});
   const [displayName, setDisplayName] = useState('');
+  const [reminder, setReminder] = useState<ReminderSettings>({ enabled: false, time: '08:00' });
   const [overdueTasks, setOverdueTasks] = useState<Task[]>([]);
   const [tasksDueToday, setTasksDueToday] = useState<Task[]>([]);
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
@@ -156,7 +161,15 @@ export default function TodayScreen() {
         setRoutineStreaks(Object.fromEntries(rows.map((row) => [row.routineId, row]))),
       ),
     );
-    ensureProfile(db).then(guard((profile) => setDisplayName(profile.displayName)));
+    ensureProfile(db).then(
+      guard((profile) => {
+        setDisplayName(profile.displayName);
+        setReminder({
+          enabled: profile.reminderEnabled,
+          time: normalizeReminderTime(profile.reminderTime),
+        });
+      }),
+    );
     listOverdueTasks(db, today).then(guard(setOverdueTasks));
     listTasksForToday(db, today).then(guard(setTasksDueToday));
     listUpcomingTasks(db, today).then(guard(setUpcomingTasks));
@@ -802,9 +815,28 @@ export default function TodayScreen() {
       onClose={() => setNotificationsOpen(false)}
       testID="today-notifications-sheet"
     >
+      {/* The bell was a placeholder through the MVP; it now reports the real
+          reminder state (T091) and hands off to the one screen that owns it,
+          rather than duplicating the switch here. */}
       <View style={styles.menu}>
-        <Text style={styles.body}>Benachrichtigungen sind noch nicht verfügbar.</Text>
-        <Button label="Schließen" onPress={() => setNotificationsOpen(false)} />
+        <Text style={styles.body} testID="today-notifications-status">
+          {reminder.enabled
+            ? `Tägliche Erinnerung um ${reminder.time} Uhr.`
+            : 'Es ist keine Erinnerung aktiv.'}
+        </Text>
+        <Button
+          label="Erinnerung einstellen"
+          onPress={() => {
+            setNotificationsOpen(false);
+            router.push('/(tabs)/settings');
+          }}
+          testID="today-notifications-settings"
+        />
+        <Button
+          label="Schließen"
+          variant="secondary"
+          onPress={() => setNotificationsOpen(false)}
+        />
       </View>
     </Sheet>
 

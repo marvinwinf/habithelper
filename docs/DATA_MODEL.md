@@ -19,11 +19,17 @@ The single local profile (see `USER_MODEL.md`).
 |---|---|---|
 | `id` | TEXT PK | stable, generated once at first launch |
 | `display_name` | TEXT | user-editable |
+| `reminder_enabled` | INTEGER (bool) | daily-reminder switch, default `0` (added by migration `0005_profile_reminder`) |
+| `reminder_time` | TEXT | `HH:mm` local wall-clock time for the daily reminder, default `'08:00'` (`0005`) |
 | `created_at` | TEXT | |
 
 Exactly one row in the MVP. Schema does not prevent a future `profiles` table with a `profile_id` FK added to owned entities — that FK column can be added additively later; omitted now because the MVP is explicitly single-profile.
 
-Note: `docs/DATA_PERSISTENCE.md` lists "settings" as its own persistent-data category separate from "local profile," but `docs/SCREEN_SPECIFICATIONS.md`'s Settings screen defines no setting beyond display name (category management and export/import are separate entities/actions, not stored settings values). No speculative settings blob is added here — this is an open documentation gap, not a modeling decision; see `docs/IMPLEMENTATION_PLAN.md`'s Open Product Questions. If a real setting is identified later, it is added as its own column, additively.
+Note: `docs/DATA_PERSISTENCE.md` lists "settings" as its own persistent-data category separate from "local profile." Through the MVP no such setting existed (category management and export/import are separate entities/actions, not stored settings values), so no speculative settings blob was modeled. The daily reminder is the first real one, and it followed exactly the rule stated here: **added as its own columns on `profile`, additively**, not as a blob and not as a new table. A future setting is added the same way.
+
+**The reminder columns store the user's choice, never the schedule.** The scheduled notification itself lives in the OS, outside the database and outside any backup, so the two can drift — a reinstall, a restored backup, or a permission revoked in Android's settings all leave the OS with no reminder while the column still says "on". `syncStoredReminder` (`src/services/reminderService.ts`) reconciles them on every app start, treating the columns as the truth. That is also why a refused notification permission does **not** write `reminder_enabled = 0`: erasing the choice would mean a user who grants the permission later silently gets nothing back.
+
+Both columns are `NOT NULL` with defaults so a profile row created before `0005` migrates to "reminder off at the default time" — an upgrade must never start notifying someone who never asked for it. A backup that predates `0005` restores the same way, since population inserts into a database already migrated to the current schema (see `docs/ARCHITECTURE.md`'s Backup and Restore).
 
 ### `category`
 

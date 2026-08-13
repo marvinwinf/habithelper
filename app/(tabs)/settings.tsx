@@ -1,25 +1,55 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'expo-router';
-import { ScrollView, StyleSheet, Text, TextInput } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 
 import { exportBackup, shareLatestSafetyBackup } from '../../src/data/backup/export';
 import { importBackup } from '../../src/data/backup/expoImport';
 import { db } from '../../src/data/db/client';
 import { ensureProfile, updateDisplayName } from '../../src/data/repositories/profileRepository';
+import {
+  formatReminderTime,
+  normalizeReminderTime,
+  parseReminderTime,
+} from '../../src/domain/notifications/reminderTime';
+import { saveReminderSettings } from '../../src/services/reminderService';
+import type { ReminderSyncResult } from '../../src/services/notifications/reminderScheduler';
 import { confirmBackupImport } from '../../src/ui/alerts';
 import { describeExportError, describeImportError } from '../../src/ui/backupMessages';
 import { Button } from '../../src/ui/components/Button';
 import { Card } from '../../src/ui/components/Card';
 import { NavRow } from '../../src/ui/components/NavRow';
-import { colors, radius, spacing, typography } from '../../src/ui/theme';
+import { colors, pressedFeedback, radius, spacing, typography } from '../../src/ui/theme';
 
 /** Which long-running backup action is in flight, if any. */
 type BackupBusy = 'export' | 'import' | 'safety' | null;
+
+/** Opens Android's native time picker seeded with the current reminder time. */
+function openReminderTimePicker(currentValue: string, onPicked: (value: string) => void) {
+  const parsed = parseReminderTime(currentValue);
+  const seed = new Date();
+  seed.setHours(parsed?.hour ?? 8, parsed?.minute ?? 0, 0, 0);
+  DateTimePickerAndroid.open({
+    value: seed,
+    mode: 'time',
+    is24Hour: true,
+    onValueChange: (_event, selectedDate) =>
+      onPicked(
+        formatReminderTime({ hour: selectedDate.getHours(), minute: selectedDate.getMinutes() }),
+      ),
+  });
+}
 
 export default function SettingsScreen() {
   const [profileId, setProfileId] = useState<string | undefined>(undefined);
   const [displayName, setDisplayName] = useState('');
   const [savedDisplayName, setSavedDisplayName] = useState('');
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState('08:00');
+  // Null until a reminder change has actually been applied — the screen says
+  // nothing about permissions before the user has asked for anything.
+  const [reminderStatus, setReminderStatus] = useState<ReminderSyncResult['status'] | null>(null);
+  const [reminderError, setReminderError] = useState<string | null>(null);
   const [busy, setBusy] = useState<BackupBusy>(null);
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
   const [backupError, setBackupError] = useState<string | null>(null);
@@ -31,12 +61,41 @@ export default function SettingsScreen() {
         setProfileId(profile.id);
         setDisplayName(profile.displayName);
         setSavedDisplayName(profile.displayName);
+        setReminderEnabled(profile.reminderEnabled);
+        setReminderTime(normalizeReminderTime(profile.reminderTime));
       }
     });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  /**
+   * Persist first, then schedule: the user's choice must survive even if the
+   * OS refuses the permission, so a permission granted later is picked up by
+   * the next startup sync instead of being forgotten.
+   */
+  async function applyReminder(next: { enabled: boolean; time: string }) {
+    if (!profileId) {
+      return;
+    }
+    const previous = { enabled: reminderEnabled, time: reminderTime };
+    setReminderEnabled(next.enabled);
+    setReminderTime(next.time);
+    setReminderError(null);
+    try {
+      const result = await saveReminderSettings(db, profileId, next);
+      setReminderStatus(result.status);
+    } catch (error) {
+      // Nothing was stored, so the switch must not keep claiming otherwise
+      // (docs/ARCHITECTURE.md's Error Handling: leave prior state intact).
+      console.error('Reminder settings could not be saved', error);
+      setReminderEnabled(previous.enabled);
+      setReminderTime(previous.time);
+      setReminderStatus(null);
+      setReminderError('Die Erinnerung konnte nicht gespeichert werden.');
+    }
+  }
 
   const trimmedName = displayName.trim();
   const canSave = trimmedName.length > 0 && trimmedName !== savedDisplayName;
@@ -128,6 +187,60 @@ export default function SettingsScreen() {
           disabled={!canSave}
           testID="settings-save-display-name"
         />
+      </Card>
+
+      <Card style={styles.section}>
+        <Text style={styles.label}>Erinnerung</Text>
+        <View style={styles.switchRow}>
+          <Text style={styles.body}>Tägliche Erinnerung</Text>
+          <Switch
+            value={reminderEnabled}
+            onValueChange={(enabled) => applyReminder({ enabled, time: reminderTime })}
+            testID="settings-reminder-switch"
+          />
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Erinnerungszeit ändern, aktuell ${reminderTime} Uhr`}
+          onPress={() =>
+            openReminderTimePicker(reminderTime, (time) =>
+              applyReminder({ enabled: reminderEnabled, time }),
+            )
+          }
+          testID="settings-reminder-time"
+          style={({ pressed }) => [styles.timeRow, pressed && styles.pressed]}
+        >
+          <Text style={styles.body}>Uhrzeit</Text>
+          <Text style={styles.timeValue}>{reminderTime} Uhr</Text>
+        </Pressable>
+        <Text style={styles.hint}>
+          Eine ruhige Erinnerung pro Tag, direkt auf dem Gerät geplant — ohne Konto und ohne
+          Internetverbindung.
+        </Text>
+        {reminderStatus === 'permission-missing' && (
+          <>
+            <Text style={styles.error} testID="settings-reminder-permission-hint">
+              Benachrichtigungen sind für HabitHelper deaktiviert. Erlaube sie in den
+              Android-Einstellungen, damit die Erinnerung ankommt.
+            </Text>
+            <Button
+              label="Android-Einstellungen öffnen"
+              variant="secondary"
+              onPress={() => Linking.openSettings()}
+              testID="settings-reminder-open-system-settings"
+            />
+          </>
+        )}
+        {reminderStatus === 'scheduled' && (
+          <Text style={styles.success} testID="settings-reminder-confirmation">
+            Erinnerung aktiv um {reminderTime} Uhr.
+          </Text>
+        )}
+        {reminderError && (
+          <Text style={styles.error} testID="settings-reminder-error">
+            {reminderError}
+          </Text>
+        )}
       </Card>
 
       <Card style={styles.section}>
@@ -234,6 +347,28 @@ const styles = StyleSheet.create({
     lineHeight: typography.bodySmall.lineHeight,
     color: colors.destructive,
   },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.xs,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    // The whole row is the control, so it carries the 44dp target from
+    // docs/ACCESSIBILITY.md rather than relying on the text's own height.
+    minHeight: 44,
+  },
+  timeValue: {
+    fontSize: typography.body.fontSize,
+    lineHeight: typography.body.lineHeight,
+    fontWeight: typography.label.fontWeight,
+    color: colors.accent,
+  },
+  pressed: pressedFeedback,
   input: {
     borderWidth: 1,
     borderColor: colors.border,

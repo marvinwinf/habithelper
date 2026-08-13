@@ -2,6 +2,7 @@ import { randomUUID } from 'expo-crypto';
 import { eq } from 'drizzle-orm';
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 import { profile } from '../db/schema';
+import { DEFAULT_REMINDER_TIME } from '../../domain/notifications/reminderTime';
 
 // Accepts any sync-dialect SQLite drizzle database (both the real
 // expo-sqlite-backed client and a better-sqlite3-backed test database
@@ -13,6 +14,13 @@ type ProfileDb = BaseSQLiteDatabase<'sync', unknown, { profile: typeof profile }
 export type Profile = typeof profile.$inferSelect;
 
 const DEFAULT_DISPLAY_NAME = 'Nutzer';
+
+/** The reminder settings the profile stores (docs/DATA_MODEL.md's `profile`). */
+export interface ReminderSettings {
+  enabled: boolean;
+  /** `HH:mm`, local wall-clock time. */
+  time: string;
+}
 
 /**
  * Creates the single local profile row (docs/USER_MODEL.md) if none exists
@@ -29,10 +37,35 @@ export async function ensureProfile(db: ProfileDb): Promise<Profile> {
   const created: Profile = {
     id: randomUUID(),
     displayName: DEFAULT_DISPLAY_NAME,
+    // Reminders are opt-in: a new install schedules nothing until the user
+    // turns the reminder on (docs/SCREEN_SPECIFICATIONS.md's Settings screen).
+    reminderEnabled: false,
+    reminderTime: DEFAULT_REMINDER_TIME,
     createdAt: new Date().toISOString(),
   };
   await db.insert(profile).values(created);
   return created;
+}
+
+/** Reads the stored reminder settings off the (single) profile row. */
+export function readReminderSettings(row: Profile): ReminderSettings {
+  return { enabled: row.reminderEnabled, time: row.reminderTime };
+}
+
+/**
+ * Persists the daily-reminder settings. The scheduled notification itself is
+ * owned by `src/services/notifications` — this only stores the user's choice,
+ * so it survives a restart and travels in a backup like any other column.
+ */
+export async function updateReminderSettings(
+  db: ProfileDb,
+  id: string,
+  settings: ReminderSettings,
+): Promise<void> {
+  await db
+    .update(profile)
+    .set({ reminderEnabled: settings.enabled, reminderTime: settings.time })
+    .where(eq(profile.id, id));
 }
 
 /** Updates the profile's display name, per the Settings screen (T023). */

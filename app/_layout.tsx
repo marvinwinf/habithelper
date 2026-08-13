@@ -7,6 +7,7 @@ import { db } from '../src/data/db/client';
 import { runMigrations } from '../src/data/db/migrate';
 import { ensureProfile } from '../src/data/repositories/profileRepository';
 import { reconcileAllActiveRoutines } from '../src/services/reconciliationService';
+import { syncStoredReminder } from '../src/services/reminderService';
 import { dayRolloverWatcher } from '../src/state/appDayRollover';
 import {
   isDatabaseClosed,
@@ -46,6 +47,16 @@ export default function RootLayout() {
       // yesterday before any screen reads routine state, per T038 /
       // docs/ARCHITECTURE.md's Missed-Occurrence Reconciliation.
       await reconcileAllActiveRoutines(db);
+      // Re-applies the stored daily reminder to the OS schedule (T091). The
+      // schedule lives outside the database, so a reinstall, a restored
+      // backup, or a permission the user revoked in Android's settings can
+      // leave the two out of step; this converges them on every launch.
+      // Deliberately not awaited into the startup gate: a notification that
+      // cannot be scheduled is not a reason to block the app behind the
+      // recovery screen, so it fails loudly in the log and quietly on screen.
+      syncStoredReminder(db).catch((error) => {
+        console.warn('Daily reminder could not be synchronized', error);
+      });
     }
 
     initialize()
