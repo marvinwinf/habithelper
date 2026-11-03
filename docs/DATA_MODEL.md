@@ -19,7 +19,13 @@ The single local profile (see `USER_MODEL.md`).
 |---|---|---|
 | `id` | TEXT PK | stable, generated once at first launch |
 | `display_name` | TEXT | user-editable |
+| `reminder_enabled` | INTEGER NOT NULL DEFAULT 0 | local daily reminder on/off (added by migration `0005_profile_reminder`, T092); defaulted off so pre-migration profiles never gain a reminder they did not ask for |
+| `reminder_time` | TEXT NULL | local wall-clock `HH:mm`, `NULL` until the user picks one |
 | `created_at` | TEXT | |
+
+`reminder_time` is stored as local wall-clock time, deliberately not as a UTC instant: "remind me at 20:00" must keep meaning 20:00 after the user travels or the device changes timezone. No event rows are written for reminders — the reminder is a setting, not streak-relevant behavior, so nothing in the domain layer reads these two columns. Both travel in backups automatically (`BACKUP_TABLE_NAMES` includes `profile` and serialization is `SELECT *`), and the schedule itself is re-applied from them on app start.
+
+The first real setting beyond the display name lands here as its own column rather than a settings blob, exactly as the note below anticipated.
 
 Exactly one row in the MVP. Schema does not prevent a future `profiles` table with a `profile_id` FK added to owned entities — that FK column can be added additively later; omitted now because the MVP is explicitly single-profile.
 

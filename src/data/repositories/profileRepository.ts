@@ -29,6 +29,10 @@ export async function ensureProfile(db: ProfileDb): Promise<Profile> {
   const created: Profile = {
     id: randomUUID(),
     displayName: DEFAULT_DISPLAY_NAME,
+    // The reminder is opt-in (T092): a fresh profile has it off and no time,
+    // so startup never schedules anything the user did not ask for.
+    reminderEnabled: false,
+    reminderTime: null,
     createdAt: new Date().toISOString(),
   };
   await db.insert(profile).values(created);
@@ -42,4 +46,46 @@ export async function updateDisplayName(
   displayName: string,
 ): Promise<void> {
   await db.update(profile).set({ displayName }).where(eq(profile.id, id));
+}
+
+/** The persisted daily-reminder setting (T092). */
+export interface ReminderSetting {
+  enabled: boolean;
+  /** Local wall-clock `HH:mm`, or null when the user has never picked one. */
+  time: string | null;
+}
+
+export const REMINDER_OFF: ReminderSetting = { enabled: false, time: null };
+
+/**
+ * Reads the reminder setting from the single profile row. Returns
+ * `REMINDER_OFF` when no profile exists yet rather than throwing: the only
+ * caller that can hit that case is startup rescheduling, and "no profile" and
+ * "reminder off" mean the same thing there.
+ */
+export async function getReminderSetting(db: ProfileDb): Promise<ReminderSetting> {
+  const [row] = await db.select().from(profile).limit(1);
+  if (!row) {
+    return REMINDER_OFF;
+  }
+  return { enabled: row.reminderEnabled, time: row.reminderTime };
+}
+
+/**
+ * Persists the reminder setting. Writing `enabled: true` without a time is
+ * rejected — an enabled reminder with nothing to schedule would silently do
+ * nothing, which is worse than a visible error.
+ */
+export async function updateReminderSetting(
+  db: ProfileDb,
+  id: string,
+  setting: ReminderSetting,
+): Promise<void> {
+  if (setting.enabled && !setting.time) {
+    throw new Error('Cannot enable the reminder without a time.');
+  }
+  await db
+    .update(profile)
+    .set({ reminderEnabled: setting.enabled, reminderTime: setting.time })
+    .where(eq(profile.id, id));
 }
