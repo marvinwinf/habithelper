@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import ProgressScreen from '../progress';
 import { listRoutines } from '../../../src/data/repositories/routineRepository';
@@ -98,5 +98,28 @@ describe('ProgressScreen', () => {
     expect(tile).toBeTruthy();
     // The stat's number counts up to its value, so wait for it to settle.
     expect(await screen.findByText('2')).toBeTruthy();
+  });
+
+  it('defaults to the week range and renders as before', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
+
+    await render(<ProgressScreen />);
+
+    expect(await screen.findByText('Erledigungsquote (Woche)')).toBeTruthy();
+    expect(screen.getByText('Erledigt diese Woche')).toBeTruthy();
+    expect(screen.getByText('Verlauf über die Woche')).toBeTruthy();
+  });
+
+  it('switching to "Gesamt" updates tile labels and chart title', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
+
+    await render(<ProgressScreen />);
+    await screen.findByText('Erledigungsquote (Woche)');
+
+    fireEvent.press(screen.getByTestId('progress-range-toggle-all'));
+
+    expect(await screen.findByText('Erledigungsquote (Gesamt)')).toBeTruthy();
+    expect(screen.getByText('Erledigt (gesamt)')).toBeTruthy();
+    expect(screen.getByText('Verlauf insgesamt')).toBeTruthy();
   });
 });

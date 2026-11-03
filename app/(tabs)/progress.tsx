@@ -19,19 +19,50 @@ import {
 } from '../../src/data/repositories/routineStateCacheRepository';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
 import {
+  bucketCompletionSeriesByWeek,
   buildCategoryBreakdown,
   buildDailyCompletionSeries,
   buildProgressStatTiles,
 } from '../../src/domain/progress/overview';
-import { buildRoutineWeekRows, currentWeekDates } from '../../src/domain/routines/weekOverview';
+import { rangeDates, buildRoutineWeekRows, type ProgressRange } from '../../src/domain/routines/weekOverview';
 import { AreaChart } from '../../src/ui/components/AreaChart';
 import { DonutChart } from '../../src/ui/components/DonutChart';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { RingProgress } from '../../src/ui/components/RingProgress';
+import { SegmentedControl } from '../../src/ui/components/SegmentedControl';
 import { StatTile } from '../../src/ui/components/StatTile';
 import { chartPalette, colors, radius, spacing, typography } from '../../src/ui/theme';
 
 const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
+const RANGE_OPTIONS: { value: ProgressRange; label: string }[] = [
+  { value: 'week', label: 'Woche' },
+  { value: '30d', label: '30 Tage' },
+  { value: 'all', label: 'Gesamt' },
+];
+
+const COMPLETION_RATE_LABEL: Record<ProgressRange, string> = {
+  week: 'Erledigungsquote (Woche)',
+  '30d': 'Erledigungsquote (30 Tage)',
+  all: 'Erledigungsquote (Gesamt)',
+};
+
+const COMPLETIONS_LABEL: Record<ProgressRange, string> = {
+  week: 'Erledigt diese Woche',
+  '30d': 'Erledigt (30 Tage)',
+  all: 'Erledigt (gesamt)',
+};
+
+const CHART_TITLE: Record<ProgressRange, string> = {
+  week: 'Verlauf über die Woche',
+  '30d': 'Verlauf über 30 Tage',
+  all: 'Verlauf insgesamt',
+};
+
+function formatWeekLabel(date: string): string {
+  const [, month, day] = date.split('-');
+  return `${day}.${month}.`;
+}
 
 /**
  * Read-only dashboard (docs/SCREEN_SPECIFICATIONS.md's Progress Screen):
@@ -46,9 +77,9 @@ export default function ProgressScreen() {
     {},
   );
   const [eventsByRoutineId, setEventsByRoutineId] = useState<Record<string, RoutineEvent[]>>({});
+  const [range, setRange] = useState<ProgressRange>('week');
 
   const today = todayDateString();
-  const weekDates = useMemo(() => currentWeekDates(today), [today]);
 
   const loadData = useCallback(() => {
     listRoutines(db).then((allRoutines) => setRoutines(allRoutines.filter((r) => !r.isPaused)));
@@ -65,21 +96,40 @@ export default function ProgressScreen() {
     }, [loadData]),
   );
 
+  // "All time" has no fixed start, so it is derived from the oldest routine
+  // still tracked (its creation date) rather than from events — this needs
+  // no extra query, unlike scanning every routine's events for their oldest
+  // row would.
+  const earliestDate = useMemo(() => {
+    if (routines.length === 0) {
+      return today;
+    }
+    return routines.reduce(
+      (oldest, routine) => (routine.createdAt.slice(0, 10) < oldest ? routine.createdAt.slice(0, 10) : oldest),
+      today,
+    );
+  }, [routines, today]);
+
+  const dates = useMemo(
+    () => rangeDates(today, range, earliestDate),
+    [today, range, earliestDate],
+  );
+
   useEffect(() => {
-    const fromDate = addDaysToDateString(weekDates[0], -1);
-    const toDate = weekDates[weekDates.length - 1];
+    const fromDate = addDaysToDateString(dates[0], -1);
+    const toDate = dates[dates.length - 1];
     routines.forEach((routine) => {
       listRoutineEventsInRange(db, routine.id, fromDate, toDate).then((events) => {
         setEventsByRoutineId((prev) => ({ ...prev, [routine.id]: events }));
       });
     });
-  }, [routines, weekDates]);
+  }, [routines, dates]);
 
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
   const weekRows = useMemo(
-    () => buildRoutineWeekRows(routines, eventsByRoutineId, weekDates, today),
-    [routines, eventsByRoutineId, weekDates, today],
+    () => buildRoutineWeekRows(routines, eventsByRoutineId, dates, today),
+    [routines, eventsByRoutineId, dates, today],
   );
 
   const bestStreakByRoutineId = useMemo(
@@ -95,10 +145,20 @@ export default function ProgressScreen() {
     [weekRows, bestStreakByRoutineId],
   );
 
-  const dailySeries = useMemo(
-    () => buildDailyCompletionSeries(weekRows, weekDates),
-    [weekRows, weekDates],
-  );
+  const dailySeries = useMemo(() => buildDailyCompletionSeries(weekRows, dates), [weekRows, dates]);
+
+  const chartPoints = useMemo(() => {
+    if (range !== 'all') {
+      return dailySeries.map((point, index) => ({
+        label: range === 'week' ? WEEKDAY_LABELS[index] : formatWeekLabel(point.date),
+        value: point.rate,
+      }));
+    }
+    return bucketCompletionSeriesByWeek(dailySeries).map((point) => ({
+      label: formatWeekLabel(point.date),
+      value: point.rate,
+    }));
+  }, [dailySeries, range]);
 
   const categoryBreakdown = useMemo(
     () => buildCategoryBreakdown(routines, categoryById, chartPalette),
@@ -121,6 +181,13 @@ export default function ProgressScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Progress</Text>
 
+      <SegmentedControl
+        options={RANGE_OPTIONS}
+        value={range}
+        onChange={setRange}
+        testID="progress-range-toggle"
+      />
+
       <View style={styles.heroCard} testID="progress-streak-hero">
         <View style={styles.heroText}>
           <Text style={styles.heroTitle}>Du bist auf einem guten Weg!</Text>
@@ -137,7 +204,7 @@ export default function ProgressScreen() {
       <View style={styles.statsGrid} testID="progress-stats">
         <StatTile
           value={`${stats.completionRatePercent}%`}
-          label="Erledigungsquote (Woche)"
+          label={COMPLETION_RATE_LABEL[range]}
           testID="progress-stat-completion-rate"
         />
         <StatTile
@@ -151,21 +218,15 @@ export default function ProgressScreen() {
           testID="progress-stat-active-routines"
         />
         <StatTile
-          value={String(stats.completionsThisWeek)}
-          label="Erledigt diese Woche"
+          value={String(stats.completionsInPeriod)}
+          label={COMPLETIONS_LABEL[range]}
           testID="progress-stat-completions"
         />
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Verlauf über die Woche</Text>
-        <AreaChart
-          data={dailySeries.map((point, index) => ({
-            label: WEEKDAY_LABELS[index],
-            value: point.rate,
-          }))}
-          testID="progress-completion-chart"
-        />
+        <Text style={styles.sectionTitle}>{CHART_TITLE[range]}</Text>
+        <AreaChart data={chartPoints} testID="progress-completion-chart" />
       </View>
 
       <View style={styles.section}>

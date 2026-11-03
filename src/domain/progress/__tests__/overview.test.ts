@@ -1,4 +1,5 @@
 import {
+  bucketCompletionSeriesByWeek,
   buildCategoryBreakdown,
   buildDailyCompletionSeries,
   buildProgressStatTiles,
@@ -18,7 +19,7 @@ describe('buildProgressStatTiles', () => {
     const stats = buildProgressStatTiles(weekRows, { r1: 12 });
 
     expect(stats.completionRatePercent).toBe(50); // 1 completed of 2 due days
-    expect(stats.completionsThisWeek).toBe(1);
+    expect(stats.completionsInPeriod).toBe(1);
   });
 
   it('returns a 0% rate when nothing was due', () => {
@@ -43,6 +44,18 @@ describe('buildProgressStatTiles', () => {
 
   it('returns a longest streak of 0 when there are no state caches', () => {
     expect(buildProgressStatTiles([], {}).longestStreak).toBe(0);
+  });
+
+  it('computes correctly over a non-7-day range (30 days)', () => {
+    const days = Array(30).fill('not_due');
+    days[0] = 'completed';
+    days[1] = 'missed';
+    const weekRows: RoutineWeekRow[] = [{ routineId: 'r1', routineName: 'Laufen', days }];
+
+    const stats = buildProgressStatTiles(weekRows, { r1: 8 });
+
+    expect(stats.completionRatePercent).toBe(50); // 1 of 2 due days
+    expect(stats.completionsInPeriod).toBe(1);
   });
 });
 
@@ -74,6 +87,27 @@ describe('buildDailyCompletionSeries', () => {
     const series = buildDailyCompletionSeries([], weekDates);
     expect(series.every((point) => point.rate === 0)).toBe(true);
     expect(series).toHaveLength(7);
+  });
+});
+
+describe('bucketCompletionSeriesByWeek', () => {
+  it('averages daily rates into one point per ISO week, keyed by Monday', () => {
+    const dailyPoints = [
+      { date: '2026-07-06', rate: 1 }, // Mon, week 1
+      { date: '2026-07-07', rate: 0 }, // Tue, week 1
+      { date: '2026-07-13', rate: 0.5 }, // Mon, week 2
+    ];
+
+    const weekly = bucketCompletionSeriesByWeek(dailyPoints);
+
+    expect(weekly).toEqual([
+      { date: '2026-07-06', rate: 0.5 },
+      { date: '2026-07-13', rate: 0.5 },
+    ]);
+  });
+
+  it('returns an empty list for no points', () => {
+    expect(bucketCompletionSeriesByWeek([])).toEqual([]);
   });
 });
 

@@ -1,4 +1,4 @@
-import { buildRoutineWeekRows, currentWeekDates } from '../weekOverview';
+import { buildRoutineWeekRows, currentWeekDates, rangeDates } from '../weekOverview';
 import type { OccurrenceEvent } from '../completion';
 
 describe('currentWeekDates', () => {
@@ -37,6 +37,30 @@ describe('currentWeekDates', () => {
       '2026-07-11',
       '2026-07-12',
     ]);
+  });
+});
+
+describe('rangeDates', () => {
+  it('matches currentWeekDates for the "week" range', () => {
+    expect(rangeDates('2026-07-11', 'week')).toEqual(currentWeekDates('2026-07-11'));
+  });
+
+  it('returns the trailing 30 days including today for the "30d" range', () => {
+    const dates = rangeDates('2026-07-31', '30d');
+
+    expect(dates).toHaveLength(30);
+    expect(dates[0]).toBe('2026-07-02');
+    expect(dates[29]).toBe('2026-07-31');
+  });
+
+  it('spans from the earliest date through today for the "all" range', () => {
+    const dates = rangeDates('2026-07-11', 'all', '2026-07-09');
+
+    expect(dates).toEqual(['2026-07-09', '2026-07-10', '2026-07-11']);
+  });
+
+  it('falls back to a single day when no earliest date is known', () => {
+    expect(rangeDates('2026-07-11', 'all')).toEqual(['2026-07-11']);
   });
 });
 
