@@ -7,6 +7,7 @@ import { db } from '../src/data/db/client';
 import { runMigrations } from '../src/data/db/migrate';
 import { ensureProfile } from '../src/data/repositories/profileRepository';
 import { reconcileAllActiveRoutines } from '../src/services/reconciliationService';
+import { rescheduleReminderOnStart } from '../src/services/reminderService';
 import { dayRolloverWatcher } from '../src/state/appDayRollover';
 import {
   isDatabaseClosed,
@@ -46,6 +47,18 @@ export default function RootLayout() {
       // yesterday before any screen reads routine state, per T038 /
       // docs/ARCHITECTURE.md's Missed-Occurrence Reconciliation.
       await reconcileAllActiveRoutines(db);
+      // Android drops scheduled alarms on reboot, and a backup restore
+      // brings the stored setting back without its schedule, so the daily
+      // reminder (T092) is re-applied on every start. Deliberately not
+      // awaited into the startup gate's failure path: a notification that
+      // cannot be scheduled must never block the app from rendering.
+      void rescheduleReminderOnStart(db)
+        .then((result) => {
+          if (result.status === 'failed') {
+            console.warn('Reminder reschedule failed', result.error);
+          }
+        })
+        .catch((error: unknown) => console.warn('Reminder reschedule failed', error));
     }
 
     initialize()

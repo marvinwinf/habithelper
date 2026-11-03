@@ -81,11 +81,12 @@ jest.mock('../../../src/domain/dates', () => {
   const actual = jest.requireActual('../../../src/domain/dates');
   return { ...actual, todayDateString: jest.fn(actual.todayDateString) };
 });
+const mockRouterPush = jest.fn();
 jest.mock('expo-router', () => ({
   ...jest.requireActual('expo-router'),
   useFocusEffect: (callback: () => void | (() => void)) =>
     jest.requireActual('react').useEffect(callback, [callback]),
-  useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ push: mockRouterPush, back: jest.fn() }),
 }));
 
 const TODAY = todayDateString();
@@ -693,14 +694,14 @@ describe('TodayScreen', () => {
     await waitFor(() => expect(screen.queryByTestId('today-shortcuts-categories')).toBeNull());
   });
 
-  it('opens the notifications placeholder sheet from the header icon', async () => {
+  it('navigates to the reminder section from the header bell', async () => {
     (listRoutines as jest.Mock).mockResolvedValue([]);
 
     await renderToday();
 
     await fireEvent.press(await screen.findByTestId('today-notifications-button'));
 
-    expect(screen.getByText('Benachrichtigungen sind noch nicht verfügbar.')).toBeTruthy();
+    expect(mockRouterPush).toHaveBeenCalledWith('/(tabs)/settings');
   });
 
   describe('never-miss-twice note', () => {

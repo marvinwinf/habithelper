@@ -34,7 +34,7 @@ Sections must not all carry equal visual weight — spacing, type size/weight, a
 
 ### Header
 
-- Leading shortcuts icon (opens a small sheet linking to Kategorien verwalten and Me); trailing bell icon (placeholder only — opens a small sheet noting notifications aren't available yet; carries no push-notification functionality, per `docs/MVP_SCOPE.md`).
+- Leading shortcuts icon (opens a small sheet linking to Kategorien verwalten and Me); trailing bell icon navigates straight to Me's "Erinnerung" section (T093) — the entry point for the local daily reminder (T092), not a push-notification placeholder, per `docs/MVP_SCOPE.md`.
 - Time-based greeting, for example "Guten Morgen, Marvin", with a short static subtitle line under it.
 - Current date.
 - Subtle overall app streak.
@@ -276,4 +276,5 @@ Reachable from the bottom navigation as **Me**. Contains:
 - display name,
 - category management,
 - export backup,
-- import backup.
+- import backup,
+- Erinnerung section (T093): an on/off toggle plus a time button (disabled while off) showing the active time or "Erinnerungen sind aus.". Toggling on requests the OS notification permission once via `reminderService` (T092); a denial returns the toggle to off and shows a plain explanation with a hint to enable it in system settings, never a native error. The time button opens the same native Android time picker used by the routine/task forms (`DateTimePickerAndroid`, mode `time`) and reschedules immediately on a new pick. The Today header's bell (above) is this section's entry point.

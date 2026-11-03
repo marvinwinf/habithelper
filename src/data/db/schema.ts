@@ -43,6 +43,15 @@ export type RoutineEventType =
 export const profile = sqliteTable('profile', {
   id: text('id').primaryKey(),
   displayName: text('display_name').notNull(),
+  // Local daily reminder (migration 0005, T092). Deliberately on the profile
+  // row rather than a new table: the MVP has exactly one profile and exactly
+  // one reminder, so a second table would only add a join. Defaulted off and
+  // NULL respectively, so profiles created before the migration keep the
+  // reminder disabled and nothing is ever scheduled without the user asking.
+  // `reminderTime` is local wall-clock `HH:mm` — not a UTC instant — because
+  // "remind me at 20:00" must survive a timezone change unmoved.
+  reminderEnabled: integer('reminder_enabled', { mode: 'boolean' }).notNull().default(false),
+  reminderTime: text('reminder_time'),
   createdAt: text('created_at').notNull(),
 });
 

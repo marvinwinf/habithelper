@@ -78,6 +78,11 @@ describe('database schema shape (docs/DATA_MODEL.md)', () => {
     expect(tableColumns(sqlite, 'profile')).toEqual({
       id: { notnull: 1, pk: 1 },
       display_name: { notnull: 1, pk: 0 },
+      // Local daily reminder (T092, migration 0005). NOT NULL with a DEFAULT
+      // so existing rows land with it off; the time stays nullable until the
+      // user picks one.
+      reminder_enabled: { notnull: 1, pk: 0 },
+      reminder_time: { notnull: 0, pk: 0 },
       created_at: { notnull: 1, pk: 0 },
     });
   });

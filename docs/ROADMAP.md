@@ -85,9 +85,22 @@
 - Progress screen: streak ring, stat tiles, completion-over-time chart, habit-breakdown donut.
 - Settings screen relabeled "Me".
 
+## Phase 13: Local Daily Reminder
+
+Scope reversal, at the product owner's request: `docs/MVP_SCOPE.md`'s
+notifications exclusion is narrowed to *remote/push* only.
+
+- Scheduling service: permission request, Android notification channel, and
+  exactly one repeating daily local trigger (cancel-then-schedule on change),
+  rescheduled on app start so it survives reboot and restore (T092).
+- Profile columns `reminder_enabled` / `reminder_time` with migration 0005.
+- Me screen reminder section (toggle + time picker), and the Today header bell
+  becomes its entry point instead of a placeholder (T093).
+
 ## Future Phases
 
-- Real push notifications (the Phase 12 bell icon stays a visual placeholder).
+- Real *remote/push* notifications and a server to send them (the local daily
+  reminder from Phase 13 covers the on-device case and needs neither).
 - Morning and evening reports.
 - Focus sessions (distinct from the Phase 12 "Focus of the day" static card).
 - Search.

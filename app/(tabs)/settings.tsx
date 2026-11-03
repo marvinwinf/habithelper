@@ -1,17 +1,48 @@
 import { useEffect, useState } from 'react';
+import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Link } from 'expo-router';
-import { ScrollView, StyleSheet, Text, TextInput } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, TextInput } from 'react-native';
 
 import { exportBackup, shareLatestSafetyBackup } from '../../src/data/backup/export';
 import { importBackup } from '../../src/data/backup/expoImport';
 import { db } from '../../src/data/db/client';
 import { ensureProfile, updateDisplayName } from '../../src/data/repositories/profileRepository';
+import {
+  enableReminder,
+  disableReminder,
+  formatReminderTime,
+  parseReminderTime,
+  type ReminderResult,
+} from '../../src/services/reminderService';
 import { confirmBackupImport } from '../../src/ui/alerts';
 import { describeExportError, describeImportError } from '../../src/ui/backupMessages';
 import { Button } from '../../src/ui/components/Button';
 import { Card } from '../../src/ui/components/Card';
 import { NavRow } from '../../src/ui/components/NavRow';
 import { colors, radius, spacing, typography } from '../../src/ui/theme';
+
+const DEFAULT_REMINDER_TIME = '20:00';
+
+/** Builds a Date carrying today's date but the stored reminder's `HH:mm`,
+ * which is the shape the native time picker needs as its starting value. */
+function timeStringToDate(time: string): Date {
+  const parsed = parseReminderTime(time) ?? { hour: 20, minute: 0 };
+  const date = new Date();
+  date.setHours(parsed.hour, parsed.minute, 0, 0);
+  return date;
+}
+
+function openReminderTimePicker(currentTime: string, onPicked: (time: string) => void) {
+  DateTimePickerAndroid.open({
+    value: timeStringToDate(currentTime),
+    mode: 'time',
+    onValueChange: (_event, selectedDate) => {
+      if (selectedDate) {
+        onPicked(formatReminderTime(selectedDate));
+      }
+    },
+  });
+}
 
 /** Which long-running backup action is in flight, if any. */
 type BackupBusy = 'export' | 'import' | 'safety' | null;
@@ -24,6 +55,15 @@ export default function SettingsScreen() {
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
   const [backupError, setBackupError] = useState<string | null>(null);
 
+  // Reminder state (T093). `reminderTime` holds the last known/picked time
+  // even while the reminder is off, so re-enabling starts the picker where
+  // the user left it instead of snapping back to the default.
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState(DEFAULT_REMINDER_TIME);
+  const [reminderBusy, setReminderBusy] = useState(false);
+  const [reminderPermissionDenied, setReminderPermissionDenied] = useState(false);
+  const [reminderError, setReminderError] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     ensureProfile(db).then((profile) => {
@@ -31,12 +71,72 @@ export default function SettingsScreen() {
         setProfileId(profile.id);
         setDisplayName(profile.displayName);
         setSavedDisplayName(profile.displayName);
+        setReminderEnabled(profile.reminderEnabled);
+        if (profile.reminderTime) {
+          setReminderTime(profile.reminderTime);
+        }
       }
     });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  function applyReminderResult(result: ReminderResult, requestedTime: string) {
+    setReminderPermissionDenied(result.status === 'permission-denied');
+    setReminderError(result.status === 'failed');
+    if (result.status === 'scheduled') {
+      setReminderEnabled(true);
+      setReminderTime(result.time);
+    } else {
+      // Every non-scheduled outcome (denied permission, platform failure, or
+      // an explicit cancel) leaves nothing scheduled, so the toggle must
+      // visibly return to off rather than keep claiming an active reminder.
+      setReminderEnabled(false);
+      setReminderTime(requestedTime);
+    }
+  }
+
+  async function handleReminderToggle(nextEnabled: boolean) {
+    if (!profileId || reminderBusy) {
+      return;
+    }
+    setReminderBusy(true);
+    try {
+      if (nextEnabled) {
+        const result = await enableReminder(db, profileId, reminderTime);
+        applyReminderResult(result, reminderTime);
+      } else {
+        const result = await disableReminder(db, profileId);
+        setReminderPermissionDenied(false);
+        setReminderError(result.status === 'failed');
+        if (result.status === 'cancelled') {
+          setReminderEnabled(false);
+        }
+        // A failed cancel leaves the toggle on, matching disableReminder's
+        // own contract: it only clears the stored setting once the OS call
+        // actually succeeds, so the UI never claims "off" for a reminder
+        // that may still fire.
+      }
+    } finally {
+      setReminderBusy(false);
+    }
+  }
+
+  function handleReminderTimePress() {
+    if (!profileId || !reminderEnabled || reminderBusy) {
+      return;
+    }
+    openReminderTimePicker(reminderTime, async (pickedTime) => {
+      setReminderBusy(true);
+      try {
+        const result = await enableReminder(db, profileId, pickedTime);
+        applyReminderResult(result, pickedTime);
+      } finally {
+        setReminderBusy(false);
+      }
+    });
+  }
 
   const trimmedName = displayName.trim();
   const canSave = trimmedName.length > 0 && trimmedName !== savedDisplayName;
@@ -128,6 +228,41 @@ export default function SettingsScreen() {
           disabled={!canSave}
           testID="settings-save-display-name"
         />
+      </Card>
+
+      <Card style={styles.section}>
+        <Text style={styles.label}>Erinnerung</Text>
+        <Text style={styles.hint}>
+          Eine tägliche, sanfte Erinnerung — ganz ohne Hinweis auf verpasste Tage.
+        </Text>
+        <Switch
+          value={reminderEnabled}
+          onValueChange={handleReminderToggle}
+          disabled={reminderBusy}
+          trackColor={{ true: colors.accent }}
+          testID="settings-reminder-toggle"
+        />
+        <Button
+          label={`Uhrzeit: ${reminderTime}`}
+          variant="secondary"
+          onPress={handleReminderTimePress}
+          disabled={!reminderEnabled || reminderBusy}
+          testID="settings-reminder-time"
+        />
+        <Text style={styles.hint} testID="settings-reminder-status">
+          {reminderEnabled ? `Aktiv um ${reminderTime} Uhr.` : 'Erinnerungen sind aus.'}
+        </Text>
+        {reminderPermissionDenied && (
+          <Text style={styles.error} testID="settings-reminder-permission-denied">
+            Benachrichtigungen sind in den Systemeinstellungen nicht erlaubt. Du kannst sie dort
+            jederzeit aktivieren und es hier erneut versuchen.
+          </Text>
+        )}
+        {reminderError && (
+          <Text style={styles.error} testID="settings-reminder-error">
+            Die Erinnerung konnte nicht eingerichtet werden. Bitte versuche es erneut.
+          </Text>
+        )}
       </Card>
 
       <Card style={styles.section}>

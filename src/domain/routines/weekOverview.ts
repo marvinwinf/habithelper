@@ -8,6 +8,40 @@ export function currentWeekDates(today: string): string[] {
   return Array.from({ length: 7 }, (_, index) => addDaysToDateString(monday, index));
 }
 
+/** The Progress screen's selectable horizons (T091). */
+export type ProgressRange = 'week' | '30d' | 'all';
+
+function daysBetween(start: string, end: string): number {
+  const [sy, sm, sd] = start.split('-').map(Number);
+  const [ey, em, ed] = end.split('-').map(Number);
+  const startMs = Date.UTC(sy, sm - 1, sd);
+  const endMs = Date.UTC(ey, em - 1, ed);
+  return Math.round((endMs - startMs) / 86_400_000);
+}
+
+/**
+ * The `YYYY-MM-DD` dates covered by `range`, ending on `today`:
+ * - `week`: the Monday–Sunday week containing `today` (see `currentWeekDates`).
+ * - `30d`: the trailing 30 days including `today`.
+ * - `all`: from `earliestDate` (the oldest event the user has, or `today` when
+ *   there is none yet) through `today`, inclusive.
+ */
+export function rangeDates(
+  today: string,
+  range: ProgressRange,
+  earliestDate?: string,
+): string[] {
+  if (range === 'week') {
+    return currentWeekDates(today);
+  }
+  if (range === '30d') {
+    return Array.from({ length: 30 }, (_, index) => addDaysToDateString(today, index - 29));
+  }
+  const start = earliestDate ?? today;
+  const span = Math.max(0, daysBetween(start, today));
+  return Array.from({ length: span + 1 }, (_, index) => addDaysToDateString(start, index));
+}
+
 // The Plan screen's week overview shows only three states per day, per
 // docs/SCREEN_SPECIFICATIONS.md's Plan Screen section — a lighter-weight
 // summary than the full OccurrenceState set the routine detail calendar

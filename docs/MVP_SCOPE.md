@@ -15,7 +15,7 @@ The architecture must avoid unnecessary Android-specific decisions that would bl
 - subtle overall app streak,
 - routine progress for the current day,
 - a "Focus of the day" card (static rotating prompt, placeholder illustration only — no personalization/backend),
-- a header shortcuts icon and a notifications-placeholder icon (visual only; no push-notification delivery, see Explicitly Excluded below),
+- a header shortcuts icon and a bell icon leading to the local daily reminder setting (T092/T093; no remote push delivery, see Explicitly Excluded below),
 - routines displayed before tasks,
 - visible completion controls,
 - completed items remain visible in a subdued completed state,
@@ -107,12 +107,27 @@ The architecture must avoid unnecessary Android-specific decisions that would bl
 - display name,
 - category management,
 - export data,
-- import data.
+- import data,
+- one local daily reminder (on/off plus a time).
+
+### Notifications
+
+Scope correction (T092), recorded so the reversal is explicit rather than
+silent: **local** notifications are in scope, at the product owner's request.
+
+- exactly one local daily reminder at a user-chosen time,
+- scheduled on-device only — no push token, no server, no network,
+- off by default; nothing is scheduled until the user enables it,
+- gentle wording only: the reminder is an invitation and never names a missed
+  day, a streak at risk, or a number.
+
+Remote/push notifications, morning reports, and evening reports remain out of
+scope (see below).
 
 ## Explicitly Excluded from the MVP
 
 - iOS release,
-- push notifications (the Today header's bell icon is a visual placeholder only — no delivery mechanism, permission request, or scheduling exists),
+- remote/push notifications (no push token is requested and no server exists; the *local* daily reminder above is in scope and is the Today header bell's destination),
 - morning report,
 - evening report,
 - focus sessions,
