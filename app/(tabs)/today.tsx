@@ -110,7 +110,6 @@ export default function TodayScreen() {
   const [undatedTasks, setUndatedTasks] = useState<Task[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   // The routine/task actions sheets are owned HERE, at screen level, and
   // opened for whichever row was tapped — never rendered inside the rows
   // themselves. A per-row Sheet puts a native Modal inside the row, and on
@@ -449,8 +448,8 @@ export default function TodayScreen() {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Benachrichtigungen"
-            onPress={() => setNotificationsOpen(true)}
+            accessibilityLabel="Erinnerung"
+            onPress={() => router.push('/(tabs)/settings')}
             hitSlop={spacing.xs}
             style={({ pressed }) => pressed && styles.iconButtonPressed}
             testID="today-notifications-button"
@@ -794,17 +793,6 @@ export default function TodayScreen() {
           }}
           testID="today-shortcuts-me"
         />
-      </View>
-    </Sheet>
-
-    <Sheet
-      visible={notificationsOpen}
-      onClose={() => setNotificationsOpen(false)}
-      testID="today-notifications-sheet"
-    >
-      <View style={styles.menu}>
-        <Text style={styles.body}>Benachrichtigungen sind noch nicht verfügbar.</Text>
-        <Button label="Schließen" onPress={() => setNotificationsOpen(false)} />
       </View>
     </Sheet>
 
