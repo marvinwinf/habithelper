@@ -1,4 +1,21 @@
-import { daypartForHour, daypartLine, daypartLines, type Daypart } from '../daypart';
+import {
+  dayCompleteLine,
+  daypartForHour,
+  daypartLine,
+  daypartLines,
+  type Daypart,
+} from '../daypart';
+
+describe('dayCompleteLine', () => {
+  it('has its own closing line per daypart, distinct from the rotating lines', () => {
+    const dayparts: Daypart[] = ['morning', 'day', 'evening', 'night'];
+    const lines = dayparts.map(dayCompleteLine);
+    expect(new Set(lines).size).toBe(4);
+    for (const daypart of dayparts) {
+      expect(daypartLines(daypart)).not.toContain(dayCompleteLine(daypart));
+    }
+  });
+});
 
 describe('daypartForHour', () => {
   it.each<[number, Daypart]>([

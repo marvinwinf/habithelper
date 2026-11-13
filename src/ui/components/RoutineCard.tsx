@@ -1,8 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CompletionControl } from './CompletionControl';
 import { IconBadge } from './IconBadge';
+import { StreakGrowthIcon, streakAccessibilityLabel } from './StreakGrowthIcon';
 import {
   triggerExceededCompletionHaptic,
   triggerLevelMilestoneHaptic,
@@ -181,8 +181,15 @@ export function RoutineCard({
                 </Text>
               )}
               <View style={styles.streakRow}>
-                <Ionicons name="flame" size={typography.caption.fontSize} color={colors.accent} />
-                <Text style={styles.streakLabel} testID={testID ? `${testID}-streak` : undefined}>
+                <StreakGrowthIcon
+                  streak={streak}
+                  testID={testID ? `${testID}-growth` : undefined}
+                />
+                <Text
+                  style={styles.streakLabel}
+                  accessibilityLabel={streakAccessibilityLabel(streak)}
+                  testID={testID ? `${testID}-streak` : undefined}
+                >
                   Streak {streak}
                 </Text>
               </View>

@@ -43,6 +43,13 @@
       "when": 1793742772452,
       "tag": "0005_profile_reminder",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794594856910,
+      "tag": "0006_profile_completion_sound",
+      "breakpoints": true
     }
   ]
 }

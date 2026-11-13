@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
@@ -29,6 +28,10 @@ import { EmptyState } from '../../src/ui/components/EmptyState';
 import { ReorderableList } from '../../src/ui/components/ReorderableList';
 import { ScreenHeader } from '../../src/ui/components/ScreenHeader';
 import { Sheet } from '../../src/ui/components/Sheet';
+import {
+  StreakGrowthIcon,
+  streakAccessibilityLabel,
+} from '../../src/ui/components/StreakGrowthIcon';
 import { colors, pressedFeedback, radius, spacing, typography } from '../../src/ui/theme';
 
 type RoutinesTab = 'active' | 'paused';
@@ -135,8 +138,12 @@ export default function RoutinesScreen() {
             </Text>
             {subtitle.length > 0 && <Text style={styles.subtitle}>{subtitle}</Text>}
             <View style={styles.streakRow}>
-              <Ionicons name="flame" size={typography.caption.fontSize} color={colors.accent} />
-              <Text style={styles.streak} testID={`routine-streak-${item.id}`}>
+              <StreakGrowthIcon streak={streak} testID={`routine-growth-${item.id}`} />
+              <Text
+                style={styles.streak}
+                accessibilityLabel={streakAccessibilityLabel(streak)}
+                testID={`routine-streak-${item.id}`}
+              >
                 Streak {streak}
               </Text>
             </View>

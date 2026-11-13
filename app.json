@@ -14,6 +14,36 @@
         {
           "color": "#3F7256"
         }
+      ],
+      [
+        "expo-font",
+        {
+          "android": {
+            "fonts": [
+              {
+                "fontFamily": "Quicksand",
+                "fontDefinitions": [
+                  { "path": "./assets/fonts/Quicksand_600SemiBold.ttf", "weight": 600 },
+                  { "path": "./assets/fonts/Quicksand_700Bold.ttf", "weight": 700 }
+                ]
+              }
+            ]
+          },
+          "ios": {
+            "fonts": [
+              "./assets/fonts/Quicksand_600SemiBold.ttf",
+              "./assets/fonts/Quicksand_700Bold.ttf"
+            ]
+          }
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
       ]
     ],
     "ios": {

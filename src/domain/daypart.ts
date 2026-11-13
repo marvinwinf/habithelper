@@ -57,6 +57,20 @@ export function daypartLine(daypart: Daypart, dateString: string): string {
   return lines[dayOfYear(dateString) % lines.length];
 }
 
+// The day's closing line (T098) once every due routine is done — replaces
+// the daypart line so finishing the day reads as its own small scene.
+const DAY_COMPLETE_LINES: Record<Daypart, string> = {
+  morning: 'Schon alles geschafft — der Tag gehört dir.',
+  day: 'Alles erledigt. Der Rest des Tages ist frei.',
+  evening: 'Für heute ist alles getan. Schönen Abend!',
+  night: 'Alles getan. Gute Nacht.',
+};
+
+/** The header line once every due routine of the day is done. */
+export function dayCompleteLine(daypart: Daypart): string {
+  return DAY_COMPLETE_LINES[daypart];
+}
+
 /** All lines for a daypart — exposed for tests and previews. */
 export function daypartLines(daypart: Daypart): readonly string[] {
   return DAYPART_LINES[daypart];

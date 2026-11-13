@@ -5,7 +5,10 @@ import Svg, { Circle, Defs, LinearGradient, RadialGradient, Rect, Stop } from 'r
 import type { Daypart } from '../../domain/daypart';
 import { FILL_EASING, MAX_SHORT_ANIMATION_DURATION_MS } from '../animation/constants';
 import { colors } from '../theme';
+import { categoryPalette } from '../theme/categoryVariant';
 import { daypartThemes } from '../theme/daypart';
+
+const DAY_COMPLETE_GLOW = categoryPalette.mint.light;
 
 export const DAYPART_BACKDROP_HEIGHT = 340;
 const GLOW_SIZE = 220;
@@ -15,6 +18,8 @@ const GLOW_RISE_PX = 16;
 export interface DaypartBackdropProps {
   daypart: Daypart;
   reducedMotion: boolean;
+  /** Every due routine is done (T098): the glow warms to the sage family. */
+  dayComplete?: boolean;
   testID?: string;
 }
 
@@ -28,8 +33,17 @@ export interface DaypartBackdropProps {
  * rises a few pixels into place when the screen mounts and whenever the
  * daypart changes. Reduced motion shows the final state instantly.
  */
-export function DaypartBackdrop({ daypart, reducedMotion, testID }: DaypartBackdropProps) {
+export function DaypartBackdrop({
+  daypart,
+  reducedMotion,
+  dayComplete = false,
+  testID,
+}: DaypartBackdropProps) {
   const theme = daypartThemes[daypart];
+  // Finishing the day turns the sun/moon into a soft sage glow — the app's
+  // own accent family — and replays the settle below, so completing the last
+  // routine visibly changes the scene rather than only a label.
+  const glowColor = dayComplete ? DAY_COMPLETE_GLOW : theme.glow;
   const [progress] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
@@ -46,7 +60,7 @@ export function DaypartBackdrop({ daypart, reducedMotion, testID }: DaypartBackd
     });
     animation.start();
     return () => animation.stop();
-  }, [daypart, progress, reducedMotion]);
+  }, [daypart, dayComplete, progress, reducedMotion]);
 
   const glowTranslateY = progress.interpolate({
     inputRange: [0, 1],
@@ -75,14 +89,14 @@ export function DaypartBackdrop({ daypart, reducedMotion, testID }: DaypartBackd
       </Animated.View>
       <Animated.View
         style={[styles.glow, { opacity: progress, transform: [{ translateY: glowTranslateY }] }]}
-        testID={testID ? `${testID}-glow` : undefined}
+        testID={testID ? `${testID}-glow${dayComplete ? '-complete' : ''}` : undefined}
       >
         <Svg width={GLOW_SIZE} height={GLOW_SIZE}>
           <Defs>
             <RadialGradient id="daypart-glow" cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor={theme.glow} stopOpacity={0.9} />
-              <Stop offset="0.45" stopColor={theme.glow} stopOpacity={0.45} />
-              <Stop offset="1" stopColor={theme.glow} stopOpacity={0} />
+              <Stop offset="0" stopColor={glowColor} stopOpacity={0.9} />
+              <Stop offset="0.45" stopColor={glowColor} stopOpacity={0.45} />
+              <Stop offset="1" stopColor={glowColor} stopOpacity={0} />
             </RadialGradient>
           </Defs>
           <Circle cx={GLOW_SIZE / 2} cy={GLOW_SIZE / 2} r={GLOW_SIZE / 2} fill="url(#daypart-glow)" />

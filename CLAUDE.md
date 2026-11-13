@@ -92,7 +92,7 @@ Follow the Soft Momentum design direction (see `docs/DESIGN_SYSTEM.md` for full 
 - warm off-white background, dark warm-gray text, single muted sage-green accent used generously (buttons, progress, streaks, focus states),
 - pastel category colors tint each routine/task's card (one dominant color per card, never several competing hues on one screen),
 - soft rounded geometry throughout — cards, buttons, inputs, pills, circular icon badges,
-- one typeface, hierarchy from weight/size rather than a second display face,
+- two faces with fixed roles: the rounded Quicksand for titles, the greeting, and streak numerals; the platform sans for all body/functional text — hierarchy otherwise from weight/size (see `docs/DESIGN_SYSTEM.md`'s Typography),
 - streaks and gentle milestone acknowledgement are the extent of gamification — no punishment for a missed day, no points/leaderboards,
 - short, gentle motion: fades for mount/dismiss, a subtle non-bouncy spring for completion/milestones,
 - routines visually prioritized over tasks,

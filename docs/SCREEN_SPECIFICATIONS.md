@@ -46,6 +46,12 @@ Sections must not all carry equal visual weight — spacing, type size/weight, a
 
 A card between the header and the routine list: accent-tinted, short "Fokus des Tages" label, a one-line rotating prompt (static list keyed by day-of-year), and a placeholder decorative icon/illustration. See `docs/DESIGN_SYSTEM.md`'s Focus of the Day section.
 
+On Mondays, when last week (Mon–Sun) holds at least one completion, this slot shows the **weekly look-back** instead (T096): "Deine letzte Woche", the completion count, "an N von 7 Tagen · am beständigsten: <Routine> (N×)", and one warm sentence. Counts every non-deleted routine (paused ones included — what was done still counts); undone (superseded), missed, and skipped events never count. An empty week keeps the Focus card.
+
+### Day Complete
+
+When every due routine is done, the header's daypart line becomes the daypart's closing line (e.g. "Alles erledigt. Der Rest des Tages ist frei.") and the backdrop glow turns sage (T098). The completing tap also plays the two-beat day-complete haptic — except on a one-routine day, where that same tap already played the first-of-day pattern.
+
 ### Content Order
 
 1. Focus of the day.
@@ -78,7 +84,7 @@ The actions bottom sheet is the one place a routine's non-completion actions liv
 
 Completed routines remain visible in a subdued completed state and move toward the end of the section.
 
-Completion acknowledgement (a fade-only toast near the bottom, never blocking): when a completion carries the routine's streak across a milestone (3, 7, 14, 21, 30, 50, 66, 100, 150, 200, 365 — `src/domain/streaks/milestones.ts`), the toast shows a supportive milestone line with a light milestone haptic, and the routine's reward ("Belohnung"), if set, as its second line. Without a milestone, only a set reward is shown. Ordinary completions stay quiet, and a repeated tap that leaves the streak unchanged never re-announces a milestone.
+Completion acknowledgement (a fade-only toast near the bottom, never blocking): when a completion carries the routine's streak across a milestone (3, 7, 14, 21, 30, 50, 66, 100, 150, 200, 365 — `src/domain/streaks/milestones.ts`), the toast shows a supportive milestone line with a light milestone haptic, and the routine's reward ("Belohnung"), if set, as its second line. Without a milestone, only a set reward is shown. Ordinary completions stay quiet, and a repeated tap that leaves the streak unchanged never re-announces a milestone. With the optional chime switched on (Me → Klang), every actual routine or task completion on Today also plays the soft chime; undo, skip, and move never do.
 
 ### Task Card
 
@@ -185,7 +191,7 @@ Each routine card shows:
 
 - name,
 - category treatment,
-- current streak.
+- current streak, with its growth glyph (seed → sprout → leaf → bud → bloom → rose, see `docs/DESIGN_SYSTEM.md`'s Growing Streak Glyph).
 
 Interactions:
 
@@ -280,4 +286,5 @@ Reachable from the bottom navigation as **Me**. Contains:
 - category management,
 - export backup,
 - import backup,
+- Klang section (T099): one switch for the optional soft completion chime, off by default, with a status line ("Ton beim Erledigen ist an/aus."). Turning it on saves immediately and plays the chime once as a sample; a failed save puts the switch back. The Today screen picks up the change on its next focus.
 - Erinnerung section (T093): an on/off toggle plus a time button (disabled while off) showing the active time or "Erinnerungen sind aus.". Toggling on requests the OS notification permission once via `reminderService` (T092); a denial returns the toggle to off and shows a plain explanation with a hint to enable it in system settings, never a native error. The time button opens the same native Android time picker used by the routine/task forms (`DateTimePickerAndroid`, mode `time`) and reschedules immediately on a new pick. The Today header's bell (above) is this section's entry point.

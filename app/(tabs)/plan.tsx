@@ -111,6 +111,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   title: {
+    fontFamily: typography.title.fontFamily,
     fontSize: typography.title.fontSize,
     lineHeight: typography.title.lineHeight,
     fontWeight: typography.title.fontWeight,

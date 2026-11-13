@@ -1,6 +1,8 @@
 import * as Haptics from 'expo-haptics';
 
 import {
+  DAY_COMPLETE_SECOND_BEAT_MS,
+  triggerDayCompleteHaptic,
   triggerExceededCompletionHaptic,
   triggerFirstCompletionOfDayHaptic,
   triggerLevelMilestoneHaptic,
@@ -39,6 +41,19 @@ describe('haptics', () => {
   it('triggers a heavy impact for a level milestone', () => {
     triggerLevelMilestoneHaptic();
     expect(Haptics.impactAsync).toHaveBeenCalledWith(Haptics.ImpactFeedbackStyle.Heavy);
+  });
+
+  it('plays a two-beat pattern for finishing the day: success, then a light tap', async () => {
+    jest.useFakeTimers();
+    const done = triggerDayCompleteHaptic();
+    await Promise.resolve();
+    expect(Haptics.notificationAsync).toHaveBeenCalledWith(Haptics.NotificationFeedbackType.Success);
+    expect(Haptics.impactAsync).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(DAY_COMPLETE_SECOND_BEAT_MS);
+    await done;
+    expect(Haptics.impactAsync).toHaveBeenCalledWith(Haptics.ImpactFeedbackStyle.Light);
+    jest.useRealTimers();
   });
 
   it('gives each completion-related trigger a distinct impact style', () => {

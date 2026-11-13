@@ -81,7 +81,9 @@ The architecture must avoid unnecessary Android-specific decisions that would bl
 - progress bars,
 - short completion animations,
 - stronger animation for exceeded completion,
-- short haptic feedback,
+- short haptic feedback (including a distinct pattern for finishing the day),
+- streak milestone acknowledgement and a growing streak glyph,
+- a Monday look-back at the previous week,
 - first routine completion of the day triggers an overall streak animation.
 
 ### Categories
@@ -108,7 +110,8 @@ The architecture must avoid unnecessary Android-specific decisions that would bl
 - category management,
 - export data,
 - import data,
-- one local daily reminder (on/off plus a time).
+- one local daily reminder (on/off plus a time),
+- optional soft completion sound (off by default; added at the product owner's request, T099).
 
 ### Notifications
 

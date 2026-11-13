@@ -26,7 +26,7 @@ Soft Momentum was this app's original direction before the "Quiet Atelier" MVP r
 - Pastel category colors (see Categories below) tint a routine/task's card lightly — one dominant color per card, never several competing hues on one screen.
 - Soft, consistently rounded geometry: `sm`/`md`/`lg` radii plus a `full` pill/circle step — see Spacing, Radius, Surfaces.
 - Cards read as soft paper: a lightly lifted `surface`, a soft low-contrast border (lighter than a hairline divider), generous internal padding, and — where it genuinely helps lift a card off the background — an extremely subtle, low-opacity shadow. Layering stays gentle: never a hard border, never a pronounced floating panel, never competing tonal steps on one screen.
-- One typeface, hierarchy from weight and size, not a second display face.
+- Two faces with fixed roles: rounded Quicksand for the confident moments (screen titles, greeting, streak numerals), the platform sans for everything else; hierarchy otherwise from weight and size.
 - Icons are simple, rounded, and circular-badged; used a bit more freely than Quiet Atelier's hairline sparsity, but still support labels rather than replace them.
 - Motion is short and gentle: fades for mount/dismiss, a subtle spring for completion and milestones — never a bounce/overshoot loop or long transition.
 - No status is punishing: a missed day reads as neutral, not alarming; only real destructive actions (delete) use an assertive color, and always with confirmation.
@@ -74,13 +74,13 @@ Category identity does **not** live in this table — see `src/ui/theme/category
 
 ## Typography
 
-One typeface (the platform system sans) for the whole app — no separate display/serif face. Hierarchy comes from weight and size:
+Two faces with fixed roles (T100, replacing the earlier "one system sans" rule at the product owner's request — the rounded face is what makes the app feel soft rather than stock):
 
-- `display` / `title` / `streak`: bold (700), sized for confident section titles and the streak numeral — prominent but not oversized.
-- `heading` / `body` / `bodySmall` / `caption`: regular/medium weight, functional text.
-- `label` (buttons, section headings): medium weight (600), normal case — no small-caps/letter-spacing treatment.
+- `display` / `title` / `streak`: **Quicksand** bold (700) — screen titles, the Today greeting, streak numerals, the weekly look-back headline. Prominent but not oversized.
+- `heading` / `body` / `bodySmall` / `caption`: the platform sans, regular/medium weight, functional text. Quicksand is never used for body copy — its narrow letterforms read worse at small sizes.
+- `label` (buttons, section headings): platform sans, medium weight (600), normal case — no small-caps/letter-spacing treatment.
 
-No custom font files are bundled in the MVP: `fontFamilies.serif`/`.sans` in `src/ui/theme/typography.ts` both resolve to the platform's own sans face. The `serif` token name is kept only so `typography.display/title/streak` don't need touching elsewhere; swapping in a genuinely rounded display font (e.g. Baloo 2, Quicksand) later is a change to that one file plus a font-loading step.
+Quicksand (SIL OFL 1.1, `assets/fonts/OFL.txt`) is embedded natively at build time by expo-font's config plugin in `app.json`: on Android it becomes one `Quicksand` font family with real 600 and 700 weight files, so `fontWeight: '700'` selects the true bold instead of a synthesized one, and nothing loads at runtime (no startup gate, no flash of fallback text). `fontFamilies.serif` in `src/ui/theme/typography.ts` resolves to it; the token name is kept so existing references don't change. A dev client or APK must be rebuilt (prebuild) to pick up the font; until then the system font is the fallback.
 
 ## Categories
 
@@ -107,7 +107,7 @@ A screen should still show one dominant color at a time — a category's tint ap
 ## Routine and Task Item Design
 
 - Each row is a light, soft-paper card (`radius.lg` or larger, `surface` background, soft low-contrast border, generous internal padding), lightly tinted by its category's `getCategoryColorVariant` background when a category is set. Keep the card feeling light — lean on the tint and gentle rounding, not heavy borders or backgrounds — with at most an extremely subtle shadow.
-- Leading: circular `IconBadge` (now fully round, `radius.full`). Title in the functional weight, then one compact meta line: for routines the "time · schedule" subtitle plus a small flame-and-count streak, for tasks the date/subtitle (plus the overdue marker when relevant). Rows stay two text lines tall and share a common minimum height (`listCardMinHeight`) so routines and tasks line up as one even rhythm — the bold, prominent streak numeral treatment stays on the Today header and routine detail, not on list rows.
+- Leading: circular `IconBadge` (now fully round, `radius.full`). Title in the functional weight, then one compact meta line: for routines the "time · schedule" subtitle plus a small growth-glyph-and-count streak (see Growing Streak Glyph below), for tasks the date/subtitle (plus the overdue marker when relevant). Rows stay two text lines tall and share a common minimum height (`listCardMinHeight`) so routines and tasks line up as one even rhythm — the bold, prominent streak numeral treatment stays on the Today header and routine detail, not on list rows.
 - No overflow / three-dot menu on the row. The row carries only its title, category treatment, streak/date, and completion control; all other actions live in the routine/task detail screen or a bottom sheet opened by tapping the row (see List Row Actions above).
 - Completion control: one shared circular control (`CompletionControl`, a compact 36dp visual with hitSlop keeping the touch target ≥44dp) that fills with the accent color and shows a checkmark on completion, with a quick, gentle spring (`GENTLE_SPRING`) rather than a plain fade — tactile, not flashy. Routines and tasks use the same control so completion reads identically everywhere; tasks simply have no exceeded state.
 
@@ -148,6 +148,23 @@ The Today header's mood follows the clock so the app feels alive across the day 
 - the subtitle line itself rotates per daypart and day of year (`src/domain/daypart.ts`).
 
 Constraints: it lives only behind the Today header — never on cards, the tab bar, buttons, or other screens; header text stays on `textPrimary`/`textSecondary`/`accent`, and each sky tint is contrast-tested for all three (`contrast.test.ts`); it is purely decorative (hidden from screen readers, no touch handling); motion is one short fade-and-rise on mount or daypart change — never a loop — and reduced motion shows it instantly.
+
+## Day Complete Moment
+
+Finishing the day's last due routine changes the scene, not just a label (T098): the daypart line becomes a closing line of its own per daypart (`dayCompleteLine`, e.g. "Für heute ist alles getan. Schönen Abend!"), the sun/moon glow turns to the sage `mint` family and settles in again, alongside the existing "Alle erledigt" cross-fade and progress-block swell. Same motion budget as the rest (one short settle, no loop). Loading an already-finished day shows the finished state quietly; only the completing tap also plays the day-complete haptic.
+
+## Weekly Look-back
+
+On Mondays the Today screen's Focus slot shows the week that just ended instead (T096): completions, active days ("an 5 von 7 Tagen"), the steadiest routine, and one warm sentence scaled to the week. It takes the Focus card's slot rather than adding a block, uses the same card geometry and the Focus card's color-freedom exception (warm `apricot.lighter`), and fades in like other cards. An empty week shows no recap — the Focus card stays — so a zero never reads as a verdict. Derived from routine events; nothing is stored.
+
+## Growing Streak Glyph
+
+Routine rows picture the streak as a plant instead of a fixed flame (T097, `src/domain/streaks/growthStage.ts`): seed (0) → sprout (1) → leaf (7) → bud (21) → bloom (66) → rose (100+). Stages change only on streak-milestone completions, so the plant and the milestone toast move together. A reset streak shows a seed again — a neutral fresh start, never a wilted plant. The glyph is decorative; the "Streak N" text's accessibility label carries the stage name ("Streak 8, Blatt").
+
+## Sound and Haptics
+
+- Haptics escalate with meaning: light tap (completion) → medium (exceeded) → success notification (first completion of the day) → a two-beat success-then-light pattern (finishing the day, T099) → heavy (level-up / streak milestone). Two celebratory patterns never stack on one tap.
+- An optional soft completion chime (T099): a ~0.6 s two-tone sound, off by default, toggled under Me → Klang (stored on the profile, migration 0006). It plays quietly and mixes with other audio rather than interrupting it, only for actual completions (never undo/skip/move), and never on a repeated tap. No microphone permission, no background playback.
 
 ## Focus of the Day
 

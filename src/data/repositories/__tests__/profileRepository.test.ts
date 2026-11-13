@@ -2,6 +2,7 @@ import { createDrizzleTestDb } from '../../db/testUtils';
 import {
   ensureProfile,
   getReminderSetting,
+  updateCompletionSoundEnabled,
   updateDisplayName,
   updateReminderSetting,
 } from '../profileRepository';
@@ -41,6 +42,25 @@ describe('updateDisplayName', () => {
     const rows = sqlite.prepare('SELECT * FROM profile').all();
     expect(rows).toHaveLength(1);
     expect((rows[0] as { display_name: string }).display_name).toBe('Alex');
+
+    sqlite.close();
+  });
+});
+
+describe('completion sound setting', () => {
+  it('is off on a fresh profile and round-trips on/off', async () => {
+    const { sqlite, db } = await createDrizzleTestDb();
+    const profile = await ensureProfile(db);
+    expect(profile.completionSoundEnabled).toBe(false);
+
+    await updateCompletionSoundEnabled(db, profile.id, true);
+    expect((await ensureProfile(db)).completionSoundEnabled).toBe(true);
+    expect(sqlite.prepare('SELECT completion_sound_enabled FROM profile').get()).toEqual({
+      completion_sound_enabled: 1,
+    });
+
+    await updateCompletionSoundEnabled(db, profile.id, false);
+    expect((await ensureProfile(db)).completionSoundEnabled).toBe(false);
 
     sqlite.close();
   });
