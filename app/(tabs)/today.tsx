@@ -43,21 +43,35 @@ import {
   skipRoutineOccurrence,
   undoRoutineCompletion,
   undoRoutineSkip,
+  type CompletionResult,
 } from '../../src/services/routineService';
 import { deleteTask, moveTask, setTaskCompletion } from '../../src/services/taskService';
 import { subscribeToDayRollover } from '../../src/state/appDayRollover';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
+import { dayCompleteLine, daypartForHour, daypartLine } from '../../src/domain/daypart';
+import {
+  buildWeeklyRecap,
+  isWeeklyRecapDay,
+  previousWeekDates,
+  type WeeklyRecap,
+} from '../../src/domain/progress/weeklyRecap';
 import { getGreeting } from '../../src/domain/greeting';
 import { classifyOccurrence, type OccurrenceState } from '../../src/domain/routines/completion';
 import { hasUnfulfilledOccurrence } from '../../src/domain/routines/recovery';
 import { applySubsetReorder } from '../../src/domain/routines/reorder';
 import { scheduleFromRoutineRow } from '../../src/domain/routines/schedule';
 import { isFirstCompletionOfDay } from '../../src/domain/streaks/appStreak';
+import { reachedStreakMilestone, streakMilestoneMessage } from '../../src/domain/streaks/milestones';
 import { compareByDateThenTime } from '../../src/domain/tasks/ordering';
 import { isDueTodayOrEarlier } from '../../src/domain/tasks/section';
 import { focusOfTheDay } from '../../src/domain/focusOfTheDay';
 import { confirmRoutineDeletion, confirmTaskDeletion } from '../../src/ui/alerts';
-import { triggerFirstCompletionOfDayHaptic } from '../../src/ui/animation/haptics';
+import {
+  triggerDayCompleteHaptic,
+  triggerFirstCompletionOfDayHaptic,
+  triggerLevelMilestoneHaptic,
+} from '../../src/ui/animation/haptics';
+import { playCompletionChime } from '../../src/ui/sound/completionSound';
 import { animateListSettle } from '../../src/ui/animation/listTransitions';
 import { pulseScale, useMilestonePulse } from '../../src/ui/animation/useMilestonePulse';
 import { mountStaggerDelayMs } from '../../src/ui/animation/useMountAnimation';
@@ -65,6 +79,7 @@ import { useReducedMotion } from '../../src/ui/animation/useReducedMotion';
 import { useRewardToast } from '../../src/ui/animation/useRewardToast';
 import { useStreakBurst } from '../../src/ui/animation/useStreakBurst';
 import { Button } from '../../src/ui/components/Button';
+import { DaypartBackdrop } from '../../src/ui/components/DaypartBackdrop';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { FocusOfTheDayCard } from '../../src/ui/components/FocusOfTheDayCard';
 import { ProgressBar } from '../../src/ui/components/ProgressBar';
@@ -73,7 +88,9 @@ import { RewardToast } from '../../src/ui/components/RewardToast';
 import { RoutineCard, type RoutineCardOccurrenceState } from '../../src/ui/components/RoutineCard';
 import { Sheet } from '../../src/ui/components/Sheet';
 import { TaskCard } from '../../src/ui/components/TaskCard';
+import { WeeklyRecapCard } from '../../src/ui/components/WeeklyRecapCard';
 import { colors, pressedFeedback, spacing, typography } from '../../src/ui/theme';
+import { daypartThemes } from '../../src/ui/theme/daypart';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('de-DE', {
   weekday: 'long',
@@ -110,6 +127,10 @@ export default function TodayScreen() {
   const [undatedTasks, setUndatedTasks] = useState<Task[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // Opt-in completion chime (T099), read from the profile on every reload so
+  // toggling it on the Me screen applies as soon as Today is refocused.
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [weeklyRecap, setWeeklyRecap] = useState<WeeklyRecap | null>(null);
   // The routine/task actions sheets are owned HERE, at screen level, and
   // opened for whichever row was tapped — never rendered inside the rows
   // themselves. A per-row Sheet puts a native Modal inside the row, and on
@@ -155,7 +176,31 @@ export default function TodayScreen() {
         setRoutineStreaks(Object.fromEntries(rows.map((row) => [row.routineId, row]))),
       ),
     );
-    ensureProfile(db).then(guard((profile) => setDisplayName(profile.displayName)));
+    ensureProfile(db).then(
+      guard((profile) => {
+        setDisplayName(profile.displayName);
+        setSoundEnabled(profile.completionSoundEnabled);
+      }),
+    );
+    // Monday's look back at last week (T096). Its own ranged query, run only
+    // on Mondays, across every non-deleted routine — paused ones included,
+    // since what was done last week still counts even if paused since.
+    if (isWeeklyRecapDay(today)) {
+      const week = previousWeekDates(today);
+      listRoutines(db)
+        .then(async (allRoutines) => {
+          const events = await listRoutineEventsInRangeForRoutines(
+            db,
+            allRoutines.map((r) => r.id),
+            week[0],
+            week[week.length - 1],
+          );
+          return buildWeeklyRecap(allRoutines, events, week);
+        })
+        .then(guard(setWeeklyRecap));
+    } else {
+      setWeeklyRecap(null);
+    }
     listOverdueTasks(db, today).then(guard(setOverdueTasks));
     listTasksForToday(db, today).then(guard(setTasksDueToday));
     listUpcomingTasks(db, today).then(guard(setUpcomingTasks));
@@ -349,7 +394,18 @@ export default function TodayScreen() {
     // the completion this card already shows is a no-op, so a repeated tap
     // can never flip a just-checked task back off.
     await setTaskCompletion(db, taskItem.id, !taskItem.isCompleted);
+    if (!taskItem.isCompleted) {
+      maybePlayChime();
+    }
     reloadWithListSettle();
+  }
+
+  // The soft chime (T099) only when the user opted in, and only for an
+  // actual completion — never for undo, skip, or move.
+  function maybePlayChime() {
+    if (soundEnabled) {
+      playCompletionChime();
+    }
   }
 
   async function handleMoveTaskToTomorrow(taskItem: Task) {
@@ -376,14 +432,34 @@ export default function TodayScreen() {
     }
   }
 
-  // "Make it satisfying" — briefly surfaces the routine's own reward
-  // ("Belohnung") when it is actually completed (complete or exceed, never
-  // undo/skip). Purely a gentle acknowledgement: it never blocks, confirms,
-  // or measures whether the reward happened (docs/DATA_MODEL.md's routine
-  // plan fields). Only routines that set a reward show anything.
-  function maybeShowReward(completedRoutine: Routine) {
-    if (completedRoutine.reward) {
-      rewardToast.showReward(completedRoutine.reward);
+  // "Make it satisfying" — after an actual completion (complete or exceed,
+  // never undo/skip) briefly surfaces either a streak milestone the
+  // completion just reached (src/domain/streaks/milestones.ts) or the
+  // routine's own reward ("Belohnung"), or both in one toast with the reward
+  // as its second line. Purely a gentle acknowledgement: it never blocks,
+  // confirms, or measures whether the reward happened. Ordinary completions
+  // without a reward or milestone stay quiet — celebrating every tap would
+  // wear the moment out.
+  function acknowledgeCompletion(completedRoutine: Routine, result: CompletionResult) {
+    // A repeated tap (unchanged streak) wrote nothing, so it plays nothing.
+    if (result.currentStreak !== result.previousStreak) {
+      maybePlayChime();
+    }
+    const milestone = reachedStreakMilestone(result.previousStreak, result.currentStreak);
+    const reward = completedRoutine.reward || undefined;
+    if (milestone !== null) {
+      rewardToast.showToast({
+        kind: 'milestone',
+        message: streakMilestoneMessage(milestone, completedRoutine.name),
+        detail: reward,
+      });
+      // The level-up haptic (RoutineCard) already marks a level crossing;
+      // never stack two milestone pulses on one tap.
+      if (!result.leveledUp) {
+        triggerLevelMilestoneHaptic();
+      }
+    } else if (reward) {
+      rewardToast.showReward(reward);
     }
   }
 
@@ -403,8 +479,12 @@ export default function TodayScreen() {
   // cross-fades into a gentle acknowledgement — fade-only, no confetti, per
   // docs/DESIGN_SYSTEM.md's Gamification and Motion sections.
   const allRoutinesDone = dueRoutines.length > 0 && completedRoutineCount === dueRoutines.length;
-  const greeting = getGreeting(new Date().getHours(), displayName);
-  const formattedDate = DATE_FORMATTER.format(new Date());
+  const now = new Date();
+  const greeting = getGreeting(now.getHours(), displayName);
+  // The header's ambient mood (sky tint, sun/moon, supportive line) follows
+  // the clock — docs/DESIGN_SYSTEM.md's Daypart Ambience section.
+  const daypart = daypartForHour(now.getHours());
+  const formattedDate = DATE_FORMATTER.format(now);
 
   const focusPrompt = focusOfTheDay(todayDateString());
 
@@ -427,12 +507,24 @@ export default function TodayScreen() {
   useEffect(() => {
     if (allRoutinesDone && hadIncompleteRoutines.current) {
       startDayCompletePulse();
+      // The day's own two-beat haptic (T099). On a one-routine day the
+      // finishing tap is also the day's first completion, which already
+      // played the first-of-day pattern — never stack two on one tap.
+      if (dueRoutines.length > 1) {
+        triggerDayCompleteHaptic();
+      }
     }
     hadIncompleteRoutines.current = dueRoutines.length > 0 && !allRoutinesDone;
   }, [allRoutinesDone, dueRoutines.length, startDayCompletePulse]);
 
   return (
-    <>
+    <View style={styles.root}>
+    <DaypartBackdrop
+      daypart={daypart}
+      reducedMotion={reducedMotion}
+      dayComplete={allRoutinesDone}
+      testID="today-daypart-backdrop"
+    />
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <View style={styles.iconRow}>
@@ -463,7 +555,17 @@ export default function TodayScreen() {
             <Text style={styles.greeting} testID="today-greeting">
               {greeting}
             </Text>
-            <Text style={styles.greetingSubtitle}>Kleine Schritte, sanfter Schwung.</Text>
+            <View style={styles.greetingSubtitleRow}>
+              <Ionicons
+                name={daypartThemes[daypart].icon}
+                size={typography.bodySmall.fontSize}
+                color={colors.textSecondary}
+                testID={`today-daypart-icon-${daypart}`}
+              />
+              <Text style={styles.greetingSubtitle} testID="today-daypart-line">
+                {allRoutinesDone ? dayCompleteLine(daypart) : daypartLine(daypart, todayDateString())}
+              </Text>
+            </View>
             <Text style={styles.date} testID="today-date">
               {formattedDate}
             </Text>
@@ -519,7 +621,13 @@ export default function TodayScreen() {
         </Animated.View>
       </View>
 
-      <FocusOfTheDayCard prompt={focusPrompt} testID="today-focus-of-the-day" />
+      {/* On Mondays the week's look-back takes the Focus card's slot rather
+          than adding a block (T096); every other day, the Focus card. */}
+      {weeklyRecap ? (
+        <WeeklyRecapCard recap={weeklyRecap} testID="today-weekly-recap" />
+      ) : (
+        <FocusOfTheDayCard prompt={focusPrompt} testID="today-focus-of-the-day" />
+      )}
 
       {dueRoutines.length === 0 && todayTasks.length === 0 && laterTasks.length === 0 ? (
         <EmptyState
@@ -561,7 +669,7 @@ export default function TodayScreen() {
                             routine.id,
                             todayDateString(),
                           );
-                          maybeShowReward(routine);
+                          acknowledgeCompletion(routine, result);
                           reloadWithListSettle();
                           return result.leveledUp;
                         }}
@@ -572,7 +680,7 @@ export default function TodayScreen() {
                             routine.id,
                             todayDateString(),
                           );
-                          maybeShowReward(routine);
+                          acknowledgeCompletion(routine, result);
                           reloadWithListSettle();
                           return result.leveledUp;
                         }}
@@ -797,18 +905,29 @@ export default function TodayScreen() {
     </Sheet>
 
     <RewardToast
-      message={rewardToast.message}
+      content={rewardToast.content}
       opacity={rewardToast.opacity}
       testID="today-reward-toast"
     />
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  // The root carries the app background so the ScrollView can stay
+  // transparent and let the daypart sky (DaypartBackdrop) show through
+  // behind the header; content scrolls over it.
+  root: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  screen: {
+    flex: 1,
+  },
+  greetingSubtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
   },
   content: {
     padding: spacing.lg,

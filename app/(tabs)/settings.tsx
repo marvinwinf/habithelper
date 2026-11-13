@@ -6,7 +6,12 @@ import { ScrollView, StyleSheet, Switch, Text, TextInput } from 'react-native';
 import { exportBackup, shareLatestSafetyBackup } from '../../src/data/backup/export';
 import { importBackup } from '../../src/data/backup/expoImport';
 import { db } from '../../src/data/db/client';
-import { ensureProfile, updateDisplayName } from '../../src/data/repositories/profileRepository';
+import {
+  ensureProfile,
+  updateCompletionSoundEnabled,
+  updateDisplayName,
+} from '../../src/data/repositories/profileRepository';
+import { playCompletionChime } from '../../src/ui/sound/completionSound';
 import {
   enableReminder,
   disableReminder,
@@ -63,6 +68,7 @@ export default function SettingsScreen() {
   const [reminderBusy, setReminderBusy] = useState(false);
   const [reminderPermissionDenied, setReminderPermissionDenied] = useState(false);
   const [reminderError, setReminderError] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,6 +78,7 @@ export default function SettingsScreen() {
         setDisplayName(profile.displayName);
         setSavedDisplayName(profile.displayName);
         setReminderEnabled(profile.reminderEnabled);
+        setSoundEnabled(profile.completionSoundEnabled);
         if (profile.reminderTime) {
           setReminderTime(profile.reminderTime);
         }
@@ -136,6 +143,24 @@ export default function SettingsScreen() {
         setReminderBusy(false);
       }
     });
+  }
+
+  // Opt-in completion chime (T099). Optimistic: the switch flips at once and
+  // a sample plays when turned on, so the user hears what they chose; a
+  // failed write puts the switch back.
+  async function handleSoundToggle(nextEnabled: boolean) {
+    if (!profileId) {
+      return;
+    }
+    setSoundEnabled(nextEnabled);
+    try {
+      await updateCompletionSoundEnabled(db, profileId, nextEnabled);
+      if (nextEnabled) {
+        playCompletionChime();
+      }
+    } catch {
+      setSoundEnabled(!nextEnabled);
+    }
   }
 
   const trimmedName = displayName.trim();
@@ -266,6 +291,25 @@ export default function SettingsScreen() {
       </Card>
 
       <Card style={styles.section}>
+        <Text style={styles.label}>Klang</Text>
+        <Text style={styles.hint}>
+          Ein leiser, kurzer Ton, wenn du etwas erledigst. Musik oder Podcasts werden nicht
+          unterbrochen.
+        </Text>
+        <Switch
+          value={soundEnabled}
+          onValueChange={handleSoundToggle}
+          disabled={!profileId}
+          trackColor={{ true: colors.accent }}
+          accessibilityLabel="Ton beim Erledigen"
+          testID="settings-sound-toggle"
+        />
+        <Text style={styles.hint} testID="settings-sound-status">
+          {soundEnabled ? 'Ton beim Erledigen ist an.' : 'Ton beim Erledigen ist aus.'}
+        </Text>
+      </Card>
+
+      <Card style={styles.section}>
         <Text style={styles.label}>Kategorien</Text>
         <NavRow
           label="Kategorien verwalten"
@@ -335,6 +379,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   title: {
+    fontFamily: typography.title.fontFamily,
     fontSize: typography.title.fontSize,
     lineHeight: typography.title.lineHeight,
     fontWeight: typography.title.fontWeight,

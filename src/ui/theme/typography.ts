@@ -1,13 +1,18 @@
 import { Platform } from 'react-native';
 
-// Type scale per docs/DESIGN_SYSTEM.md's Soft Momentum direction: one
-// friendly, highly-readable sans everywhere — hierarchy comes from weight
-// and size, not from a second display face. `serif` is kept as a token name
-// (rather than deleted) purely so `typography.display/title/streak` don't
-// need touching; it now resolves to the same rounded system sans as `sans`.
-// No custom font files are bundled in the MVP.
+// Type scale per docs/DESIGN_SYSTEM.md's Soft Momentum direction. Body and
+// functional text use the platform sans; the confident moments —
+// display/title/streak (screen titles, the greeting, streak numerals) — use
+// Quicksand, a rounded display face that carries the app's soft warmth
+// (T100). Quicksand is embedded natively at build time by expo-font's config
+// plugin (app.json) as one "Quicksand" family with real 600/700 weights, so
+// `fontWeight: '700'` selects the true bold file instead of a synthesized
+// one, and nothing has to load at runtime. `serif` is kept as the token name
+// so existing references don't need touching.
+export const DISPLAY_FONT_FAMILY = 'Quicksand';
+
 export const fontFamilies = {
-  serif: Platform.select({ android: 'sans-serif-medium', ios: 'System', default: 'System' }),
+  serif: DISPLAY_FONT_FAMILY,
   sans: Platform.select({ android: 'sans-serif', ios: 'System', default: 'System' }),
 } as const;
 

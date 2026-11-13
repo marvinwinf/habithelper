@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react-native';
 
 import {
+  MILESTONE_TOAST_HOLD_DURATION_MS,
   REWARD_TOAST_FADE_DURATION_MS,
   REWARD_TOAST_HOLD_DURATION_MS,
   useRewardToast,
@@ -46,6 +47,32 @@ describe('useRewardToast', () => {
       result.current.showReward('Zweite Belohnung');
     });
     expect(result.current.message).toBe('Zweite Belohnung');
+  });
+
+  it('holds a milestone longer than a plain reward', async () => {
+    const { result } = await renderHook(() => useRewardToast(false));
+
+    await act(() => {
+      result.current.showToast({ kind: 'milestone', message: '7× Lesen in Folge', detail: 'Kaffee' });
+    });
+    expect(result.current.content).toEqual({
+      kind: 'milestone',
+      message: '7× Lesen in Folge',
+      detail: 'Kaffee',
+    });
+
+    // A reward's full cycle has elapsed, but the milestone is still showing.
+    await act(() => {
+      jest.advanceTimersByTime(FULL_CYCLE_MS);
+    });
+    expect(result.current.message).toBe('7× Lesen in Folge');
+
+    await act(() => {
+      jest.advanceTimersByTime(
+        MILESTONE_TOAST_HOLD_DURATION_MS - REWARD_TOAST_HOLD_DURATION_MS + REWARD_TOAST_FADE_DURATION_MS,
+      );
+    });
+    expect(result.current.content).toBeNull();
   });
 
   it('honors reduced motion, still showing then clearing the message', async () => {

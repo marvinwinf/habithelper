@@ -33,6 +33,19 @@ jest.mock('expo-notifications', () => ({
   getAllScheduledNotificationsAsync: jest.fn(async () => []),
 }));
 
+// expo-audio (T099's optional completion chime) is a native module; each
+// created player is a plain object of jest.fns so tests can assert playback.
+jest.mock('expo-audio', () => ({
+  __esModule: true,
+  createAudioPlayer: jest.fn(() => ({
+    volume: 1,
+    play: jest.fn(),
+    pause: jest.fn(),
+    seekTo: jest.fn(async () => undefined),
+    remove: jest.fn(),
+  })),
+}));
+
 // @react-native-community/datetimepicker (task date field) has no real
 // TurboModule under Jest; each native spec throws just from being imported
 // unless stubbed first, which its own jest/ test helper does not do for you.

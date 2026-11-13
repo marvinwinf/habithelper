@@ -21,6 +21,7 @@ The single local profile (see `USER_MODEL.md`).
 | `display_name` | TEXT | user-editable |
 | `reminder_enabled` | INTEGER NOT NULL DEFAULT 0 | local daily reminder on/off (added by migration `0005_profile_reminder`, T092); defaulted off so pre-migration profiles never gain a reminder they did not ask for |
 | `reminder_time` | TEXT NULL | local wall-clock `HH:mm`, `NULL` until the user picks one |
+| `completion_sound_enabled` | INTEGER NOT NULL DEFAULT 0 | optional soft completion chime on/off (added by migration `0006_profile_completion_sound`, T099); defaulted off so no existing user starts hearing sounds they did not ask for. A setting only — never read by domain logic; travels in backups like the reminder columns |
 | `created_at` | TEXT | |
 
 `reminder_time` is stored as local wall-clock time, deliberately not as a UTC instant: "remind me at 20:00" must keep meaning 20:00 after the user travels or the device changes timezone. No event rows are written for reminders — the reminder is a setting, not streak-relevant behavior, so nothing in the domain layer reads these two columns. Both travel in backups automatically (`BACKUP_TABLE_NAMES` includes `profile` and serialization is `SELECT *`), and the schedule itself is re-applied from them on app start.

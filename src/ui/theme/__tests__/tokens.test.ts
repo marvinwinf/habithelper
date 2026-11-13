@@ -8,6 +8,7 @@ import {
   spacing,
   typography,
 } from '../index';
+import { DISPLAY_FONT_FAMILY } from '../typography';
 
 const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 
@@ -80,10 +81,11 @@ describe('typography tokens', () => {
     }
   });
 
-  it('gives display/title/streak extra weight for hierarchy rather than a second face', () => {
+  it('sets display/title/streak in the rounded bold display face, everything else in the sans', () => {
     const emphasisTokens = ['display', 'title', 'streak'] as const;
     for (const token of emphasisTokens) {
       expect(Number(typography[token].fontWeight)).toBeGreaterThanOrEqual(700);
+      expect(typography[token].fontFamily).toBe(DISPLAY_FONT_FAMILY);
     }
 
     const sansTokens = ['heading', 'body', 'bodySmall', 'caption', 'label'] as const;

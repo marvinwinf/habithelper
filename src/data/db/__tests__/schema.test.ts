@@ -83,6 +83,8 @@ describe('database schema shape (docs/DATA_MODEL.md)', () => {
       // user picks one.
       reminder_enabled: { notnull: 1, pk: 0 },
       reminder_time: { notnull: 0, pk: 0 },
+      // Optional completion chime (migration 0006), defaulted off.
+      completion_sound_enabled: { notnull: 1, pk: 0 },
       created_at: { notnull: 1, pk: 0 },
     });
   });

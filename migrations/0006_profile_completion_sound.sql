@@ -1,0 +1,1 @@
+ALTER TABLE `profile` ADD `completion_sound_enabled` integer DEFAULT false NOT NULL;

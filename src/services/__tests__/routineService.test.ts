@@ -396,6 +396,36 @@ describe('routineService', () => {
     });
   });
 
+  describe('streak before/after a completion', () => {
+    it('reports the streak growing by one per consecutive completion', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      const first = await completeRoutineOccurrence(db, created.id, '2026-07-01', '2026-07-01');
+      expect(first.previousStreak).toBe(0);
+      expect(first.currentStreak).toBe(1);
+
+      const second = await exceedRoutineOccurrence(db, created.id, '2026-07-02', '2026-07-02');
+      expect(second.previousStreak).toBe(1);
+      expect(second.currentStreak).toBe(2);
+
+      sqlite.close();
+    });
+
+    it('reports an unchanged streak for a repeated completion of the same occurrence', async () => {
+      const { db, sqlite } = await createDrizzleTestDb();
+      const created = await createRoutine(db, baseInput);
+
+      await completeRoutineOccurrence(db, created.id, '2026-07-01', '2026-07-01');
+      const repeat = await completeRoutineOccurrence(db, created.id, '2026-07-01', '2026-07-01');
+
+      expect(repeat.previousStreak).toBe(1);
+      expect(repeat.currentStreak).toBe(1);
+
+      sqlite.close();
+    });
+  });
+
   describe('leveledUp signal', () => {
     it('fires only on the specific completion that crosses a 66-completion boundary', async () => {
       const { db, sqlite } = await createDrizzleTestDb();

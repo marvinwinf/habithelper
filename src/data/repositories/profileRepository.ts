@@ -33,6 +33,8 @@ export async function ensureProfile(db: ProfileDb): Promise<Profile> {
     // so startup never schedules anything the user did not ask for.
     reminderEnabled: false,
     reminderTime: null,
+    // The completion chime is opt-in too (migration 0006).
+    completionSoundEnabled: false,
     createdAt: new Date().toISOString(),
   };
   await db.insert(profile).values(created);
@@ -46,6 +48,15 @@ export async function updateDisplayName(
   displayName: string,
 ): Promise<void> {
   await db.update(profile).set({ displayName }).where(eq(profile.id, id));
+}
+
+/** Persists whether the soft completion chime plays (T099). */
+export async function updateCompletionSoundEnabled(
+  db: ProfileDb,
+  id: string,
+  enabled: boolean,
+): Promise<void> {
+  await db.update(profile).set({ completionSoundEnabled: enabled }).where(eq(profile.id, id));
 }
 
 /** The persisted daily-reminder setting (T092). */

@@ -248,6 +248,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   title: {
+    fontFamily: typography.title.fontFamily,
     fontSize: typography.title.fontSize,
     lineHeight: typography.title.lineHeight,
     fontWeight: typography.title.fontWeight,

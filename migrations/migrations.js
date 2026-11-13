@@ -7,6 +7,7 @@ import m0002 from './0002_routine_plan.sql';
 import m0003 from './0003_routine_mini_version.sql';
 import m0004 from './0004_routine_habit_stack.sql';
 import m0005 from './0005_profile_reminder.sql';
+import m0006 from './0006_profile_completion_sound.sql';
 
   export default {
     journal,
@@ -16,7 +17,8 @@ m0001,
 m0002,
 m0003,
 m0004,
-m0005
+m0005,
+m0006
     }
   }
   

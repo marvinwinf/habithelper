@@ -3,7 +3,12 @@ import { mockAndroidDialogDateChange } from '@react-native-community/datetimepic
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import SettingsScreen from '../settings';
-import { ensureProfile, updateDisplayName } from '../../../src/data/repositories/profileRepository';
+import {
+  ensureProfile,
+  updateCompletionSoundEnabled,
+  updateDisplayName,
+} from '../../../src/data/repositories/profileRepository';
+import { playCompletionChime } from '../../../src/ui/sound/completionSound';
 import { exportBackup, shareLatestSafetyBackup } from '../../../src/data/backup/export';
 import { importBackup } from '../../../src/data/backup/expoImport';
 import { BackupParseError } from '../../../src/data/backup/validate';
@@ -13,6 +18,10 @@ jest.mock('../../../src/data/db/client', () => ({ db: {} }));
 jest.mock('../../../src/data/repositories/profileRepository', () => ({
   ensureProfile: jest.fn(),
   updateDisplayName: jest.fn().mockResolvedValue(undefined),
+  updateCompletionSoundEnabled: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../../../src/ui/sound/completionSound', () => ({
+  playCompletionChime: jest.fn(),
 }));
 // The real service reaches expo-notifications' native module, which cannot
 // load under Jest (docs/TEST_STRATEGY.md) — the screen's own wiring (which
@@ -39,6 +48,7 @@ const existingProfile = {
   displayName: 'Nutzer',
   reminderEnabled: false,
   reminderTime: null,
+  completionSoundEnabled: false,
   createdAt: 'x',
 };
 
@@ -212,6 +222,62 @@ describe('SettingsScreen', () => {
         ),
       );
       expect(screen.queryByTestId('settings-backup-error')).toBeNull();
+    });
+  });
+
+  describe('completion sound', () => {
+    it('defaults off and shows the off status', async () => {
+      await render(<SettingsScreen />);
+      await screen.findByDisplayValue('Nutzer');
+
+      expect(screen.getByTestId('settings-sound-toggle').props.on).toBe(false);
+      expect(screen.getByTestId('settings-sound-status').props.children).toBe(
+        'Ton beim Erledigen ist aus.',
+      );
+    });
+
+    it('turns on, persists, and plays a sample', async () => {
+      await render(<SettingsScreen />);
+      await screen.findByDisplayValue('Nutzer');
+
+      await act(async () => {
+        fireEvent(screen.getByTestId('settings-sound-toggle'), 'valueChange', true);
+      });
+
+      expect(updateCompletionSoundEnabled).toHaveBeenCalledWith({}, 'profile-1', true);
+      expect(playCompletionChime).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('settings-sound-toggle').props.on).toBe(true);
+      expect(screen.getByTestId('settings-sound-status').props.children).toBe(
+        'Ton beim Erledigen ist an.',
+      );
+    });
+
+    it('turns off without playing anything', async () => {
+      (ensureProfile as jest.Mock).mockResolvedValue({ ...existingProfile, completionSoundEnabled: true });
+      await render(<SettingsScreen />);
+      await screen.findByDisplayValue('Nutzer');
+      expect(screen.getByTestId('settings-sound-toggle').props.on).toBe(true);
+
+      await act(async () => {
+        fireEvent(screen.getByTestId('settings-sound-toggle'), 'valueChange', false);
+      });
+
+      expect(updateCompletionSoundEnabled).toHaveBeenCalledWith({}, 'profile-1', false);
+      expect(playCompletionChime).not.toHaveBeenCalled();
+      expect(screen.getByTestId('settings-sound-toggle').props.on).toBe(false);
+    });
+
+    it('reverts the switch when saving fails', async () => {
+      (updateCompletionSoundEnabled as jest.Mock).mockRejectedValueOnce(new Error('disk'));
+      await render(<SettingsScreen />);
+      await screen.findByDisplayValue('Nutzer');
+
+      await act(async () => {
+        fireEvent(screen.getByTestId('settings-sound-toggle'), 'valueChange', true);
+      });
+
+      expect(screen.getByTestId('settings-sound-toggle').props.on).toBe(false);
+      expect(playCompletionChime).not.toHaveBeenCalled();
     });
   });
 

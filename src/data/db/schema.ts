@@ -52,6 +52,12 @@ export const profile = sqliteTable('profile', {
   // "remind me at 20:00" must survive a timezone change unmoved.
   reminderEnabled: integer('reminder_enabled', { mode: 'boolean' }).notNull().default(false),
   reminderTime: text('reminder_time'),
+  // Optional soft completion chime (migration 0006). Off by default: a
+  // routines app must never start making sounds the user did not ask for,
+  // and profiles created before the migration keep it off.
+  completionSoundEnabled: integer('completion_sound_enabled', { mode: 'boolean' })
+    .notNull()
+    .default(false),
   createdAt: text('created_at').notNull(),
 });
 

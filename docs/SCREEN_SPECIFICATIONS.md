@@ -35,7 +35,8 @@ Sections must not all carry equal visual weight — spacing, type size/weight, a
 ### Header
 
 - Leading shortcuts icon (opens a small sheet linking to Kategorien verwalten and Me); trailing bell icon navigates straight to Me's "Erinnerung" section (T093) — the entry point for the local daily reminder (T092), not a push-notification placeholder, per `docs/MVP_SCOPE.md`.
-- Time-based greeting, for example "Guten Morgen, Marvin", with a short static subtitle line under it.
+- Time-based greeting, for example "Guten Morgen, Marvin", with a short supportive subtitle line under it. The line and a small leading glyph follow the daypart (morning 05–10, day 11–16, evening 17–21, night 22–04) and rotate by day of year — invitations only, never naming undone work (`src/domain/daypart.ts`).
+- Daypart ambience behind the header: a pale sky tint fading into the background plus a soft sun/moon glow behind the top-right corner, fading/rising in once on mount (never looping). Decorative only — hidden from screen readers, never intercepts touches. See `docs/DESIGN_SYSTEM.md`'s Daypart Ambience.
 - Current date.
 - Subtle overall app streak.
 - Daily routine progress only. Once every due routine is completed, the count label fades into a quiet "Alle erledigt" acknowledgement — the day's one gentle milestone moment (see `docs/DESIGN_SYSTEM.md`'s Gamification).
@@ -44,6 +45,12 @@ Sections must not all carry equal visual weight — spacing, type size/weight, a
 ### Focus of the Day
 
 A card between the header and the routine list: accent-tinted, short "Fokus des Tages" label, a one-line rotating prompt (static list keyed by day-of-year), and a placeholder decorative icon/illustration. See `docs/DESIGN_SYSTEM.md`'s Focus of the Day section.
+
+On Mondays, when last week (Mon–Sun) holds at least one completion, this slot shows the **weekly look-back** instead (T096): "Deine letzte Woche", the completion count, "an N von 7 Tagen · am beständigsten: <Routine> (N×)", and one warm sentence. Counts every non-deleted routine (paused ones included — what was done still counts); undone (superseded), missed, and skipped events never count. An empty week keeps the Focus card.
+
+### Day Complete
+
+When every due routine is done, the header's daypart line becomes the daypart's closing line (e.g. "Alles erledigt. Der Rest des Tages ist frei.") and the backdrop glow turns sage (T098). The completing tap also plays the two-beat day-complete haptic — except on a one-routine day, where that same tap already played the first-of-day pattern.
 
 ### Content Order
 
@@ -76,6 +83,8 @@ Interactions:
 The actions bottom sheet is the one place a routine's non-completion actions live — the row itself carries only the completion control (see `docs/DESIGN_SYSTEM.md`'s List Row Actions). It contains: **Statistik** (opens the full Routine Detail — streak, level, calendar), **move to tomorrow** and **conscious skip** (today's occurrence, shown only while it is unresolved and, for skip, allowed), **edit**, **pause**, and **delete** (destructive, confirmed).
 
 Completed routines remain visible in a subdued completed state and move toward the end of the section.
+
+Completion acknowledgement (a fade-only toast near the bottom, never blocking): when a completion carries the routine's streak across a milestone (3, 7, 14, 21, 30, 50, 66, 100, 150, 200, 365 — `src/domain/streaks/milestones.ts`), the toast shows a supportive milestone line with a light milestone haptic, and the routine's reward ("Belohnung"), if set, as its second line. Without a milestone, only a set reward is shown. Ordinary completions stay quiet, and a repeated tap that leaves the streak unchanged never re-announces a milestone. With the optional chime switched on (Me → Klang), every actual routine or task completion on Today also plays the soft chime; undo, skip, and move never do.
 
 ### Task Card
 
@@ -182,7 +191,7 @@ Each routine card shows:
 
 - name,
 - category treatment,
-- current streak.
+- current streak, with its growth glyph (seed → sprout → leaf → bud → bloom → rose, see `docs/DESIGN_SYSTEM.md`'s Growing Streak Glyph).
 
 Interactions:
 
@@ -277,4 +286,5 @@ Reachable from the bottom navigation as **Me**. Contains:
 - category management,
 - export backup,
 - import backup,
+- Klang section (T099): one switch for the optional soft completion chime, off by default, with a status line ("Ton beim Erledigen ist an/aus."). Turning it on saves immediately and plays the chime once as a sample; a failed save puts the switch back. The Today screen picks up the change on its next focus.
 - Erinnerung section (T093): an on/off toggle plus a time button (disabled while off) showing the active time or "Erinnerungen sind aus.". Toggling on requests the OS notification permission once via `reminderService` (T092); a denial returns the toggle to off and shows a plain explanation with a hint to enable it in system settings, never a native error. The time button opens the same native Android time picker used by the routine/task forms (`DateTimePickerAndroid`, mode `time`) and reschedules immediately on a new pick. The Today header's bell (above) is this section's entry point.
