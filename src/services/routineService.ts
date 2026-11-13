@@ -246,6 +246,11 @@ export interface CompletionResult {
   // (docs/ROUTINE_RULES.md's Levels section) — the signal T042's level-up
   // milestone animation fires on, exactly once, on the crossing completion.
   readonly leveledUp: boolean;
+  // The routine's streak immediately before and after this completion — the
+  // pair the Today screen's streak-milestone acknowledgement compares
+  // (src/domain/streaks/milestones.ts). Equal when nothing was written.
+  readonly previousStreak: number;
+  readonly currentStreak: number;
 }
 
 /**
@@ -273,16 +278,22 @@ function writeCompletionEventTx(
     // Data), double-counting the streak, level progress, and joker-earning
     // for a single calendar day. No new event, no cache change: return the
     // completion already on record, and never a spurious `leveledUp`.
-    const existingCompletion = findActiveCompletionEventTx(tx, routineId, occurrenceDate);
-    if (existingCompletion) {
-      return { event: existingCompletion, leveledUp: false };
-    }
-
     const [previousCache] = tx
       .select()
       .from(routineStateCache)
       .where(eq(routineStateCache.routineId, routineId))
       .all();
+    const previousStreak = previousCache?.currentStreak ?? 0;
+
+    const existingCompletion = findActiveCompletionEventTx(tx, routineId, occurrenceDate);
+    if (existingCompletion) {
+      return {
+        event: existingCompletion,
+        leveledUp: false,
+        previousStreak,
+        currentStreak: previousStreak,
+      };
+    }
 
     const event = buildRoutineEvent({ routineId, occurrenceDate, eventType });
     tx.insert(routineEvent).values(event).run();
@@ -290,7 +301,12 @@ function writeCompletionEventTx(
     const newCache = recomputeRoutineCacheTx(tx, routineId);
     recomputeAppStreakCacheTx(tx, today);
 
-    return { event, leveledUp: newCache.levelRank > (previousCache?.levelRank ?? 0) };
+    return {
+      event,
+      leveledUp: newCache.levelRank > (previousCache?.levelRank ?? 0),
+      previousStreak,
+      currentStreak: newCache.currentStreak,
+    };
   });
 }
 

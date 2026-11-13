@@ -28,7 +28,11 @@ import {
   undoRoutineSkip,
 } from '../../../src/services/routineService';
 import { deleteTask, moveTask, setTaskCompletion } from '../../../src/services/taskService';
-import { triggerFirstCompletionOfDayHaptic } from '../../../src/ui/animation/haptics';
+import { daypartLine, type Daypart } from '../../../src/domain/daypart';
+import {
+  triggerFirstCompletionOfDayHaptic,
+  triggerLevelMilestoneHaptic,
+} from '../../../src/ui/animation/haptics';
 
 jest.mock('../../../src/data/db/client', () => ({ db: {} }));
 jest.mock('../../../src/data/repositories/categoryRepository', () => ({
@@ -58,8 +62,12 @@ jest.mock('../../../src/data/repositories/taskRepository', () => ({
   listCompletedTasks: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('../../../src/services/routineService', () => ({
-  completeRoutineOccurrence: jest.fn().mockResolvedValue({ event: undefined, leveledUp: false }),
-  exceedRoutineOccurrence: jest.fn().mockResolvedValue({ event: undefined, leveledUp: false }),
+  completeRoutineOccurrence: jest
+    .fn()
+    .mockResolvedValue({ event: undefined, leveledUp: false, previousStreak: 0, currentStreak: 1 }),
+  exceedRoutineOccurrence: jest
+    .fn()
+    .mockResolvedValue({ event: undefined, leveledUp: false, previousStreak: 0, currentStreak: 1 }),
   moveRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
   skipRoutineOccurrence: jest.fn().mockResolvedValue(undefined),
   pauseRoutine: jest.fn().mockResolvedValue(undefined),
@@ -385,6 +393,91 @@ describe('TodayScreen', () => {
 
     expect(completeRoutineOccurrence).toHaveBeenCalledWith({}, dailyRoutine.id, TODAY);
     expect(screen.queryByTestId('today-reward-toast')).toBeNull();
+    expect(triggerLevelMilestoneHaptic).not.toHaveBeenCalled();
+  });
+
+  it('acknowledges a streak milestone the completion just reached', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
+    (completeRoutineOccurrence as jest.Mock).mockResolvedValueOnce({
+      event: undefined,
+      leveledUp: false,
+      previousStreak: 6,
+      currentStreak: 7,
+    });
+
+    await renderToday();
+    const control = await screen.findByTestId(`routine-card-${dailyRoutine.id}-complete`);
+    await fireEvent(control, 'pressIn');
+    await fireEvent(control, 'pressOut');
+
+    const toastText = await screen.findByTestId('today-reward-toast-text');
+    expect(toastText.props.children).toBe('7× Laufen in Folge. Schön drangeblieben!');
+    expect(screen.getByTestId('today-reward-toast-icon-milestone')).toBeTruthy();
+    expect(screen.queryByTestId('today-reward-toast-detail')).toBeNull();
+    expect(triggerLevelMilestoneHaptic).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the reward beneath a milestone when both apply', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([rewardRoutine]);
+    (completeRoutineOccurrence as jest.Mock).mockResolvedValueOnce({
+      event: undefined,
+      leveledUp: false,
+      previousStreak: 2,
+      currentStreak: 3,
+    });
+
+    await renderToday();
+    const control = await screen.findByTestId(`routine-card-${rewardRoutine.id}-complete`);
+    await fireEvent(control, 'pressIn');
+    await fireEvent(control, 'pressOut');
+
+    expect((await screen.findByTestId('today-reward-toast-text')).props.children).toBe(
+      '3× Lesen in Folge — ein guter Anfang.',
+    );
+    expect(screen.getByTestId('today-reward-toast-detail').props.children).toBe(
+      'Danach ein Kaffee',
+    );
+  });
+
+  it('stays quiet when a repeated tap leaves the streak unchanged', async () => {
+    (listRoutines as jest.Mock).mockResolvedValue([dailyRoutine]);
+    (completeRoutineOccurrence as jest.Mock).mockResolvedValueOnce({
+      event: undefined,
+      leveledUp: false,
+      previousStreak: 7,
+      currentStreak: 7,
+    });
+
+    await renderToday();
+    const control = await screen.findByTestId(`routine-card-${dailyRoutine.id}-complete`);
+    await fireEvent(control, 'pressIn');
+    await fireEvent(control, 'pressOut');
+
+    await waitFor(() => expect(completeRoutineOccurrence).toHaveBeenCalled());
+    expect(screen.queryByTestId('today-reward-toast')).toBeNull();
+    expect(triggerLevelMilestoneHaptic).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [8, 'morning'],
+    [13, 'day'],
+    [19, 'evening'],
+    [23, 'night'],
+  ])('sets the header mood for %i:00 (%s)', async (hour, daypart) => {
+    (listRoutines as jest.Mock).mockResolvedValue([]);
+    const spy = jest.spyOn(Date.prototype, 'getHours').mockReturnValue(hour);
+
+    await renderToday();
+
+    expect(await screen.findByTestId(`today-daypart-icon-${daypart}`)).toBeTruthy();
+    // Decorative and hidden from screen readers by design.
+    expect(
+      screen.getByTestId('today-daypart-backdrop', { includeHiddenElements: true }),
+    ).toBeTruthy();
+    expect(screen.getByTestId('today-daypart-line').props.children).toBe(
+      daypartLine(daypart as Daypart, TODAY),
+    );
+    spy.mockRestore();
   });
 
   it('moves a routine to tomorrow from the screen-level actions sheet', async () => {

@@ -35,7 +35,8 @@ Sections must not all carry equal visual weight — spacing, type size/weight, a
 ### Header
 
 - Leading shortcuts icon (opens a small sheet linking to Kategorien verwalten and Me); trailing bell icon navigates straight to Me's "Erinnerung" section (T093) — the entry point for the local daily reminder (T092), not a push-notification placeholder, per `docs/MVP_SCOPE.md`.
-- Time-based greeting, for example "Guten Morgen, Marvin", with a short static subtitle line under it.
+- Time-based greeting, for example "Guten Morgen, Marvin", with a short supportive subtitle line under it. The line and a small leading glyph follow the daypart (morning 05–10, day 11–16, evening 17–21, night 22–04) and rotate by day of year — invitations only, never naming undone work (`src/domain/daypart.ts`).
+- Daypart ambience behind the header: a pale sky tint fading into the background plus a soft sun/moon glow behind the top-right corner, fading/rising in once on mount (never looping). Decorative only — hidden from screen readers, never intercepts touches. See `docs/DESIGN_SYSTEM.md`'s Daypart Ambience.
 - Current date.
 - Subtle overall app streak.
 - Daily routine progress only. Once every due routine is completed, the count label fades into a quiet "Alle erledigt" acknowledgement — the day's one gentle milestone moment (see `docs/DESIGN_SYSTEM.md`'s Gamification).
@@ -76,6 +77,8 @@ Interactions:
 The actions bottom sheet is the one place a routine's non-completion actions live — the row itself carries only the completion control (see `docs/DESIGN_SYSTEM.md`'s List Row Actions). It contains: **Statistik** (opens the full Routine Detail — streak, level, calendar), **move to tomorrow** and **conscious skip** (today's occurrence, shown only while it is unresolved and, for skip, allowed), **edit**, **pause**, and **delete** (destructive, confirmed).
 
 Completed routines remain visible in a subdued completed state and move toward the end of the section.
+
+Completion acknowledgement (a fade-only toast near the bottom, never blocking): when a completion carries the routine's streak across a milestone (3, 7, 14, 21, 30, 50, 66, 100, 150, 200, 365 — `src/domain/streaks/milestones.ts`), the toast shows a supportive milestone line with a light milestone haptic, and the routine's reward ("Belohnung"), if set, as its second line. Without a milestone, only a set reward is shown. Ordinary completions stay quiet, and a repeated tap that leaves the streak unchanged never re-announces a milestone.
 
 ### Task Card
 

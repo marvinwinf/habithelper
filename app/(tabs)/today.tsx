@@ -43,21 +43,27 @@ import {
   skipRoutineOccurrence,
   undoRoutineCompletion,
   undoRoutineSkip,
+  type CompletionResult,
 } from '../../src/services/routineService';
 import { deleteTask, moveTask, setTaskCompletion } from '../../src/services/taskService';
 import { subscribeToDayRollover } from '../../src/state/appDayRollover';
 import { addDaysToDateString, todayDateString } from '../../src/domain/dates';
+import { daypartForHour, daypartLine } from '../../src/domain/daypart';
 import { getGreeting } from '../../src/domain/greeting';
 import { classifyOccurrence, type OccurrenceState } from '../../src/domain/routines/completion';
 import { hasUnfulfilledOccurrence } from '../../src/domain/routines/recovery';
 import { applySubsetReorder } from '../../src/domain/routines/reorder';
 import { scheduleFromRoutineRow } from '../../src/domain/routines/schedule';
 import { isFirstCompletionOfDay } from '../../src/domain/streaks/appStreak';
+import { reachedStreakMilestone, streakMilestoneMessage } from '../../src/domain/streaks/milestones';
 import { compareByDateThenTime } from '../../src/domain/tasks/ordering';
 import { isDueTodayOrEarlier } from '../../src/domain/tasks/section';
 import { focusOfTheDay } from '../../src/domain/focusOfTheDay';
 import { confirmRoutineDeletion, confirmTaskDeletion } from '../../src/ui/alerts';
-import { triggerFirstCompletionOfDayHaptic } from '../../src/ui/animation/haptics';
+import {
+  triggerFirstCompletionOfDayHaptic,
+  triggerLevelMilestoneHaptic,
+} from '../../src/ui/animation/haptics';
 import { animateListSettle } from '../../src/ui/animation/listTransitions';
 import { pulseScale, useMilestonePulse } from '../../src/ui/animation/useMilestonePulse';
 import { mountStaggerDelayMs } from '../../src/ui/animation/useMountAnimation';
@@ -65,6 +71,7 @@ import { useReducedMotion } from '../../src/ui/animation/useReducedMotion';
 import { useRewardToast } from '../../src/ui/animation/useRewardToast';
 import { useStreakBurst } from '../../src/ui/animation/useStreakBurst';
 import { Button } from '../../src/ui/components/Button';
+import { DaypartBackdrop } from '../../src/ui/components/DaypartBackdrop';
 import { EmptyState } from '../../src/ui/components/EmptyState';
 import { FocusOfTheDayCard } from '../../src/ui/components/FocusOfTheDayCard';
 import { ProgressBar } from '../../src/ui/components/ProgressBar';
@@ -74,6 +81,7 @@ import { RoutineCard, type RoutineCardOccurrenceState } from '../../src/ui/compo
 import { Sheet } from '../../src/ui/components/Sheet';
 import { TaskCard } from '../../src/ui/components/TaskCard';
 import { colors, pressedFeedback, spacing, typography } from '../../src/ui/theme';
+import { daypartThemes } from '../../src/ui/theme/daypart';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('de-DE', {
   weekday: 'long',
@@ -376,14 +384,30 @@ export default function TodayScreen() {
     }
   }
 
-  // "Make it satisfying" — briefly surfaces the routine's own reward
-  // ("Belohnung") when it is actually completed (complete or exceed, never
-  // undo/skip). Purely a gentle acknowledgement: it never blocks, confirms,
-  // or measures whether the reward happened (docs/DATA_MODEL.md's routine
-  // plan fields). Only routines that set a reward show anything.
-  function maybeShowReward(completedRoutine: Routine) {
-    if (completedRoutine.reward) {
-      rewardToast.showReward(completedRoutine.reward);
+  // "Make it satisfying" — after an actual completion (complete or exceed,
+  // never undo/skip) briefly surfaces either a streak milestone the
+  // completion just reached (src/domain/streaks/milestones.ts) or the
+  // routine's own reward ("Belohnung"), or both in one toast with the reward
+  // as its second line. Purely a gentle acknowledgement: it never blocks,
+  // confirms, or measures whether the reward happened. Ordinary completions
+  // without a reward or milestone stay quiet — celebrating every tap would
+  // wear the moment out.
+  function acknowledgeCompletion(completedRoutine: Routine, result: CompletionResult) {
+    const milestone = reachedStreakMilestone(result.previousStreak, result.currentStreak);
+    const reward = completedRoutine.reward || undefined;
+    if (milestone !== null) {
+      rewardToast.showToast({
+        kind: 'milestone',
+        message: streakMilestoneMessage(milestone, completedRoutine.name),
+        detail: reward,
+      });
+      // The level-up haptic (RoutineCard) already marks a level crossing;
+      // never stack two milestone pulses on one tap.
+      if (!result.leveledUp) {
+        triggerLevelMilestoneHaptic();
+      }
+    } else if (reward) {
+      rewardToast.showReward(reward);
     }
   }
 
@@ -403,8 +427,12 @@ export default function TodayScreen() {
   // cross-fades into a gentle acknowledgement — fade-only, no confetti, per
   // docs/DESIGN_SYSTEM.md's Gamification and Motion sections.
   const allRoutinesDone = dueRoutines.length > 0 && completedRoutineCount === dueRoutines.length;
-  const greeting = getGreeting(new Date().getHours(), displayName);
-  const formattedDate = DATE_FORMATTER.format(new Date());
+  const now = new Date();
+  const greeting = getGreeting(now.getHours(), displayName);
+  // The header's ambient mood (sky tint, sun/moon, supportive line) follows
+  // the clock — docs/DESIGN_SYSTEM.md's Daypart Ambience section.
+  const daypart = daypartForHour(now.getHours());
+  const formattedDate = DATE_FORMATTER.format(now);
 
   const focusPrompt = focusOfTheDay(todayDateString());
 
@@ -432,7 +460,8 @@ export default function TodayScreen() {
   }, [allRoutinesDone, dueRoutines.length, startDayCompletePulse]);
 
   return (
-    <>
+    <View style={styles.root}>
+    <DaypartBackdrop daypart={daypart} reducedMotion={reducedMotion} testID="today-daypart-backdrop" />
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <View style={styles.iconRow}>
@@ -463,7 +492,17 @@ export default function TodayScreen() {
             <Text style={styles.greeting} testID="today-greeting">
               {greeting}
             </Text>
-            <Text style={styles.greetingSubtitle}>Kleine Schritte, sanfter Schwung.</Text>
+            <View style={styles.greetingSubtitleRow}>
+              <Ionicons
+                name={daypartThemes[daypart].icon}
+                size={typography.bodySmall.fontSize}
+                color={colors.textSecondary}
+                testID={`today-daypart-icon-${daypart}`}
+              />
+              <Text style={styles.greetingSubtitle} testID="today-daypart-line">
+                {daypartLine(daypart, todayDateString())}
+              </Text>
+            </View>
             <Text style={styles.date} testID="today-date">
               {formattedDate}
             </Text>
@@ -561,7 +600,7 @@ export default function TodayScreen() {
                             routine.id,
                             todayDateString(),
                           );
-                          maybeShowReward(routine);
+                          acknowledgeCompletion(routine, result);
                           reloadWithListSettle();
                           return result.leveledUp;
                         }}
@@ -572,7 +611,7 @@ export default function TodayScreen() {
                             routine.id,
                             todayDateString(),
                           );
-                          maybeShowReward(routine);
+                          acknowledgeCompletion(routine, result);
                           reloadWithListSettle();
                           return result.leveledUp;
                         }}
@@ -797,18 +836,29 @@ export default function TodayScreen() {
     </Sheet>
 
     <RewardToast
-      message={rewardToast.message}
+      content={rewardToast.content}
       opacity={rewardToast.opacity}
       testID="today-reward-toast"
     />
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  // The root carries the app background so the ScrollView can stay
+  // transparent and let the daypart sky (DaypartBackdrop) show through
+  // behind the header; content scrolls over it.
+  root: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  screen: {
+    flex: 1,
+  },
+  greetingSubtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
   },
   content: {
     padding: spacing.lg,

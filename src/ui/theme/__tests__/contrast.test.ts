@@ -1,5 +1,6 @@
 import { colors, colorsDark } from '../index';
 import { categoryPalette, getCategorySolidFill } from '../categoryVariant';
+import { daypartThemes } from '../daypart';
 
 // WCAG 2.1 relative luminance + contrast ratio, so the documented token
 // pairings (docs/ACCESSIBILITY.md) stay regression-proof: a future tweak to a
@@ -84,6 +85,14 @@ describe('token contrast (WCAG AA)', () => {
     it.each(DARK_PAIRINGS)('$name meets its AA bar', ({ fg, bg, min }) => {
       expect(contrastRatio(colorsDark[fg], colorsDark[bg])).toBeGreaterThanOrEqual(min);
     });
+  });
+
+  it('keeps header text readable on every daypart sky tint (Today header)', () => {
+    for (const { sky } of Object.values(daypartThemes)) {
+      expect(contrastRatio(colors.textPrimary, sky)).toBeGreaterThanOrEqual(NORMAL);
+      expect(contrastRatio(colors.textSecondary, sky)).toBeGreaterThanOrEqual(NORMAL);
+      expect(contrastRatio(colors.accent, sky)).toBeGreaterThanOrEqual(NORMAL);
+    }
   });
 
   it('keeps "missed" above the graphic bar on every light surface (glyph/dot use only, never small text)', () => {

@@ -121,3 +121,47 @@ confirm the graceful revert, then grant and confirm the time shows and persists 
 a restart.
 **Dependencies:** T092.
 **Commit message:** `feat(reminders): add reminder controls to the Me screen`
+
+### T094 — Daypart ambience on the Today header
+**Goal:** the Today screen stops looking identical at every hour. Its header gets a
+pale daypart sky tint, a soft sun/moon glow, and a rotating supportive line with a
+small daypart glyph, so opening the app feels alive through the day. Presentation
+only — no schema change.
+**Files/areas:** new `src/domain/daypart.ts` (hour → daypart, rotating lines),
+new `src/ui/theme/daypart.ts` (tints from existing pastel families), new
+`src/ui/components/DaypartBackdrop.tsx` (SVG wash + glow, one fade-and-rise, no
+loop), `app/(tabs)/today.tsx`, `docs/DESIGN_SYSTEM.md` (Daypart Ambience exception),
+`docs/SCREEN_SPECIFICATIONS.md`.
+**Acceptance criteria:** daypart boundaries morning 05–10 / day 11–16 / evening
+17–21 / night 22–04; header text keeps AA contrast on every tint; backdrop is
+hidden from accessibility and never intercepts touches; reduced motion shows it
+instantly; lines never name undone work or streak risk.
+**Required automated tests:** `daypart.test.ts` (boundaries, determinism, rotation,
+tone), contrast test for each sky tint, `today.test.tsx` per-daypart rendering.
+**Manual verification:** on-device, change the system clock across the four
+dayparts and confirm the tint, glow, glyph, and line change; scroll and confirm
+cards pass smoothly over the wash.
+**Dependencies:** T048 (greeting), T060 (react-native-svg).
+**Commit message:** `feat(today): add daypart ambience to the header`
+
+### T095 — Streak milestone acknowledgement
+**Goal:** completing a routine that carries its streak across a milestone
+(3, 7, 14, 21, 30, 50, 66, 100, 150, 200, 365) gets one gentle, supportive line in
+the completion toast plus a light haptic; the routine's reward, if any, becomes the
+toast's second line. Ordinary completions stay quiet.
+**Files/areas:** new `src/domain/streaks/milestones.ts`, `src/services/routineService.ts`
+(`CompletionResult` gains `previousStreak`/`currentStreak`), `src/ui/animation/useRewardToast.ts`
+(`showToast` with kind + detail, longer milestone hold), `src/ui/components/RewardToast.tsx`,
+`app/(tabs)/today.tsx`, docs.
+**Acceptance criteria:** fires only on a threshold crossing, never on a repeated tap
+(unchanged streak); no stacked haptic when the same tap also levels up; copy is
+never loss-framed; toast is announced politely to screen readers.
+**Required automated tests:** `milestones.test.ts`, service tests for the streak
+pair (including the idempotent repeat), toast hook/component tests, Today tests for
+milestone, milestone + reward, and repeated-tap silence.
+**Manual verification:** with seed data, complete a routine sitting at streak 6
+and confirm the "7×" toast and haptic; complete one at streak 2 with a reward and
+confirm both lines; double-tap quickly and confirm only one toast (an undo followed
+by a fresh completion is a genuine re-crossing and may show it again).
+**Dependencies:** T041/T042 (completion feedback), the reward toast.
+**Commit message:** `feat(today): acknowledge streak milestones on completion`

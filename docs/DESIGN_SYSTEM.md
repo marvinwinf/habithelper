@@ -139,6 +139,16 @@ Soft Momentum's "one accent, category tint stays on its own card" rule governs e
 - every chart still sits on the warm off-white/cream surface tokens, uses the same rounded-card geometry, and keeps text at the standard `textPrimary`/`textSecondary` tokens,
 - category-tinted routine/task rows on Today, Plan, and the Routines list keep the existing one-dominant-color-per-card rule untouched.
 
+## Daypart Ambience (Today header)
+
+The Today header's mood follows the clock so the app feels alive across the day rather than identical at 7:00 and 22:00. A third, narrowly scoped color exception alongside the Dashboard one above:
+
+- a pale sky wash at the top of the Today screen that fades into `background`, tinted from the existing pastel families — morning `apricot.lighter`, day `skyBlue.lighter`, evening `softPeach.lighter`, night `lavender.lighter` (`src/ui/theme/daypart.ts`),
+- a soft radial sun/moon glow behind the header's top-right corner, and a small matching Ionicons glyph beside the supportive subtitle line,
+- the subtitle line itself rotates per daypart and day of year (`src/domain/daypart.ts`).
+
+Constraints: it lives only behind the Today header — never on cards, the tab bar, buttons, or other screens; header text stays on `textPrimary`/`textSecondary`/`accent`, and each sky tint is contrast-tested for all three (`contrast.test.ts`); it is purely decorative (hidden from screen readers, no touch handling); motion is one short fade-and-rise on mount or daypart change — never a loop — and reduced motion shows it instantly.
+
 ## Focus of the Day
 
 A small daily-highlight card on the Today screen, above the routine list: an accent-tinted (sage) card with a short label ("Fokus des Tages") and a one-line prompt, plus a decorative placeholder icon/illustration. Content is a rotating static list keyed by day-of-year in the MVP — no personalization or backend involved.
@@ -166,6 +176,7 @@ The Progress screen's hero streak uses a circular ring (filled arc, `accent`-col
 ## Gamification
 
 - Streaks, weekly completion summaries, and gentle milestone text are the full extent of gamification — no points/currency, no leaderboards, no countdown pressure.
+- Streak milestones (3, 7, 14, 21, 30, 50, 66, 100, 150, 200, 365 — `src/domain/streaks/milestones.ts`) get one supportive line in the completion toast (sparkles glyph, longer hold than a reward) plus the light milestone haptic. Only threshold crossings speak up — ordinary completions stay quiet so the moment keeps its meaning. Copy names what the user did, never what they could lose.
 - A broken streak is communicated neutrally (the `missed` taupe, a plain count reset) — never a loss-framed message or a red warning state.
 
 ## Accessibility
